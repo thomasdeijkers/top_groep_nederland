@@ -79,6 +79,7 @@ def validate_timesheet(timesheet_id: int, principal_id: int | None, project_id: 
             relation_id, work_date, hours, parsed_fields = row
             parsed_fields = parsed_fields or {}
             hours = hours or _hours_from_fields(parsed_fields)
+            payroll_cao_setting_id = _project_cao_setting_id(cursor, project_id)
 
             cursor.execute(
                 """
@@ -96,11 +97,11 @@ def validate_timesheet(timesheet_id: int, principal_id: int | None, project_id: 
                 """
                 INSERT INTO project_time_bookings (
                     timesheet_inbox_id, relation_id, principal_id, project_id,
-                    work_date, hours, status, updated_at
+                    payroll_cao_setting_id, work_date, hours, status, updated_at
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, 'loon_te_berekenen', NOW());
+                VALUES (%s, %s, %s, %s, %s, %s, %s, 'loon_te_berekenen', NOW());
                 """,
-                (timesheet_id, relation_id, principal_id, project_id, work_date, hours),
+                (timesheet_id, relation_id, principal_id, project_id, payroll_cao_setting_id, work_date, hours),
             )
         conn.commit()
 
@@ -137,6 +138,21 @@ def _hours_from_fields(parsed_fields: dict):
         return str(total).replace(",", ".") if str(total or "").strip() else None
     except Exception:
         return None
+
+
+def _project_cao_setting_id(cursor, project_id: int | None):
+    if not project_id:
+        return None
+    cursor.execute(
+        """
+        SELECT payroll_cao_setting_id
+        FROM vacancies
+        WHERE id = %s;
+        """,
+        (project_id,),
+    )
+    row = cursor.fetchone()
+    return row[0] if row else None
 
 
 def _decimal_or_none(value):

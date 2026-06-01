@@ -7,6 +7,7 @@
             {% if active_page == 'overview' %}Top Groep Nederland Dashboard
             {% elif active_page == 'relations' %}Relaties - Top Groep Nederland
             {% elif active_page == 'vacancies' %}Vacatures - Top Groep Nederland
+            {% elif active_page == 'projects' %}Projecten - Top Groep Nederland
             {% elif active_page == 'tickets' %}Tickets - Top Groep Nederland
             {% elif active_page == 'timesheets' %}Urenverwerking - Top Groep Nederland
             {% elif active_page == 'server' %}Server info - Top Groep Nederland
@@ -35,6 +36,7 @@
                     <a class="side-nav__item {% if active_page == 'overview' %}side-nav__item--active{% endif %}" href="/dashboard">Overzicht</a>
                     <a class="side-nav__item {% if active_page == 'relations' %}side-nav__item--active{% endif %}" href="/dashboard/relations">Relaties</a>
                     <a class="side-nav__item {% if active_page == 'vacancies' %}side-nav__item--active{% endif %}" href="/dashboard/vacancies">Vacatures</a>
+                    <a class="side-nav__item {% if active_page == 'projects' %}side-nav__item--active{% endif %}" href="/dashboard/projects">Projecten</a>
                     <a class="side-nav__item {% if active_page == 'tickets' %}side-nav__item--active{% endif %}" href="/dashboard/tickets">Tickets</a>
                     <a class="side-nav__item {% if active_page == 'timesheets' %}side-nav__item--active{% endif %}" href="/dashboard/timesheets">Urenverwerking</a>
                     <a class="side-nav__item {% if active_page == 'server' %}side-nav__item--active{% endif %}" href="/dashboard/server">Server info</a>
@@ -58,6 +60,7 @@
                             {% if active_page == 'overview' %}Dashboard
                             {% elif active_page == 'relations' %}Relaties
                             {% elif active_page == 'vacancies' %}Vacatures
+                            {% elif active_page == 'projects' %}Projecten
                             {% elif active_page == 'tickets' %}Tickets
                             {% elif active_page == 'timesheets' %}Urenverwerking
                             {% elif active_page == 'server' %}Server info
@@ -68,6 +71,7 @@
                             {% if active_page == 'overview' %}Het centrale overzicht met aantallen, signalen en snelle ingangen naar de werkmodules.
                             {% elif active_page == 'relations' %}Beheer kandidaten en opdrachtgevers op één plek, inclusief contactgegevens, status en koppelingen met vacatures en urenstaten.
                             {% elif active_page == 'vacancies' %}Beheer openstaande vacatures voor publicatie richting website, Indeed en matching met kandidaten.
+                            {% elif active_page == 'projects' %}Maak projecten aan en gebruik ze direct bij de urenverwerking.
                             {% elif active_page == 'tickets' %}Verzamel opvolgwerk uit e-mail, WhatsApp en urencontrole in een centrale takenlijst.
                             {% elif active_page == 'timesheets' %}Verwerk urenbriefjes uit WhatsApp, e-mail, servermap of handmatige testupload.
                             {% elif active_page == 'server' %}Controleer de technische status van dit dashboarddeel en de geplande achtergrondtaken.
@@ -216,6 +220,77 @@
                                             <small>Gebruiker - rol nog te bepalen</small>
                                         </div>
                                     </article>
+                                </div>
+                            </section>
+
+                            <section class="settings-card settings-card--wide" id="cao-instellingen">
+                                <div>
+                                    <p class="section-label">Verloning</p>
+                                    <h2>CAO instellingen</h2>
+                                    <p>Leg de basisregels handmatig vast. Deze regels kunnen later worden gebruikt in de stap Loon berekenen en eventueel via een externe bron worden bijgewerkt.</p>
+                                </div>
+
+                                <form class="payroll-settings-form" action="/api/settings/cao" method="post">
+                                    <label>Naam CAO / regelset <input type="text" name="name" placeholder="Bijvoorbeeld Bouw & Infra" required></label>
+                                    <label>Versie <input type="text" name="version_label" placeholder="2026 periode 5"></label>
+                                    <label>Geldig vanaf <input type="date" name="effective_from"></label>
+                                    <label>Geldig tot <input type="date" name="effective_until"></label>
+                                    <label>Normale uren/week <input type="number" step="0.01" name="standard_week_hours" placeholder="40"></label>
+                                    <label>Overwerk vanaf <input type="number" step="0.01" name="overtime_after_hours" placeholder="40"></label>
+                                    <label>Overwerk % <input type="number" step="0.01" name="weekday_overtime_percent" placeholder="125"></label>
+                                    <label>Zaterdag % <input type="number" step="0.01" name="saturday_percent" placeholder="150"></label>
+                                    <label>Zondag % <input type="number" step="0.01" name="sunday_percent" placeholder="200"></label>
+                                    <label>Feestdag % <input type="number" step="0.01" name="holiday_percent" placeholder="200"></label>
+                                    <label>Reiskosten/km <input type="number" step="0.001" name="travel_cost_per_km" placeholder="0.23"></label>
+                                    <label>Basis uurloon <input type="number" step="0.01" name="default_hourly_wage" placeholder="18.50"></label>
+                                    <label>Status
+                                        <select name="status">
+                                            <option value="concept">Concept</option>
+                                            <option value="actief">Actief</option>
+                                            <option value="archief">Archief</option>
+                                        </select>
+                                    </label>
+                                    <label class="payroll-settings-form__notes">Notitie <input type="text" name="notes" placeholder="Bijvoorbeeld afwijkende afspraak of bron"></label>
+                                    <button class="ghost-button" type="submit">CAO regel opslaan</button>
+                                </form>
+
+                                <div class="table-wrap payroll-settings-table">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Naam</th>
+                                                <th>Geldig</th>
+                                                <th>Uren</th>
+                                                <th>Toeslagen</th>
+                                                <th>Reiskosten</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for cao in cao_settings %}
+                                            <tr>
+                                                <td>
+                                                    <strong>{{ cao.name }}</strong>
+                                                    <span>{{ cao.version_label or 'Handmatig' }}</span>
+                                                </td>
+                                                <td>{{ cao.effective_from }} t/m {{ cao.effective_until }}</td>
+                                                <td>{{ cao.standard_week_hours or '-' }} normaal / {{ cao.overtime_after_hours or '-' }} overwerk</td>
+                                                <td>OW {{ cao.weekday_overtime_percent or '-' }}% · Za {{ cao.saturday_percent or '-' }}% · Zo {{ cao.sunday_percent or '-' }}%</td>
+                                                <td>{{ cao.travel_cost_per_km or '-' }}</td>
+                                                <td><span class="status-tag">{{ cao.status }}</span></td>
+                                            </tr>
+                                            {% else %}
+                                            <tr>
+                                                <td colspan="6">
+                                                    <div class="empty-state">
+                                                        <strong>Nog geen CAO instellingen</strong>
+                                                        <span>Sla hierboven de eerste handmatige regelset op.</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </section>
 
@@ -609,6 +684,119 @@
                         </form>
                     </article>
 
+                    <article class="panel panel--full projects-only" id="projecten">
+                        <div class="panel-header">
+                            <div>
+                                <p class="section-label">Projecten</p>
+                                <h2>Projecten beheren</h2>
+                                <p>Nieuwe projecten zijn meteen beschikbaar in de projectkeuze van de urenverwerking.</p>
+                            </div>
+                        </div>
+
+                        <form class="project-create-form" action="/api/projects" method="post">
+                            <label>Projectnaam <input type="text" name="title" placeholder="Bijvoorbeeld: Bouwplaats Den Haag" required></label>
+                            <label>Projectnummer <input type="text" name="reference_number" placeholder="P202000052"></label>
+                            <label>Opdrachtgever <input type="text" name="relation_name" placeholder="Naam opdrachtgever"></label>
+                            <label>Plaats <input type="text" name="location" placeholder="Plaats"></label>
+                            <label>Status
+                                <select name="status">
+                                    <option value="Actief">Actief</option>
+                                    <option value="Voorbereiding">Voorbereiding</option>
+                                    <option value="Afgerond">Afgerond</option>
+                                </select>
+                            </label>
+                            <label>CAO
+                                <select name="payroll_cao_setting_id">
+                                    <option value="">Nog niet koppelen</option>
+                                    {% for cao in cao_settings %}
+                                    <option value="{{ cao.id }}">{{ cao.name }}{% if cao.version_label %} · {{ cao.version_label }}{% endif %}</option>
+                                    {% endfor %}
+                                </select>
+                            </label>
+                            <label class="project-create-form__notes">Notitie <input type="text" name="notes" placeholder="Korte interne notitie"></label>
+                            <button class="ghost-button" type="submit">Project aanmaken</button>
+                        </form>
+
+                        <form class="timesheet-search project-search" action="/dashboard/projects" method="get">
+                            <input type="search" name="q" value="{{ query }}" placeholder="Zoek project, nummer, opdrachtgever of plaats">
+                            <button class="ghost-button" type="submit">Zoeken</button>
+                            {% if query %}
+                            <a class="ghost-button" href="/dashboard/projects#projecten">Wissen</a>
+                            {% endif %}
+                        </form>
+
+                        <div class="table-wrap">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Project</th>
+                                        <th>Nummer</th>
+                                        <th>Opdrachtgever</th>
+                                        <th>Plaats</th>
+                                        <th>CAO</th>
+                                        <th>Boekingen</th>
+                                        <th>Uren</th>
+                                        <th>Laatste uren</th>
+                                        <th>Status</th>
+                                        <th>Gewijzigd</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for project in projects %}
+                                    <tr>
+                                        <td><strong>{{ project.title }}</strong></td>
+                                        <td>{{ project.reference_number or '-' }}</td>
+                                        <td>{{ project.relation_name or '-' }}</td>
+                                        <td>{{ project.location or '-' }}</td>
+                                        <td>{{ project.cao_name or 'Nog niet gekoppeld' }}</td>
+                                        <td>{{ project.booking_count }}</td>
+                                        <td>{{ project.total_hours }}</td>
+                                        <td>{{ project.last_booking_date }}</td>
+                                        <td><span class="status-tag">{{ project.status }}</span></td>
+                                        <td>{{ project.updated_at }}</td>
+                                    </tr>
+                                    <tr class="project-bookings-row">
+                                        <td colspan="10">
+                                            <details class="project-bookings">
+                                                <summary>
+                                                    <span>Geboekte uren</span>
+                                                    <strong>{{ project.total_hours }} uur</strong>
+                                                </summary>
+                                                {% if project.recent_bookings %}
+                                                <div class="project-bookings-list">
+                                                    {% for booking in project.recent_bookings %}
+                                                    <a href="/dashboard/timesheets?tab=task&stage=loon&timesheet={{ booking.timesheet_inbox_id }}#timesheet-tabs">
+                                                        <span>{{ booking.work_date }}</span>
+                                                        <strong>{{ booking.employee_name }}</strong>
+                                                        <span>{{ booking.hours }} uur</span>
+                                                        <small>{{ booking.cao_name }} · {{ booking.status }}</small>
+                                                    </a>
+                                                    {% endfor %}
+                                                </div>
+                                                {% else %}
+                                                <div class="empty-state empty-state--compact">
+                                                    <strong>Nog geen uren geboekt</strong>
+                                                    <span>Gevalideerde urenbriefjes verschijnen hier automatisch.</span>
+                                                </div>
+                                                {% endif %}
+                                            </details>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="10">
+                                            <div class="empty-state">
+                                                <strong>Nog geen projecten</strong>
+                                                <span>Maak hierboven het eerste project aan.</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </article>
+
                     <article class="panel panel--full timesheets-only" id="timesheets">
                         {% set active_timesheet_tab = timesheet_tab|default('overview') %}
                         <div class="timesheet-compact-head">
@@ -627,8 +815,8 @@
                             </div>
                             {% if active_timesheet_tab == 'overview' %}
                             <form class="timesheet-dropzone timesheet-dropzone--compact" action="/api/whatsapp/timesheet-upload" method="post" enctype="multipart/form-data" data-timesheet-dropzone>
-                                <input type="hidden" name="sender_name" value="">
-                                <input type="hidden" name="sender_phone" value="onbekend">
+                                <input type="hidden" name="sender_name" value="" data-timesheet-upload-sender-name>
+                                <input type="hidden" name="sender_phone" value="onbekend" data-timesheet-upload-sender-phone>
                                 <input type="file" name="file" accept="image/*,.pdf" data-timesheet-drop-input hidden>
                                 <span class="timesheet-dropzone__icon">
                                     <img src="https://api.iconify.design/lucide:file-up.svg" alt="">
@@ -640,25 +828,13 @@
                             {% endif %}
                         </div>
 
-                        {% if active_timesheet_tab == 'overview' %}
-                        <details class="manual-processing manual-processing--form" id="manual-processing">
-                            <summary>
-                                <span class="manual-processing__icon">
-                                    <img src="https://api.iconify.design/lucide:hand.svg" alt="">
-                                </span>
-                                <span>
-                                    <strong>Handmatig taak aanmaken</strong>
-                                    <small>Upload met naam en telefoonnummer</small>
-                                </span>
-                            </summary>
-                            <form class="whatsapp-upload-form whatsapp-upload-form--compact" action="/api/whatsapp/timesheet-upload" method="post" enctype="multipart/form-data">
-                                <label>Naam afzender <input type="text" name="sender_name" placeholder="Naam afzender"></label>
-                                <label>Telefoonnummer <input type="text" name="sender_phone" placeholder="+31 6 ... / automatisch uit briefje"></label>
-                                <label>Urenbriefje <input type="file" name="file" accept="image/*,.pdf" required></label>
-                                <button class="ghost-button" type="submit">Upload en parse</button>
-                            </form>
-                        </details>
-                        {% endif %}
+                        <div class="processing-status" data-processing-status hidden>
+                            <div>
+                                <strong data-processing-status-title>Bezig met verwerken</strong>
+                                <span data-processing-status-text>Even geduld, de taak wordt verwerkt.</span>
+                            </div>
+                            <div class="processing-status__bar" aria-hidden="true"><span></span></div>
+                        </div>
 
                         <div class="timesheet-inbox-layout" id="timesheet-inbox">
                             {% if active_timesheet_tab == 'overview' %}
@@ -859,7 +1035,7 @@
                                                     <select name="field_work_name">
                                                         <option value="">Kies project</option>
                                                         {% for project in project_options %}
-                                                        <option value="{{ project.title }}" data-id="{{ project.id }}" {% if selected_message.selected_project_id == project.id or selected_message.project_name == project.title %}selected{% endif %}>{{ project.title }}{% if project.reference_number %} &middot; {{ project.reference_number }}{% endif %}</option>
+                                                        <option value="{{ project.title }}" data-id="{{ project.id }}" {% if selected_message.selected_project_id == project.id or selected_message.project_name == project.title %}selected{% endif %}>{{ project.title }}{% if project.reference_number %} &middot; {{ project.reference_number }}{% endif %}{% if project.cao_name %} &middot; CAO: {{ project.cao_name }}{% endif %}</option>
                                                         {% endfor %}
                                                     </select>
                                                 </label>
@@ -945,6 +1121,21 @@
                             <button class="modal-close document-zoom-close" type="button" data-document-zoom-close aria-label="Sluiten">x</button>
                             <img src="" alt="Vergroot urenbriefje" data-document-zoom-image>
                         </div>
+                    </div>
+
+                    <div class="document-zoom-backdrop upload-meta-backdrop" data-timesheet-upload-modal hidden>
+                        <form class="upload-meta-modal" role="dialog" aria-modal="true" aria-label="Handmatige taakgegevens">
+                            <button class="modal-close document-zoom-close" type="button" data-timesheet-upload-cancel aria-label="Sluiten">x</button>
+                            <p class="section-label">Handmatige verwerking</p>
+                            <h3>Taak aanmaken</h3>
+                            <p class="upload-meta-modal__file" data-timesheet-upload-file-name>Geen bestand gekozen</p>
+                            <label>Naam afzender <input type="text" data-timesheet-upload-name placeholder="Mag leeg blijven"></label>
+                            <label>Telefoonnummer <input type="text" data-timesheet-upload-phone placeholder="Mag leeg blijven, of nummer van bron"></label>
+                            <div class="preview-actions">
+                                <button class="ghost-button" type="button" data-timesheet-upload-cancel>Annuleren</button>
+                                <button class="ghost-button" type="submit">Taak aanmaken en parsen</button>
+                            </div>
+                        </form>
                     </div>
 
                     <article class="panel panel--full server-only" id="server">

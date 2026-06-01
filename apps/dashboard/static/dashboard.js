@@ -230,14 +230,64 @@
         }
     });
 
+    const processingStatus = document.querySelector("[data-processing-status]");
+    const processingStatusTitle = document.querySelector("[data-processing-status-title]");
+    const processingStatusText = document.querySelector("[data-processing-status-text]");
+    const showProcessingStatus = (text, title = "Bezig met verwerken") => {
+        if (!processingStatus) {
+            return;
+        }
+        if (processingStatusTitle) {
+            processingStatusTitle.textContent = title;
+        }
+        if (processingStatusText) {
+            processingStatusText.textContent = text;
+        }
+        processingStatus.hidden = false;
+        processingStatus.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    };
+
+    document.querySelectorAll("form").forEach((form) => {
+        const action = form.getAttribute("action") || "";
+        if (!action.includes("/api/whatsapp/timesheet/") || action.includes("/delete")) {
+            return;
+        }
+        form.addEventListener("submit", () => {
+            const message = action.includes("/reparse")
+                ? "Het urenbriefje wordt opnieuw gelezen en geparseerd."
+                : action.includes("/corrections")
+                    ? "Correcties worden opgeslagen en totalen worden gecontroleerd."
+                    : action.includes("/validate")
+                        ? "De uren worden gevalideerd voor loonberekening."
+                        : action.includes("/payroll")
+                            ? "De taak wordt klaargezet voor loonadministratie."
+                            : "De taak wordt verwerkt.";
+            showProcessingStatus(message);
+        });
+    });
+
     document.querySelectorAll(".whatsapp-upload-form").forEach((form) => {
         form.addEventListener("submit", () => {
             const phoneInput = form.querySelector('[name="sender_phone"]');
             if (phoneInput && !phoneInput.value.trim()) {
                 phoneInput.value = "onbekend";
             }
+            showProcessingStatus("Het urenbriefje wordt geupload en geparseerd.");
         });
     });
+
+    const uploadModal = document.querySelector("[data-timesheet-upload-modal]");
+    const uploadModalForm = uploadModal?.querySelector("form");
+    const uploadNameInput = uploadModal?.querySelector("[data-timesheet-upload-name]");
+    const uploadPhoneInput = uploadModal?.querySelector("[data-timesheet-upload-phone]");
+    const uploadFileName = uploadModal?.querySelector("[data-timesheet-upload-file-name]");
+    let activeDropzone = null;
+
+    const closeUploadModal = () => {
+        if (uploadModal) {
+            uploadModal.hidden = true;
+        }
+    };
 
     document.querySelectorAll("[data-timesheet-dropzone]").forEach((dropzone) => {
         const input = dropzone.querySelector("[data-timesheet-drop-input]");
@@ -262,16 +312,25 @@
                 return;
             }
 
-            setDropState("uploading", "Nieuwe taak wordt aangemaakt...");
             try {
                 const transfer = new DataTransfer();
                 transfer.items.add(file);
                 input.files = transfer.files;
-                if (dropzone.requestSubmit) {
-                    dropzone.requestSubmit();
-                } else {
-                    dropzone.submit();
+                activeDropzone = dropzone;
+                if (uploadFileName) {
+                    uploadFileName.textContent = file.name;
                 }
+                if (uploadNameInput) {
+                    uploadNameInput.value = "";
+                }
+                if (uploadPhoneInput) {
+                    uploadPhoneInput.value = "";
+                }
+                if (uploadModal) {
+                    uploadModal.hidden = false;
+                    uploadNameInput?.focus();
+                }
+                setDropState("", `Gekozen: ${file.name}`);
             } catch (error) {
                 setDropState("error", "Gebruik Bestand kiezen om te uploaden.");
             }
@@ -280,12 +339,7 @@
         button?.addEventListener("click", () => input?.click());
         input?.addEventListener("change", () => {
             if (input.files?.[0]) {
-                setDropState("uploading", "Nieuwe taak wordt aangemaakt...");
-                if (dropzone.requestSubmit) {
-                    dropzone.requestSubmit();
-                } else {
-                    dropzone.submit();
-                }
+                uploadFile(input.files[0]);
             }
         });
 
@@ -306,6 +360,39 @@
                 setDropState("", originalText);
             });
         });
+    });
+
+    uploadModalForm?.addEventListener("submit", (event) => {
+        event.preventDefault();
+        if (!activeDropzone) {
+            closeUploadModal();
+            return;
+        }
+        const senderName = activeDropzone.querySelector("[data-timesheet-upload-sender-name]");
+        const senderPhone = activeDropzone.querySelector("[data-timesheet-upload-sender-phone]");
+        if (senderName) {
+            senderName.value = uploadNameInput?.value.trim() || "";
+        }
+        if (senderPhone) {
+            senderPhone.value = uploadPhoneInput?.value.trim() || "onbekend";
+        }
+        activeDropzone.dataset.dropState = "uploading";
+        showProcessingStatus("Het urenbriefje wordt geupload en geparseerd.");
+        closeUploadModal();
+        if (activeDropzone.requestSubmit) {
+            activeDropzone.requestSubmit();
+        } else {
+            activeDropzone.submit();
+        }
+    });
+
+    document.querySelectorAll("[data-timesheet-upload-cancel]").forEach((button) => {
+        button.addEventListener("click", closeUploadModal);
+    });
+    uploadModal?.addEventListener("click", (event) => {
+        if (event.target === uploadModal) {
+            closeUploadModal();
+        }
     });
 
     const zoomModal = document.querySelector("[data-document-zoom-modal]");
@@ -342,6 +429,7 @@
     document.addEventListener("keydown", (event) => {
         if (event.key === "Escape") {
             closeZoom();
+            closeUploadModal();
         }
     });
 })();

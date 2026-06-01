@@ -28,6 +28,7 @@ body[data-theme="light"] {
 body:not(.page-overview) .overview-only,
 body:not(.page-relations) .relations-only,
 body:not(.page-vacancies) .vacancies-only,
+body:not(.page-projects) .projects-only,
 body:not(.page-tickets) .tickets-only,
 body:not(.page-timesheets) .timesheets-only,
 body:not(.page-server) .server-only,
@@ -184,6 +185,193 @@ h2 {
 .status-pill--unavailable {
     border-color: rgba(237, 125, 102, 0.46);
     color: #ffad9b;
+}
+
+.project-create-form {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr)) auto;
+    gap: 10px;
+    align-items: end;
+    margin: 16px 0;
+}
+
+.payroll-settings-form {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    align-items: end;
+    margin: 4px 0 6px;
+}
+
+.project-create-form label,
+.payroll-settings-form label,
+.upload-meta-modal label {
+    display: grid;
+    gap: 6px;
+    color: #bdd0dc;
+    font-size: 0.84rem;
+    font-weight: 700;
+}
+
+.project-create-form input,
+.project-create-form select,
+.payroll-settings-form input,
+.payroll-settings-form select,
+.upload-meta-modal input {
+    min-height: 40px;
+    width: 100%;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    padding: 0 12px;
+}
+
+.project-create-form__notes {
+    grid-column: span 2;
+}
+
+.payroll-settings-form__notes {
+    grid-column: span 2;
+}
+
+.payroll-settings-form .ghost-button {
+    min-height: 40px;
+}
+
+.payroll-settings-table {
+    margin-top: 12px;
+}
+
+.payroll-settings-table td span:not(.status-tag) {
+    display: block;
+    margin-top: 3px;
+    color: #9fb0bd;
+    font-size: 0.78rem;
+}
+
+.project-search {
+    margin-top: 8px;
+}
+
+.project-bookings-row td {
+    padding-top: 0;
+    background: rgba(255, 255, 255, 0.025);
+}
+
+.project-bookings {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.035);
+}
+
+.project-bookings summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 42px;
+    padding: 0 12px;
+    color: #c8d8e2;
+    cursor: pointer;
+    font-size: 0.84rem;
+    font-weight: 800;
+}
+
+.project-bookings summary::-webkit-details-marker {
+    display: none;
+}
+
+.project-bookings summary strong {
+    color: #9fe5b9;
+    font-size: 0.84rem;
+}
+
+.project-bookings-list {
+    display: grid;
+    gap: 6px;
+    padding: 0 10px 10px;
+}
+
+.project-bookings-list a {
+    display: grid;
+    grid-template-columns: 110px minmax(140px, 1fr) 80px minmax(160px, 1fr);
+    align-items: center;
+    gap: 10px;
+    min-height: 38px;
+    padding: 8px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: rgba(11, 22, 29, 0.5);
+}
+
+.project-bookings-list a:hover {
+    border-color: rgba(127, 209, 160, 0.28);
+    background: rgba(30, 64, 48, 0.35);
+}
+
+.project-bookings-list span,
+.project-bookings-list small {
+    color: #aebbc8;
+    font-size: 0.82rem;
+}
+
+.project-bookings-list strong {
+    color: #ffffff;
+    font-size: 0.86rem;
+}
+
+.processing-status {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(180px, 24%);
+    align-items: center;
+    gap: 18px;
+    margin: 12px 0 0;
+    padding: 10px 12px;
+    border: 1px solid rgba(81, 190, 127, 0.34);
+    border-radius: 8px;
+    background: rgba(37, 78, 59, 0.34);
+}
+
+.processing-status[hidden] {
+    display: none;
+}
+
+.processing-status strong {
+    display: block;
+    margin-bottom: 2px;
+    color: #f6fff9;
+}
+
+.processing-status span {
+    color: #b9d1c3;
+    font-size: 0.88rem;
+}
+
+.processing-status__bar {
+    height: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.processing-status__bar span {
+    display: block;
+    width: 42%;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #58d68d, #ffd27a);
+    animation: processing-slide 1.05s ease-in-out infinite alternate;
+}
+
+@keyframes processing-slide {
+    from {
+        transform: translateX(0);
+    }
+
+    to {
+        transform: translateX(140%);
+    }
 }
 
 .stats-grid {
@@ -1927,6 +2115,37 @@ body[data-theme="light"] .user-placeholder-list strong {
     grid-area: button;
 }
 
+.upload-meta-backdrop {
+    align-items: center;
+    justify-content: center;
+}
+
+.upload-meta-modal {
+    position: relative;
+    display: grid;
+    gap: 12px;
+    width: min(460px, calc(100vw - 32px));
+    padding: 22px;
+    border: 1px solid rgba(110, 185, 129, 0.32);
+    border-radius: 8px;
+    background: #182329;
+    box-shadow: 0 26px 70px rgba(0, 0, 0, 0.42);
+}
+
+.upload-meta-modal h3 {
+    margin: 0;
+}
+
+.upload-meta-modal__file {
+    margin: 0;
+    padding: 9px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #d7e5ed;
+    font-size: 0.9rem;
+}
+
 .panel-header-actions {
     display: flex;
     align-items: flex-start;
@@ -2941,6 +3160,9 @@ body[data-theme="light"] .user-placeholder-list strong {
     .server-grid,
     .ticket-grid,
     .settings-grid,
+    .project-create-form,
+    .payroll-settings-form,
+    .project-bookings-list a,
     .workflow-grid,
     .channel-grid,
     .timesheet-workflow-tabs,
@@ -2963,6 +3185,11 @@ body[data-theme="light"] .user-placeholder-list strong {
     .import-strip,
     .inline-import-form {
         grid-template-columns: 1fr;
+    }
+
+    .project-create-form__notes,
+    .payroll-settings-form__notes {
+        grid-column: auto;
     }
 }
 
@@ -2993,6 +3220,10 @@ body[data-theme="light"] .user-placeholder-list strong {
     .timesheet-status-grid,
     .timesheet-search,
     .timesheet-dropzone,
+    .processing-status,
+    .project-create-form,
+    .payroll-settings-form,
+    .project-bookings-list a,
     .search-bar,
     .relation-layout,
     .inbox-layout,

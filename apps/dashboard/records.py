@@ -1,3 +1,4 @@
+import json
 from decimal import Decimal
 
 from apps.dashboard.data_store import ensure_dashboard_tables
@@ -365,9 +366,22 @@ def list_project_options(limit: int = 100) -> list[dict]:
             with conn.cursor() as cursor:
                 cursor.execute(
                     """
-                    SELECT id, title, reference_number, relation_name, status
-                    FROM vacancies
-                    ORDER BY updated_at DESC, id DESC
+                    SELECT v.id,
+                           v.title,
+                           v.reference_number,
+                           v.relation_name,
+                           v.status,
+                           v.payroll_cao_setting_id,
+                           c.name
+                    FROM vacancies v
+                    LEFT JOIN payroll_cao_settings c
+                        ON c.id = v.payroll_cao_setting_id
+                    WHERE COALESCE(v.raw_data->>'record_type', '') = 'project'
+                       OR LOWER(COALESCE(v.status, '')) IN ('project', 'actief project', 'actief')
+                    ORDER BY
+                        CASE WHEN COALESCE(v.raw_data->>'record_type', '') = 'project' THEN 0 ELSE 1 END,
+                        v.updated_at DESC,
+                        v.id DESC
                     LIMIT %s;
                     """,
                     (limit,),
@@ -379,11 +393,322 @@ def list_project_options(limit: int = 100) -> list[dict]:
                         "reference_number": row[2] or "",
                         "relation_name": row[3] or "",
                         "status": row[4] or "",
+                        "payroll_cao_setting_id": row[5],
+                        "cao_name": row[6] or "",
                     }
                     for row in cursor.fetchall()
                 ]
     except Exception:
         return []
+
+
+def list_projects(limit: int = 100, query: str = "") -> list[dict]:
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                params = []
+                filters = ["COALESCE(v.raw_data->>'record_type', '') = 'project'"]
+                if query:
+                    filters.append(
+                        """
+                        (
+                            v.title ILIKE %s
+                            OR v.reference_number ILIKE %s
+                            OR v.relation_name ILIKE %s
+                            OR v.location ILIKE %s
+                            OR v.status ILIKE %s
+                        )
+                        """
+                    )
+                    like_query = f"%{query}%"
+                    params.extend([like_query] * 5)
+                params.append(limit)
+                cursor.execute(
+                    f"""
+                    SELECT v.id,
+                           v.title,
+                           v.reference_number,
+                           v.relation_name,
+                           v.location,
+                           v.status,
+                           v.updated_at,
+                           v.payroll_cao_setting_id,
+                           c.name,
+                           COUNT(b.id),
+                           COALESCE(SUM(b.hours), 0),
+                           MAX(b.work_date)
+                    FROM vacancies v
+                    LEFT JOIN payroll_cao_settings c
+                        ON c.id = v.payroll_cao_setting_id
+                    LEFT JOIN project_time_bookings b
+                        ON b.project_id = v.id
+                    WHERE {' AND '.join(filters)}
+                    GROUP BY v.id, c.name
+                    ORDER BY v.updated_at DESC, v.id DESC
+                    LIMIT %s;
+                    """,
+                    tuple(params),
+                )
+                projects = [
+                    {
+                        "id": row[0],
+                        "title": row[1],
+                        "reference_number": row[2] or "",
+                        "relation_name": row[3] or "",
+                        "location": row[4] or "",
+                        "status": row[5] or "Actief",
+                        "updated_at": row[6].strftime("%d-%m-%Y %H:%M") if row[6] else "-",
+                        "payroll_cao_setting_id": row[7],
+                        "cao_name": row[8] or "Nog niet gekoppeld",
+                        "booking_count": row[9] or 0,
+                        "total_hours": _format_number(row[10]),
+                        "last_booking_date": row[11].strftime("%d-%m-%Y") if row[11] else "-",
+                        "recent_bookings": [],
+                    }
+                    for row in cursor.fetchall()
+                ]
+                _attach_project_bookings(cursor, projects)
+                return projects
+    except Exception:
+        return []
+
+
+def create_project(data: dict) -> int:
+    ensure_dashboard_tables()
+    raw_data = {
+        "record_type": "project",
+        "source": "dashboard",
+        "notes": (data.get("notes") or "").strip(),
+    }
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO vacancies (
+                    title,
+                    reference_number,
+                    relation_name,
+                    location,
+                    status,
+                    payroll_cao_setting_id,
+                    publication_status,
+                    website_enabled,
+                    indeed_enabled,
+                    raw_data,
+                    created_at,
+                    updated_at
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, 'project', FALSE, FALSE, %s::jsonb, NOW(), NOW())
+                RETURNING id;
+                """,
+                (
+                    (data.get("title") or "").strip() or "Nieuw project",
+                    (data.get("reference_number") or "").strip(),
+                    (data.get("relation_name") or "").strip(),
+                    (data.get("location") or "").strip(),
+                    (data.get("status") or "").strip() or "Actief",
+                    _int_or_none(data.get("payroll_cao_setting_id")),
+                    json.dumps(raw_data),
+                ),
+            )
+            project_id = cursor.fetchone()[0]
+        conn.commit()
+    return project_id
+
+
+def _empty_to_none(value):
+    text = str(value or "").strip()
+    return text or None
+
+
+def _number_or_none(value):
+    text = str(value or "").strip().replace(",", ".")
+    return text or None
+
+
+def _int_or_none(value):
+    try:
+        text = str(value or "").strip()
+        return int(text) if text else None
+    except Exception:
+        return None
+
+
+def _format_number(value) -> str:
+    if value is None:
+        return "0"
+    text = str(value)
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return text or "0"
+
+
+def _attach_project_bookings(cursor, projects: list[dict], per_project: int = 5) -> None:
+    project_ids = [project["id"] for project in projects]
+    if not project_ids:
+        return
+    cursor.execute(
+        """
+        SELECT b.project_id,
+               b.id,
+               b.timesheet_inbox_id,
+               b.relation_id,
+               b.principal_id,
+               COALESCE(r.name, w.employee_name, w.matched_candidate_name, ''),
+               b.work_date,
+               b.hours,
+               b.status,
+               b.payroll_cao_setting_id,
+               c.name,
+               b.updated_at
+        FROM project_time_bookings b
+        LEFT JOIN relations r
+            ON r.id = b.relation_id
+        LEFT JOIN whatsapp_timesheet_inbox w
+            ON w.id = b.timesheet_inbox_id
+        LEFT JOIN payroll_cao_settings c
+            ON c.id = b.payroll_cao_setting_id
+        WHERE b.project_id = ANY(%s)
+        ORDER BY b.project_id, b.work_date DESC NULLS LAST, b.updated_at DESC, b.id DESC;
+        """,
+        (project_ids,),
+    )
+    project_map = {project["id"]: project for project in projects}
+    counters = {project_id: 0 for project_id in project_ids}
+    for row in cursor.fetchall():
+        project_id = row[0]
+        if counters.get(project_id, 0) >= per_project:
+            continue
+        project = project_map.get(project_id)
+        if not project:
+            continue
+        project["recent_bookings"].append(
+            {
+                "id": row[1],
+                "timesheet_inbox_id": row[2],
+                "relation_id": row[3],
+                "principal_id": row[4],
+                "employee_name": row[5] or "Onbekend",
+                "work_date": row[6].strftime("%d-%m-%Y") if row[6] else "-",
+                "hours": _format_number(row[7]),
+                "status": row[8] or "",
+                "payroll_cao_setting_id": row[9],
+                "cao_name": row[10] or "Nog niet gekoppeld",
+                "updated_at": row[11].strftime("%d-%m-%Y %H:%M") if row[11] else "-",
+            }
+        )
+        counters[project_id] = counters.get(project_id, 0) + 1
+
+
+def list_cao_settings(limit: int = 25) -> list[dict]:
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT id,
+                           name,
+                           version_label,
+                           effective_from,
+                           effective_until,
+                           standard_week_hours,
+                           overtime_after_hours,
+                           weekday_overtime_percent,
+                           saturday_percent,
+                           sunday_percent,
+                           holiday_percent,
+                           travel_cost_per_km,
+                           default_hourly_wage,
+                           status,
+                           source,
+                           notes,
+                           updated_at
+                    FROM payroll_cao_settings
+                    ORDER BY
+                        CASE WHEN status = 'actief' THEN 0 ELSE 1 END,
+                        effective_from DESC NULLS LAST,
+                        updated_at DESC,
+                        id DESC
+                    LIMIT %s;
+                    """,
+                    (limit,),
+                )
+                return [
+                    {
+                        "id": row[0],
+                        "name": row[1],
+                        "version_label": row[2] or "",
+                        "effective_from": row[3].strftime("%d-%m-%Y") if row[3] else "-",
+                        "effective_until": row[4].strftime("%d-%m-%Y") if row[4] else "-",
+                        "standard_week_hours": row[5],
+                        "overtime_after_hours": row[6],
+                        "weekday_overtime_percent": row[7],
+                        "saturday_percent": row[8],
+                        "sunday_percent": row[9],
+                        "holiday_percent": row[10],
+                        "travel_cost_per_km": row[11],
+                        "default_hourly_wage": row[12],
+                        "status": row[13] or "concept",
+                        "source": row[14] or "manual",
+                        "notes": row[15] or "",
+                        "updated_at": row[16].strftime("%d-%m-%Y %H:%M") if row[16] else "-",
+                    }
+                    for row in cursor.fetchall()
+                ]
+    except Exception:
+        return []
+
+
+def create_cao_setting(data: dict) -> int:
+    ensure_dashboard_tables()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO payroll_cao_settings (
+                    name,
+                    version_label,
+                    effective_from,
+                    effective_until,
+                    standard_week_hours,
+                    overtime_after_hours,
+                    weekday_overtime_percent,
+                    saturday_percent,
+                    sunday_percent,
+                    holiday_percent,
+                    travel_cost_per_km,
+                    default_hourly_wage,
+                    status,
+                    source,
+                    notes,
+                    created_at,
+                    updated_at
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'manual', %s, NOW(), NOW())
+                RETURNING id;
+                """,
+                (
+                    _empty_to_none(data.get("name")) or "CAO instelling",
+                    _empty_to_none(data.get("version_label")),
+                    _empty_to_none(data.get("effective_from")),
+                    _empty_to_none(data.get("effective_until")),
+                    _number_or_none(data.get("standard_week_hours")),
+                    _number_or_none(data.get("overtime_after_hours")),
+                    _number_or_none(data.get("weekday_overtime_percent")),
+                    _number_or_none(data.get("saturday_percent")),
+                    _number_or_none(data.get("sunday_percent")),
+                    _number_or_none(data.get("holiday_percent")),
+                    _number_or_none(data.get("travel_cost_per_km")),
+                    _number_or_none(data.get("default_hourly_wage")),
+                    _empty_to_none(data.get("status")) or "concept",
+                    _empty_to_none(data.get("notes")),
+                ),
+            )
+            setting_id = cursor.fetchone()[0]
+        conn.commit()
+    return setting_id
 
 
 def list_tickets(limit: int = 25) -> list[dict]:

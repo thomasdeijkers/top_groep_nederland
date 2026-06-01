@@ -20,6 +20,8 @@ def ensure_dashboard_tables():
         Path("migrations/013_timesheet_workflow_booking.sql"),
         Path("migrations/014_timesheet_source_channel.sql"),
         Path("migrations/015_relation_address_archive.sql"),
+        Path("migrations/016_payroll_cao_settings.sql"),
+        Path("migrations/017_project_cao_link.sql"),
     ]
 
     with get_connection() as conn:
