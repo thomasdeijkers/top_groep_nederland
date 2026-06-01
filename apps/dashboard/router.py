@@ -24,6 +24,7 @@ from apps.dashboard.records import (
     get_project,
     get_overview_data,
     get_timesheet_channel_tiles,
+    list_audit_events,
     list_cao_settings,
     list_projects,
     list_payroll_periods,
@@ -34,6 +35,7 @@ from apps.dashboard.records import (
     list_tickets,
     list_vacancies,
     list_whatsapp_timesheets,
+    log_audit_event,
     update_cao_setting,
 )
 from apps.dashboard.relations import (
@@ -73,6 +75,18 @@ def _relations_url(tab: str = "candidates", edit: int | None = None, q: str = ""
     if q:
         params["q"] = q
     return f"/dashboard/relations?{urlencode(params)}{anchor}"
+
+
+def _audit(action: str, entity_type: str, entity_id: int | None = None, label: str = "", description: str = "", status: str = "") -> None:
+    log_audit_event(
+        action=action,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        entity_label=label,
+        description=description,
+        status=status,
+        actor_name="Admin",
+    )
 
 
 def _timesheet_stage(status: str) -> str:
@@ -155,6 +169,7 @@ def _dashboard_context(
             "modules": MODULES,
             "review_items": REVIEW_ITEMS,
             "activity_items": ACTIVITY_ITEMS,
+            "audit_events": [],
             "server_metrics": server_overview["server_metrics"],
             "server_system_tiles": server_overview["server_system_tiles"],
             "server_scheduler_tiles": server_overview["server_scheduler_tiles"],
@@ -189,7 +204,7 @@ def _dashboard_context(
                 "recent": [],
                 "whatsapp_workflow": [],
             },
-            "openai_usage": {"month_cost_usd": 0, "requests": 0, "total_tokens": 0},
+            "openai_usage": {"month_cost_usd": 0, "month_requests": 0, "month_tokens": 0, "requests": 0, "total_tokens": 0},
             "principal_options": [],
             "project_options": [],
             "projects": [],
@@ -227,6 +242,7 @@ def _dashboard_context(
     imported_vacancies = list_vacancies(query=query if data_page == "vacancies" else "")
     whatsapp_timesheets = list_whatsapp_timesheets()
     overview_data = get_overview_data()
+    audit_events = list_audit_events(120 if data_page == "audit" else 8)
     openai_usage = get_openai_usage_summary()
     project_options = list_project_options()
     projects = list_projects(query=query if data_page == "projects" else "")
@@ -265,6 +281,7 @@ def _dashboard_context(
         "modules": MODULES,
         "review_items": REVIEW_ITEMS,
         "activity_items": ACTIVITY_ITEMS,
+        "audit_events": audit_events,
         "server_metrics": server_overview["server_metrics"],
         "server_system_tiles": server_overview["server_system_tiles"],
         "server_scheduler_tiles": server_overview["server_scheduler_tiles"],
@@ -387,6 +404,11 @@ def tickets_page(request: Request):
     return _render_dashboard(request, "tickets")
 
 
+@router.get("/dashboard/audit", response_class=HTMLResponse)
+def audit_page(request: Request):
+    return _render_dashboard(request, "audit")
+
+
 @router.get("/dashboard/whatsapp", response_class=HTMLResponse)
 def whatsapp_page(request: Request):
     return RedirectResponse("/dashboard/timesheets", status_code=303)
@@ -425,6 +447,7 @@ async def upload_whatsapp_timesheet(
         source_channel="manual_upload",
         allow_openai=True,
     )
+    _audit("Urenbriefje geupload", "urenbriefje", record_id, file.filename or "urenbriefje.jpg", "Nieuw urenbriefje ontvangen en klaargezet voor controle.", "Urenverwerking")
     return RedirectResponse(f"/dashboard/timesheets?tab=overview&stage=all&uploaded={record_id}#timesheet-inbox", status_code=303)
 
 
@@ -437,12 +460,14 @@ async def correct_whatsapp_timesheet(timesheet_id: int, request: Request):
         if key.startswith("field_")
     }
     save_field_corrections(timesheet_id, corrections)
+    _audit("Urenbriefje gecorrigeerd", "urenbriefje", timesheet_id, f"Urenbriefje {timesheet_id}", "Velden op het urenbriefje zijn handmatig aangepast.", "Controle")
     return RedirectResponse(f"/dashboard/timesheets?stage=valideren&timesheet={timesheet_id}", status_code=303)
 
 
 @router.post("/api/whatsapp/timesheet/{timesheet_id}/reparse")
 def reparse_whatsapp_timesheet(timesheet_id: int):
     reparse_timesheet_upload(timesheet_id, allow_openai=True)
+    _audit("Urenbriefje opnieuw geparsed", "urenbriefje", timesheet_id, f"Urenbriefje {timesheet_id}", "Parsing opnieuw uitgevoerd met de actuele parserinstellingen.", "Controle")
     return RedirectResponse(f"/dashboard/timesheets?stage=controle&timesheet={timesheet_id}", status_code=303)
 
 
@@ -453,24 +478,28 @@ def validate_whatsapp_timesheet(
     project_id: int | None = Form(None),
 ):
     validate_timesheet(timesheet_id, principal_id, project_id)
+    _audit("Urenbriefje gevalideerd", "urenbriefje", timesheet_id, f"Urenbriefje {timesheet_id}", "Uren zijn gekoppeld aan opdrachtgever en project.", "Loon berekenen")
     return RedirectResponse(f"/dashboard/timesheets?stage=loon&timesheet={timesheet_id}", status_code=303)
 
 
 @router.post("/api/whatsapp/timesheet/{timesheet_id}/payroll")
 def payroll_whatsapp_timesheet(timesheet_id: int):
     send_to_payroll(timesheet_id)
+    _audit("Doorgestuurd naar loonadministratie", "urenbriefje", timesheet_id, f"Urenbriefje {timesheet_id}", "Urenbriefje is doorgestuurd voor loonadministratie.", "Accorderen")
     return RedirectResponse(f"/dashboard/timesheets?stage=accorderen&timesheet={timesheet_id}", status_code=303)
 
 
 @router.post("/api/whatsapp/timesheet/{timesheet_id}/archive")
 def archive_whatsapp_message(timesheet_id: int):
     archive_whatsapp_timesheet(timesheet_id)
+    _audit("Urenbriefje gearchiveerd", "urenbriefje", timesheet_id, f"Urenbriefje {timesheet_id}", "Urenbriefje is uit de actieve werklijst gehaald.", "Archief")
     return RedirectResponse("/dashboard/timesheets", status_code=303)
 
 
 @router.post("/api/whatsapp/timesheet/{timesheet_id}/delete")
 def delete_whatsapp_message(timesheet_id: int):
     delete_whatsapp_timesheet(timesheet_id)
+    _audit("Urenbriefje verwijderd", "urenbriefje", timesheet_id, f"Urenbriefje {timesheet_id}", "Urenbriefje is verwijderd uit de actieve verwerking.", "Verwijderd")
     return RedirectResponse("/dashboard/timesheets", status_code=303)
 
 
@@ -503,6 +532,7 @@ def save_cao_setting(
     notes: str = Form(""),
 ):
     setting_id = create_cao_setting(locals())
+    _audit("CAO aangemaakt", "cao", setting_id, name or "CAO instelling", "Nieuwe CAO-regelset aangemaakt voor verloning.", "Instellingen")
     return RedirectResponse(f"/dashboard/settings?cao={setting_id}#cao-instellingen", status_code=303)
 
 
@@ -525,6 +555,7 @@ def edit_cao_setting(
     notes: str = Form(""),
 ):
     update_cao_setting(setting_id, locals())
+    _audit("CAO bijgewerkt", "cao", setting_id, name or "CAO instelling", "CAO-regelset bijgewerkt voor toekomstige berekeningen.", "Instellingen")
     return RedirectResponse(f"/dashboard/settings?cao={setting_id}#cao-instellingen", status_code=303)
 
 
@@ -569,6 +600,7 @@ def save_project(
     notes: str = Form(""),
 ):
     project_id = create_project(locals())
+    _audit("Project aangemaakt", "project", project_id, title or "Project", "Nieuw project aangemaakt en beschikbaar gemaakt voor urenboeking.", "Projecten")
     return RedirectResponse(f"/dashboard/projects?created={project_id}#projecten", status_code=303)
 
 
@@ -583,6 +615,7 @@ def save_payroll_period(
     notes: str = Form(""),
 ):
     period_id = create_payroll_period(locals())
+    _audit("Periode aangemaakt", "periode", period_id, name or f"Periode {period_number}", "Vierwekelijkse loonperiode aangemaakt of bijgewerkt.", "Periodes")
     return RedirectResponse(f"/dashboard/periods?created={period_id}#periodes", status_code=303)
 
 
@@ -622,6 +655,8 @@ async def save_relation(
     photo_data = await _relation_photo_from_upload(photo)
     record_id = create_relation(locals(), photo_data)
     tab = "principals" if relation_type == "principal" else "candidates"
+    label = name if relation_type == "principal" else " ".join(part for part in (first_name, last_name) if part).strip()
+    _audit("Relatie aangemaakt", relation_type, record_id, label or "Relatie", "Nieuwe relatie aangemaakt in het dashboard.", "Relaties")
     return RedirectResponse(_relations_url(tab, edit=record_id, anchor="#relatie-formulier"), status_code=303)
 
 
@@ -655,18 +690,22 @@ async def edit_relation(
     photo_data = await _relation_photo_from_upload(photo)
     update_relation(relation_id, locals(), photo_data)
     tab = "principals" if relation_type == "principal" else "candidates"
+    label = name if relation_type == "principal" else " ".join(part for part in (first_name, last_name) if part).strip()
+    _audit("Relatie bijgewerkt", relation_type, relation_id, label or "Relatie", "Relatiegegevens bijgewerkt.", "Relaties")
     return RedirectResponse(_relations_url(tab, edit=relation_id, anchor="#relatie-formulier"), status_code=303)
 
 
 @router.post("/api/relations/{relation_id}/delete")
 def remove_relation(relation_id: int):
     archive_relation(relation_id)
+    _audit("Relatie gearchiveerd", "relatie", relation_id, f"Relatie {relation_id}", "Relatie is gearchiveerd.", "Archief")
     return RedirectResponse(_relations_url(), status_code=303)
 
 
 @router.post("/api/relations/{relation_id}/archive")
 def archive_relation_record(relation_id: int):
     archive_relation(relation_id)
+    _audit("Relatie gearchiveerd", "relatie", relation_id, f"Relatie {relation_id}", "Relatie is gearchiveerd.", "Archief")
     return RedirectResponse(_relations_url(), status_code=303)
 
 
@@ -688,6 +727,7 @@ def save_candidate(
     notes: str = Form(""),
 ):
     record_id = create_candidate(locals())
+    _audit("Kandidaat aangemaakt", "candidate", record_id, " ".join(part for part in (first_name, last_name) if part).strip() or "Kandidaat", "Nieuwe kandidaat aangemaakt.", "Relaties")
     return RedirectResponse(_relations_url("candidates", edit=record_id, anchor="#relatie-formulier"), status_code=303)
 
 
@@ -710,12 +750,14 @@ def edit_candidate(
     notes: str = Form(""),
 ):
     update_candidate(candidate_id, locals())
+    _audit("Kandidaat bijgewerkt", "candidate", candidate_id, " ".join(part for part in (first_name, last_name) if part).strip() or "Kandidaat", "Kandidaatgegevens bijgewerkt.", "Relaties")
     return RedirectResponse(_relations_url("candidates", edit=candidate_id, anchor="#relatie-formulier"), status_code=303)
 
 
 @router.post("/api/candidates/{candidate_id}/delete")
 def remove_candidate(candidate_id: int):
     delete_candidate(candidate_id)
+    _audit("Kandidaat verwijderd", "candidate", candidate_id, f"Kandidaat {candidate_id}", "Kandidaat verwijderd uit de database.", "Verwijderd")
     return RedirectResponse(_relations_url("candidates", anchor="#relaties"), status_code=303)
 
 
@@ -737,6 +779,7 @@ def save_principal(
     notes: str = Form(""),
 ):
     record_id = create_principal(locals())
+    _audit("Opdrachtgever aangemaakt", "principal", record_id, name or "Opdrachtgever", "Nieuwe opdrachtgever aangemaakt.", "Relaties")
     return RedirectResponse(_relations_url("principals", edit=record_id, anchor="#relatie-formulier"), status_code=303)
 
 
@@ -759,12 +802,14 @@ def edit_principal(
     notes: str = Form(""),
 ):
     update_principal(principal_id, locals())
+    _audit("Opdrachtgever bijgewerkt", "principal", principal_id, name or "Opdrachtgever", "Opdrachtgevergegevens bijgewerkt.", "Relaties")
     return RedirectResponse(_relations_url("principals", edit=principal_id, anchor="#relatie-formulier"), status_code=303)
 
 
 @router.post("/api/principals/{principal_id}/delete")
 def remove_principal(principal_id: int):
     delete_principal(principal_id)
+    _audit("Opdrachtgever verwijderd", "principal", principal_id, f"Opdrachtgever {principal_id}", "Opdrachtgever verwijderd uit de database.", "Verwijderd")
     return RedirectResponse(_relations_url("principals", anchor="#relaties"), status_code=303)
 
 
@@ -795,6 +840,7 @@ def save_vacancy(
     employment_type: str = Form(""),
 ):
     record_id = create_vacancy(locals())
+    _audit("Vacature aangemaakt", "vacature", record_id, title or "Vacature", "Nieuwe vacature aangemaakt.", "Vacatures")
     return RedirectResponse(f"/dashboard/vacancies?edit={record_id}", status_code=303)
 
 
@@ -826,12 +872,14 @@ def edit_vacancy(
     employment_type: str = Form(""),
 ):
     update_vacancy(vacancy_id, locals())
+    _audit("Vacature bijgewerkt", "vacature", vacancy_id, title or "Vacature", "Vacaturegegevens en publicatievelden bijgewerkt.", "Vacatures")
     return RedirectResponse(f"/dashboard/vacancies?edit={vacancy_id}", status_code=303)
 
 
 @router.post("/api/vacancies/{vacancy_id}/delete")
 def remove_vacancy(vacancy_id: int):
     delete_vacancy(vacancy_id)
+    _audit("Vacature verwijderd", "vacature", vacancy_id, f"Vacature {vacancy_id}", "Vacature verwijderd uit de database.", "Verwijderd")
     return RedirectResponse("/dashboard/vacancies", status_code=303)
 
 

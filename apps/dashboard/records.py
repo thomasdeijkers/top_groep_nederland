@@ -2,6 +2,8 @@ import json
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
+from psycopg2.extras import Json
+
 from apps.dashboard.data_store import ensure_dashboard_tables
 from shared.db.connection import get_connection
 
@@ -12,21 +14,43 @@ def get_overview_data() -> dict:
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 counts = {}
-                for table_name in ("vacancies", "tickets", "whatsapp_timesheet_inbox"):
+                for table_name in ("vacancies", "tickets"):
                     cursor.execute(f"SELECT COUNT(*) FROM {table_name};")
                     counts[table_name] = cursor.fetchone()[0]
                 cursor.execute(
                     """
-                    SELECT relation_type, COUNT(*)
+                    SELECT LOWER(relation_type), COUNT(*)
                     FROM relations
                     WHERE archived_at IS NULL
                       AND LOWER(COALESCE(status, '')) NOT IN ('archief', 'gearchiveerd', 'archived')
-                    GROUP BY relation_type;
+                    GROUP BY LOWER(relation_type);
                     """
                 )
                 relation_counts = {row[0]: row[1] for row in cursor.fetchall()}
                 counts["candidates"] = relation_counts.get("candidate", 0)
                 counts["principals"] = relation_counts.get("principal", 0)
+                cursor.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM whatsapp_timesheet_inbox
+                    WHERE deleted_at IS NULL
+                      AND archived_at IS NULL
+                      AND LOWER(COALESCE(status, '')) IN (
+                          'nieuw',
+                          'geupload',
+                          'uploaded',
+                          'gematcht',
+                          'matched',
+                          'te_controleren',
+                          'controle',
+                          'goed_te_keuren',
+                          'approval',
+                          'akkoord_nodig',
+                          'loon_te_berekenen'
+                      );
+                    """
+                )
+                counts["whatsapp_timesheet_inbox"] = cursor.fetchone()[0]
 
                 cursor.execute(
                     """
@@ -65,15 +89,19 @@ def get_overview_data() -> dict:
                     """
                     SELECT status, COUNT(*)
                     FROM whatsapp_timesheet_inbox
+                    WHERE deleted_at IS NULL
+                      AND archived_at IS NULL
                     GROUP BY status;
                     """
                 )
                 whatsapp_statuses = {row[0]: row[1] for row in cursor.fetchall()}
+                weekly_hours_yoy = _weekly_hours_yoy(cursor)
 
         return {
             "counts": counts,
             "recent": recent,
             "whatsapp_workflow": _whatsapp_workflow(whatsapp_statuses),
+            "weekly_hours_yoy": weekly_hours_yoy or _demo_weekly_hours_yoy(),
         }
     except Exception:
         return {
@@ -86,7 +114,182 @@ def get_overview_data() -> dict:
             },
             "recent": [],
             "whatsapp_workflow": _whatsapp_workflow({}),
+            "weekly_hours_yoy": _demo_weekly_hours_yoy(),
         }
+
+
+def _weekly_hours_yoy(cursor, weeks_back: int = 8) -> list[dict]:
+    today = date.today()
+    monday = today - timedelta(days=today.weekday())
+    week_starts = [monday - timedelta(days=7 * index) for index in range(weeks_back - 1, -1, -1)]
+    current_start = week_starts[0]
+    current_end = week_starts[-1] + timedelta(days=6)
+    previous_start = current_start.replace(year=current_start.year - 1)
+    previous_end = current_end.replace(year=current_end.year - 1)
+    cursor.execute(
+        """
+        SELECT EXTRACT(ISOYEAR FROM work_date)::int AS iso_year,
+               EXTRACT(WEEK FROM work_date)::int AS iso_week,
+               COALESCE(SUM(hours), 0) AS total_hours
+        FROM project_time_bookings
+        WHERE work_date BETWEEN %s AND %s
+           OR work_date BETWEEN %s AND %s
+        GROUP BY iso_year, iso_week;
+        """,
+        (current_start, current_end, previous_start, previous_end),
+    )
+    totals = {(row[0], row[1]): Decimal(str(row[2] or 0)) for row in cursor.fetchall()}
+    current_year = today.isocalendar().year
+    previous_year = current_year - 1
+    max_hours = max(
+        [Decimal("1")]
+        + [totals.get((start.isocalendar().year, start.isocalendar().week), Decimal("0")) for start in week_starts]
+        + [totals.get((previous_year, start.isocalendar().week), Decimal("0")) for start in week_starts]
+    )
+    rows = []
+    for start in week_starts:
+        week_number = start.isocalendar().week
+        current_hours = totals.get((start.isocalendar().year, week_number), Decimal("0"))
+        previous_hours = totals.get((previous_year, week_number), Decimal("0"))
+        if previous_hours:
+            yoy = ((current_hours - previous_hours) / previous_hours * Decimal("100")).quantize(Decimal("0.01"))
+        elif current_hours:
+            yoy = Decimal("100")
+        else:
+            yoy = Decimal("0")
+        rows.append(
+            {
+                "label": f"WK{week_number}",
+                "date_label": start.strftime("%d-%m"),
+                "current_year": current_year,
+                "previous_year": previous_year,
+                "current_hours": _format_number(current_hours),
+                "previous_hours": _format_number(previous_hours),
+                "current_height": int((current_hours / max_hours) * 100) if max_hours else 0,
+                "previous_height": int((previous_hours / max_hours) * 100) if max_hours else 0,
+                "yoy": f"{'+' if yoy > 0 else ''}{str(yoy).replace('.', ',')}%",
+                "yoy_positive": yoy >= 0,
+            }
+        )
+    has_hours = any(row["current_hours"] != "0" or row["previous_hours"] != "0" for row in rows)
+    return rows if has_hours else []
+
+
+def _demo_weekly_hours_yoy() -> list[dict]:
+    demo = [
+        ("WK19", 186, 248),
+        ("WK20", 379, 538),
+        ("WK21", 489, 271),
+        ("WK22", 371, 369),
+        ("WK23", 455, 696),
+        ("WK24", 490, 462),
+        ("WK25", 327, 662),
+        ("WK26", 87, 248),
+    ]
+    max_hours = max(max(previous, current) for _, previous, current in demo)
+    rows = []
+    for label, previous, current in demo:
+        yoy = ((Decimal(current) - Decimal(previous)) / Decimal(previous) * Decimal("100")).quantize(Decimal("0.01"))
+        rows.append(
+            {
+                "label": label,
+                "date_label": label,
+                "current_year": date.today().year,
+                "previous_year": date.today().year - 1,
+                "current_hours": _format_number(current),
+                "previous_hours": _format_number(previous),
+                "current_height": int(current / max_hours * 100),
+                "previous_height": int(previous / max_hours * 100),
+                "yoy": f"{'+' if yoy > 0 else ''}{str(yoy).replace('.', ',')}%",
+                "yoy_positive": yoy >= 0,
+            }
+        )
+    return rows
+
+
+def log_audit_event(
+    action: str,
+    entity_type: str,
+    entity_id: int | None = None,
+    entity_label: str = "",
+    description: str = "",
+    status: str = "",
+    metadata: dict | None = None,
+    actor_name: str = "Admin",
+) -> None:
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO audit_events (
+                        actor_name,
+                        action,
+                        entity_type,
+                        entity_id,
+                        entity_label,
+                        description,
+                        status,
+                        metadata,
+                        created_at
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW());
+                    """,
+                    (
+                        actor_name or "Admin",
+                        action,
+                        entity_type,
+                        entity_id,
+                        entity_label or "",
+                        description or "",
+                        status or "",
+                        Json(metadata or {}),
+                    ),
+                )
+            conn.commit()
+    except Exception:
+        return
+
+
+def list_audit_events(limit: int = 25) -> list[dict]:
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT id,
+                           actor_name,
+                           action,
+                           entity_type,
+                           entity_id,
+                           entity_label,
+                           description,
+                           status,
+                           created_at
+                    FROM audit_events
+                    ORDER BY created_at DESC, id DESC
+                    LIMIT %s;
+                    """,
+                    (limit,),
+                )
+                return [
+                    {
+                        "id": row[0],
+                        "user": row[1] or "Admin",
+                        "title": row[2],
+                        "entity_type": row[3],
+                        "entity_id": row[4],
+                        "meta": row[5] or row[3],
+                        "detail": row[6] or "",
+                        "status": row[7] or row[3],
+                        "time": row[8].strftime("%d-%m-%Y %H:%M") if row[8] else "-",
+                    }
+                    for row in cursor.fetchall()
+                ]
+    except Exception:
+        return []
 
 
 def _whatsapp_workflow(statuses: dict) -> list[dict]:

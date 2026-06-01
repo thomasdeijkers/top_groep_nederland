@@ -81,19 +81,23 @@ def get_openai_usage_summary() -> dict:
                 total = cursor.fetchone()
                 cursor.execute(
                     """
-                    SELECT COALESCE(SUM(estimated_cost_usd), 0)
+                    SELECT COUNT(*),
+                           COALESCE(SUM(total_tokens), 0),
+                           COALESCE(SUM(estimated_cost_usd), 0)
                     FROM openai_usage_events
                     WHERE created_at >= date_trunc('month', NOW());
                     """
                 )
-                month_cost = cursor.fetchone()[0]
+                month = cursor.fetchone()
         return {
             "requests": total[0],
             "input_tokens": total[1],
             "output_tokens": total[2],
             "total_tokens": total[3],
             "total_cost_usd": total[4],
-            "month_cost_usd": month_cost,
+            "month_requests": month[0],
+            "month_tokens": month[1],
+            "month_cost_usd": month[2],
         }
     except Exception:
         return {
@@ -102,6 +106,8 @@ def get_openai_usage_summary() -> dict:
             "output_tokens": 0,
             "total_tokens": 0,
             "total_cost_usd": Decimal("0"),
+            "month_requests": 0,
+            "month_tokens": 0,
             "month_cost_usd": Decimal("0"),
         }
 

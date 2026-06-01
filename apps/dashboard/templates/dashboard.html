@@ -10,6 +10,7 @@
             {% elif active_page == 'projects' %}Projecten - Top Groep Nederland
             {% elif active_page == 'periods' %}Periodes - Top Groep Nederland
             {% elif active_page == 'tickets' %}Tickets - Top Groep Nederland
+            {% elif active_page == 'audit' %}Auditspoor - Top Groep Nederland
             {% elif active_page == 'timesheets' %}Urenverwerking - Top Groep Nederland
             {% elif active_page == 'server' %}Server info - Top Groep Nederland
             {% elif active_page == 'settings' %}Instellingen - Top Groep Nederland
@@ -47,9 +48,24 @@
 
                 <div class="sidebar-footer">
                     <div class="openai-cost-mini openai-cost-mini--sidebar">
-                        <span>OpenAI deze maand</span>
-                        <strong>${{ "%.4f"|format(openai_usage.month_cost_usd|float) }}</strong>
-                        <small>{{ openai_usage.requests }} parsing{% if openai_usage.requests != 1 %}s{% endif %} &middot; {{ openai_usage.total_tokens }} tokens</small>
+                        <span class="sidebar-status-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"></ellipse><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"></path><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"></path></svg>
+                        </span>
+                        <div>
+                            <span>Database</span>
+                            <strong>{{ database.status }}</strong>
+                            <small>{{ database.meta if database.meta is defined else 'Dashboard database' }}</small>
+                        </div>
+                    </div>
+                    <div class="openai-cost-mini openai-cost-mini--sidebar">
+                        <span class="sidebar-status-icon" aria-hidden="true">
+                            <img src="https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/openai.svg" alt="">
+                        </span>
+                        <div>
+                            <span>ChatGPT deze maand</span>
+                            <strong>${{ "%.4f"|format(openai_usage.month_cost_usd|float) }}</strong>
+                            <small>{{ openai_usage.month_requests }} parsing{% if openai_usage.month_requests != 1 %}s{% endif %}</small>
+                        </div>
                     </div>
                 </div>
             </aside>
@@ -65,6 +81,7 @@
                             {% elif active_page == 'projects' %}Projecten
                             {% elif active_page == 'periods' %}Periodes
                             {% elif active_page == 'tickets' %}Tickets
+                            {% elif active_page == 'audit' %}Auditspoor
                             {% elif active_page == 'timesheets' %}Urenverwerking
                             {% elif active_page == 'server' %}Server info
                             {% elif active_page == 'settings' %}Instellingen
@@ -77,6 +94,7 @@
                             {% elif active_page == 'projects' %}Maak projecten aan en gebruik ze direct bij de urenverwerking.
                             {% elif active_page == 'periods' %}Beheer vierwekelijkse loonperiodes voor bouwverloning en loonstrookvoorbereiding.
                             {% elif active_page == 'tickets' %}Verzamel opvolgwerk uit e-mail, WhatsApp en urencontrole in een centrale takenlijst.
+                            {% elif active_page == 'audit' %}Bekijk het volledige trackrecord van acties in het dashboard.
                             {% elif active_page == 'timesheets' %}Verwerk urenbriefjes uit WhatsApp, e-mail, servermap of handmatige testupload.
                             {% elif active_page == 'server' %}Controleer de technische status van dit dashboarddeel en de geplande achtergrondtaken.
                             {% elif active_page == 'settings' %}Beheer weergave, gebruikers en rolverdeling voor het dashboard.
@@ -132,29 +150,9 @@
                         </span>
                         <div class="stat-card__copy">
                             <p>Urenbriefjes</p>
-                            <span>Inbox</span>
+                            <span>Te verwerken</span>
                         </div>
                         <strong>{{ overview_data.counts.whatsapp_timesheet_inbox }}</strong>
-                    </a>
-                    <a class="stat-card" href="/dashboard/server">
-                        <span class="stat-card__icon" aria-hidden="true">
-                            <svg viewBox="0 0 24 24"><path d="M4 4h16v6H4Z"></path><path d="M4 14h16v6H4Z"></path><path d="M8 7h.01"></path><path d="M8 17h.01"></path></svg>
-                        </span>
-                        <div class="stat-card__copy">
-                            <p>Server</p>
-                            <span>{{ database.status }}</span>
-                        </div>
-                        <strong>{{ server_system_tiles|length }}</strong>
-                    </a>
-                    <a class="stat-card" href="/dashboard/settings">
-                        <span class="stat-card__icon" aria-hidden="true">
-                            <svg viewBox="0 0 24 24"><path d="M12 3v18"></path><path d="M18 8a6 6 0 0 0-12 0c0 7 12 7 12 0Z"></path></svg>
-                        </span>
-                        <div class="stat-card__copy">
-                            <p>OpenAI</p>
-                            <span>{{ openai_usage.requests }} parsings</span>
-                        </div>
-                        <strong>${{ "%.2f"|format(openai_usage.month_cost_usd|float) }}</strong>
                     </a>
                 </section>
 
@@ -184,6 +182,45 @@
                                 </div>
                                 <strong>{{ step.count }}</strong>
                             </a>
+                            {% endfor %}
+                        </div>
+                    </article>
+
+                    <article class="panel panel--full overview-only hours-yoy-panel">
+                        <div class="panel-header">
+                            <div>
+                                <h2>Gefactureerde uren per week</h2>
+                                <p>Vergelijking van gefactureerde projecturen met dezelfde week vorig jaar.</p>
+                            </div>
+                        </div>
+
+                        <div class="hours-yoy-grid">
+                            {% for week in overview_data.weekly_hours_yoy %}
+                            <article class="hours-yoy-card">
+                                <div class="hours-bars" aria-hidden="true">
+                                    <span class="hours-bar hours-bar--previous" style="height: {{ week.previous_height }}%"></span>
+                                    <span class="hours-bar hours-bar--current" style="height: {{ week.current_height }}%"></span>
+                                </div>
+                                <div class="hours-yoy-head">
+                                    <strong>{{ week.label }}</strong>
+                                    <span class="{% if week.yoy_positive %}hours-yoy-positive{% else %}hours-yoy-negative{% endif %}">{{ week.yoy }} YoY</span>
+                                </div>
+                                <div class="hours-yoy-values">
+                                    <div>
+                                        <span>Vorig jaar</span>
+                                        <strong>{{ week.previous_hours }} uur</strong>
+                                    </div>
+                                    <div>
+                                        <span>Huidig jaar</span>
+                                        <strong>{{ week.current_hours }} uur</strong>
+                                    </div>
+                                </div>
+                            </article>
+                            {% else %}
+                            <div class="empty-state empty-state--compact">
+                                <strong>Nog geen weekdata</strong>
+                                <span>Zodra uren op projecten zijn geboekt, verschijnt hier de YoY vergelijking.</span>
+                            </div>
                             {% endfor %}
                         </div>
                     </article>
@@ -511,36 +548,18 @@
                         </div>
                     </div>
 
-                    <article class="panel panel--wide overview-only">
+                    <article class="panel overview-only todo-panel">
                         <div class="panel-header">
                             <div>
-                                <h2>Modules</h2>
-                                <p>Basisstructuur voor de eerste werkstromen.</p>
-                            </div>
-                        </div>
-
-                        <div class="module-grid">
-                            {% for module in modules %}
-                            <a class="module-card" href="#">
-                                <span>{{ module.name }}</span>
-                                <strong>{{ module.count }}</strong>
-                                <small>{{ module.status }}</small>
-                            </a>
-                            {% endfor %}
-                        </div>
-                    </article>
-
-                    <article class="panel overview-only">
-                        <div class="panel-header">
-                            <div>
-                                <h2>Te controleren</h2>
-                                <p>Werk dat aandacht nodig heeft.</p>
+                                <h2>To do</h2>
+                                <p>Aandachtspunten en open opvolging.</p>
                             </div>
                         </div>
 
                         <div class="task-list">
                             {% for item in review_items %}
                             <div class="task-item">
+                                <span class="todo-check" aria-hidden="true"></span>
                                 <div>
                                     <strong>{{ item.title }}</strong>
                                     <span>{{ item.meta }}</span>
@@ -555,12 +574,13 @@
                         <div class="panel-header">
                             <div>
                                 <h2>Auditspoor</h2>
-                                <p>Auditspoor en voortgangsmeldingen voor database-acties komen hier samen.</p>
+                                <p>Laatste dashboardacties met gebruiker, omschrijving en status.</p>
                             </div>
+                            <a class="ghost-button" href="/dashboard/audit#auditspoor">Open auditspoor</a>
                         </div>
 
                         <div class="activity-list">
-                            {% for item in activity_items %}
+                            {% for item in audit_events %}
                             <div class="activity-item">
                                 <span></span>
                                 <div>
@@ -573,6 +593,44 @@
                                         <b>{{ item.status }}</b>
                                     </div>
                                 </div>
+                            </div>
+                            {% else %}
+                            <div class="empty-state empty-state--compact">
+                                <strong>Nog geen auditregels</strong>
+                                <span>Nieuwe acties worden vanaf nu automatisch vastgelegd.</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </article>
+
+                    <article class="panel panel--full audit-only" id="auditspoor">
+                        <div class="panel-header">
+                            <div>
+                                <p class="section-label">Trackrecord</p>
+                                <h2>Volledig auditspoor</h2>
+                                <p>Scroll door de vastgelegde dashboardacties. Voor nu worden alle acties onder gebruiker Admin opgeslagen.</p>
+                            </div>
+                            <a class="ghost-button" href="/dashboard">Terug naar overzicht</a>
+                        </div>
+
+                        <div class="audit-sheet">
+                            {% for item in audit_events %}
+                            <article class="audit-row">
+                                <div>
+                                    <strong>{{ item.title }}</strong>
+                                    <span>{{ item.meta }}</span>
+                                </div>
+                                <p>{{ item.detail }}</p>
+                                <div class="activity-meta-row">
+                                    <em>{{ item.user }}</em>
+                                    <time>{{ item.time }}</time>
+                                    <b>{{ item.status }}</b>
+                                </div>
+                            </article>
+                            {% else %}
+                            <div class="empty-state">
+                                <strong>Nog geen auditregels</strong>
+                                <span>Nieuwe acties worden vanaf nu automatisch vastgelegd.</span>
                             </div>
                             {% endfor %}
                         </div>

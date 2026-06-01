@@ -42,6 +42,7 @@ body:not(.page-vacancies) .vacancies-only,
 body:not(.page-projects) .projects-only,
 body:not(.page-periods) .periods-only,
 body:not(.page-tickets) .tickets-only,
+body:not(.page-audit) .audit-only,
 body:not(.page-timesheets) .timesheets-only,
 body:not(.page-server) .server-only,
 body:not(.page-settings) .settings-only {
@@ -143,6 +144,8 @@ a {
 }
 
 .sidebar-footer {
+    display: grid;
+    gap: 8px;
     margin-top: auto;
     padding-top: 18px;
 }
@@ -618,7 +621,8 @@ h2 {
 
 .stats-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    align-items: stretch;
     gap: 14px;
     margin-bottom: 18px;
 }
@@ -634,9 +638,9 @@ h2 {
 
 .stat-card {
     display: grid;
-    grid-template-columns: 34px minmax(0, 1fr) auto;
+    grid-template-columns: 34px minmax(0, 1fr) minmax(62px, auto);
     align-items: center;
-    min-height: 70px;
+    min-height: 74px;
     padding: 12px;
     gap: 10px;
 }
@@ -658,6 +662,8 @@ h2 {
     color: #ffffff;
     font-size: 1.65rem;
     line-height: 1;
+    text-align: right;
+    white-space: nowrap;
 }
 
 .stat-card__copy {
@@ -702,7 +708,7 @@ h2 {
 }
 
 .page-overview .content-grid {
-    grid-template-columns: minmax(0, 1.45fr) minmax(340px, 0.55fr);
+    grid-template-columns: minmax(0, 1fr) minmax(340px, 1fr);
 }
 
 .panel {
@@ -723,7 +729,11 @@ h2 {
 
 .audit-panel {
     grid-column: 2;
-    grid-row: span 2;
+    grid-row: auto;
+}
+
+.todo-panel {
+    grid-column: 1;
 }
 
 .panel-header {
@@ -802,14 +812,23 @@ h2 {
 }
 
 .task-item {
-    display: flex;
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr) auto;
     align-items: center;
-    justify-content: space-between;
     gap: 12px;
-    min-height: 68px;
+    min-height: 64px;
     padding: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.055);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.todo-check {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(127, 209, 160, 0.45);
+    border-radius: 6px;
+    background: rgba(127, 209, 160, 0.08);
 }
 
 .task-item strong,
@@ -872,6 +891,155 @@ h2 {
 .activity-meta-row b {
     border: 1px solid rgba(127, 209, 160, 0.22);
     color: #a9ecc0;
+}
+
+.hours-yoy-panel {
+    overflow: hidden;
+}
+
+.hours-yoy-grid {
+    display: grid;
+    grid-template-columns: repeat(8, minmax(130px, 1fr));
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+}
+
+.hours-yoy-card {
+    display: grid;
+    gap: 10px;
+    min-height: 230px;
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 8px;
+    background: rgba(14, 34, 57, 0.58);
+}
+
+.hours-bars {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: end;
+    gap: 6px;
+    height: 86px;
+    padding-top: 6px;
+}
+
+.hours-bar {
+    display: block;
+    min-height: 4px;
+    border-radius: 6px 6px 0 0;
+}
+
+.hours-bar--previous {
+    background: linear-gradient(180deg, #3f60ad, #263f93);
+}
+
+.hours-bar--current {
+    background: linear-gradient(180deg, #5ca044, #2f7a2c);
+}
+
+.hours-yoy-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.hours-yoy-head strong {
+    color: #ffffff;
+    font-size: 0.9rem;
+}
+
+.hours-yoy-head span {
+    display: inline-flex;
+    min-height: 22px;
+    align-items: center;
+    padding: 0 7px;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 900;
+    white-space: nowrap;
+}
+
+.hours-yoy-positive {
+    border: 1px solid rgba(80, 231, 139, 0.55);
+    color: #50e78b;
+}
+
+.hours-yoy-negative {
+    border: 1px solid rgba(255, 98, 78, 0.55);
+    color: #ff796b;
+}
+
+.hours-yoy-values {
+    display: grid;
+    gap: 8px;
+}
+
+.hours-yoy-values div {
+    padding-left: 8px;
+    border-left: 3px solid rgba(63, 96, 173, 0.85);
+}
+
+.hours-yoy-values div + div {
+    border-left-color: rgba(47, 122, 44, 0.9);
+}
+
+.hours-yoy-values span,
+.hours-yoy-values strong {
+    display: block;
+}
+
+.hours-yoy-values span {
+    color: #aebbc8;
+    font-size: 0.68rem;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.hours-yoy-values strong {
+    color: #ffffff;
+    font-size: 0.92rem;
+}
+
+.audit-sheet {
+    display: grid;
+    gap: 8px;
+    max-height: min(68vh, 760px);
+    overflow-y: auto;
+    padding-right: 6px;
+}
+
+.audit-row {
+    display: grid;
+    grid-template-columns: minmax(220px, 0.85fr) minmax(280px, 1.2fr) auto;
+    align-items: center;
+    gap: 14px;
+    padding: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.audit-row strong,
+.audit-row span {
+    display: block;
+}
+
+.audit-row strong {
+    margin-bottom: 4px;
+    color: #ffffff;
+}
+
+.audit-row span,
+.audit-row p {
+    color: #aebbc8;
+    font-size: 0.82rem;
+}
+
+.audit-row p {
+    margin: 0;
+    line-height: 1.4;
 }
 
 .server-grid {
@@ -1630,20 +1798,22 @@ select option {
 
 .workflow-grid {
     display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    align-items: stretch;
     gap: 8px;
 }
 
 .workflow-card {
     display: grid;
-    grid-template-columns: 34px minmax(0, 1fr) auto;
+    grid-template-columns: 34px minmax(0, 1fr) minmax(62px, auto);
     align-items: center;
-    min-height: 62px;
-    padding: 10px 12px;
+    min-height: 74px;
+    padding: 12px;
     gap: 10px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
-    background: rgba(12, 31, 50, 0.56);
+    background: rgba(255, 255, 255, 0.065);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.18);
 }
 
 .workflow-icon {
@@ -1652,10 +1822,10 @@ select option {
     justify-content: center;
     width: 34px;
     height: 34px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(127, 209, 160, 0.18);
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.06);
-    color: #dcecff;
+    background: rgba(127, 209, 160, 0.08);
+    color: #bfe8ce;
 }
 
 .workflow-icon svg {
@@ -1678,48 +1848,31 @@ select option {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: #b9c8d2;
-    font-size: 0.78rem;
+    color: #abb5be;
+    font-size: 0.82rem;
     font-weight: 800;
 }
 
 .workflow-card strong {
     color: #ffffff;
-    font-size: 1.55rem;
+    font-size: 1.65rem;
     line-height: 1;
+    text-align: right;
+    white-space: nowrap;
 }
 
 .workflow-copy small {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: #91a2ad;
-    font-size: 0.7rem;
+    color: #7fd1a0;
+    font-size: 0.74rem;
     line-height: 1.2;
 }
 
-.workflow-card--geupload {
-    border-color: rgba(37, 211, 102, 0.28);
-}
-
-.workflow-card--gematcht {
-    border-color: rgba(127, 209, 160, 0.32);
-}
-
-.workflow-card--te_controleren {
-    border-color: rgba(245, 217, 90, 0.32);
-}
-
-.workflow-card--goed_te_keuren {
-    border-color: rgba(255, 184, 138, 0.34);
-}
-
-.workflow-card--verwerkt {
-    border-color: rgba(132, 166, 255, 0.28);
-}
-
-.workflow-card--loon_te_berekenen {
-    border-color: rgba(82, 160, 255, 0.3);
+.workflow-card:hover {
+    border-color: rgba(110, 185, 129, 0.42);
+    background: rgba(110, 185, 129, 0.1);
 }
 
 .settings-grid {
@@ -1904,6 +2057,39 @@ body[data-theme="light"] .role-placeholder-grid span {
 body[data-theme="light"] .activity-item {
     border-color: rgba(28, 42, 50, 0.1);
     background: rgba(247, 251, 248, 0.84);
+}
+
+body[data-theme="light"] .task-item {
+    border-color: rgba(28, 42, 50, 0.1);
+    background: rgba(247, 251, 248, 0.84);
+}
+
+body[data-theme="light"] .audit-row {
+    border-color: rgba(28, 42, 50, 0.1);
+    background: rgba(247, 251, 248, 0.84);
+}
+
+body[data-theme="light"] .hours-yoy-card {
+    border-color: rgba(28, 42, 50, 0.1);
+    background: rgba(247, 251, 248, 0.88);
+}
+
+body[data-theme="light"] .hours-yoy-head strong,
+body[data-theme="light"] .hours-yoy-values strong {
+    color: #172027;
+}
+
+body[data-theme="light"] .hours-yoy-values span {
+    color: #60717d;
+}
+
+body[data-theme="light"] .audit-row strong {
+    color: #172027;
+}
+
+body[data-theme="light"] .audit-row span,
+body[data-theme="light"] .audit-row p {
+    color: #52616a;
 }
 
 body[data-theme="light"] .activity-item p {
@@ -2628,7 +2814,9 @@ body[data-theme="light"] .theme-toggle strong {
 
 .openai-cost-mini {
     display: grid;
-    gap: 2px;
+    grid-template-columns: 30px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
     min-width: 170px;
     padding: 8px 10px;
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -2653,6 +2841,36 @@ body[data-theme="light"] .theme-toggle strong {
     color: #ffffff;
     font-size: 0.98rem;
     line-height: 1.1;
+}
+
+.sidebar-status-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: 1px solid rgba(127, 209, 160, 0.18);
+    border-radius: 8px;
+    background: rgba(127, 209, 160, 0.08);
+    color: #bfe8ce;
+}
+
+.sidebar-status-icon svg,
+.sidebar-status-icon img {
+    width: 17px;
+    height: 17px;
+}
+
+.sidebar-status-icon svg {
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2;
+}
+
+.sidebar-status-icon img {
+    filter: invert(84%) sepia(16%) saturate(733%) hue-rotate(82deg) brightness(95%) contrast(88%);
 }
 
 .whatsapp-logo-bubble img {
@@ -3641,6 +3859,7 @@ body[data-theme="light"] .theme-toggle strong {
     .project-bookings-list a,
     .workflow-grid,
     .channel-grid,
+    .hours-yoy-grid,
     .timesheet-workflow-tabs,
     .timesheet-status-grid,
     .relation-layout,
@@ -3708,6 +3927,7 @@ body[data-theme="light"] .theme-toggle strong {
     .role-placeholder-grid,
     .workflow-grid,
     .channel-grid,
+    .hours-yoy-grid,
     .timesheet-workflow-tabs,
     .timesheet-status-grid,
     .timesheet-search,
@@ -3740,6 +3960,10 @@ body[data-theme="light"] .theme-toggle strong {
     }
 
     .page-overview .content-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .audit-row {
         grid-template-columns: 1fr;
     }
 }
