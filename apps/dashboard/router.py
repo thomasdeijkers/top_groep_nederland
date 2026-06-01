@@ -1,0 +1,807 @@
+from pathlib import Path
+from urllib.parse import urlencode
+
+from fastapi import APIRouter, File, Form, Query, UploadFile
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
+from starlette.requests import Request
+
+from apps.dashboard.placeholders import (
+    ACTIVITY_ITEMS,
+    MODULES,
+    IMPORT_STEPS,
+    REVIEW_ITEMS,
+    TICKET_QUEUES,
+)
+from apps.dashboard.organizations import create_organization, list_organizations
+from apps.dashboard.openai_usage import get_openai_usage_summary
+from apps.dashboard.records import (
+    get_overview_data,
+    get_timesheet_channel_tiles,
+    list_candidates,
+    list_project_options,
+    list_principals,
+    list_relations,
+    list_tickets,
+    list_vacancies,
+    list_whatsapp_timesheets,
+)
+from apps.dashboard.relations import (
+    create_candidate,
+    create_principal,
+    create_relation,
+    archive_relation,
+    delete_candidate,
+    delete_principal,
+    delete_vacancy,
+    get_candidate,
+    get_principal,
+    get_relation,
+    get_vacancy,
+    create_vacancy,
+    save_relation_photo,
+    update_candidate,
+    update_principal,
+    update_relation,
+    update_vacancy,
+)
+from apps.dashboard.stats import get_dashboard_stats, get_empty_dashboard_stats, get_health, get_server_overview
+from apps.dashboard.timesheet_corrections import save_field_corrections, send_to_payroll, validate_timesheet
+from apps.dashboard.timesheet_uploads import reparse_timesheet_upload, save_timesheet_upload
+from apps.dashboard.whatsapp_actions import archive_whatsapp_timesheet, delete_whatsapp_timesheet
+from jobs.imports.otys_export import import_otys_organizations, parse_otys_csv
+from jobs.imports.table_import import import_candidates, import_principals, import_vacancies, parse_csv
+
+router = APIRouter()
+templates = Jinja2Templates(directory=Path(__file__).resolve().parent / "templates")
+
+
+def _relations_url(tab: str = "candidates", edit: int | None = None, q: str = "", anchor: str = "") -> str:
+    params = {"tab": tab}
+    if edit is not None:
+        params["edit"] = edit
+    if q:
+        params["q"] = q
+    return f"/dashboard/relations?{urlencode(params)}{anchor}"
+
+
+def _timesheet_stage(status: str) -> str:
+    normalized = (status or "").strip().lower()
+    if normalized in {"goed_te_keuren", "approval", "akkoord_nodig"}:
+        return "valideren"
+    if normalized in {"loon_te_berekenen"}:
+        return "loon"
+    if normalized in {"doorgestuurd_naar_loonadministratie", "verwerkt", "processed"}:
+        return "accorderen"
+    return "controle"
+
+
+def _timesheet_workflow_tabs(items: list[dict], active_stage: str) -> list[dict]:
+    labels = {
+        "all": ("Alle taken", "Alle open urenbriefjes"),
+        "controle": ("Controle", "Ingekomen urenstaten openen en corrigeren"),
+        "valideren": ("Valideren", "Gecontroleerde uren boeken op opdrachtgever en project"),
+        "loon": ("Loon berekenen", "Gevalideerde uren klaarzetten voor loonberekening"),
+        "accorderen": ("Accorderen", "Definitieve controle voor loonadministratie"),
+    }
+    return [
+        {
+            "key": key,
+            "label": label,
+            "description": description,
+            "count": len(items) if key == "all" else sum(1 for item in items if item.get("workflow_stage") == key),
+            "active": key == active_stage,
+        }
+        for key, (label, description) in labels.items()
+    ]
+
+
+def _filter_timesheets(items: list[dict], query: str, workflow_stage: str) -> list[dict]:
+    filtered = items if workflow_stage == "all" else [item for item in items if item.get("workflow_stage") == workflow_stage]
+    search = (query or "").strip().lower()
+    if not search:
+        return filtered
+
+    def haystack(item: dict) -> str:
+        return " ".join(
+            str(value or "")
+            for value in (
+                item.get("sender_name"),
+                item.get("sender_phone"),
+                item.get("employee_name"),
+                item.get("media_filename"),
+                item.get("matched_name"),
+                item.get("workflow_stage_label"),
+                item.get("source_channel_label"),
+                item.get("status"),
+            )
+        ).lower()
+
+    return [item for item in filtered if search in haystack(item)]
+
+
+def _dashboard_context(
+    active_page: str,
+    edit_id: int | None = None,
+    query: str = "",
+    timesheet_id: int | None = None,
+    workflow_stage: str = "all",
+    timesheet_tab: str = "overview",
+    relation_tab: str = "candidates",
+    show_relation_form: bool = False,
+):
+    data_page = "timesheets" if active_page in {"timesheets", "whatsapp"} else "relations" if active_page in {"relations", "candidates", "principals"} else active_page
+    if active_page == "server":
+        stats = get_empty_dashboard_stats()
+        server_overview = get_server_overview()
+        return {
+            "active_page": active_page,
+            "stats": stats["cards"],
+            "database": server_overview["database"],
+            "modules": MODULES,
+            "review_items": REVIEW_ITEMS,
+            "activity_items": ACTIVITY_ITEMS,
+            "server_metrics": server_overview["server_metrics"],
+            "server_system_tiles": server_overview["server_system_tiles"],
+            "server_scheduler_tiles": server_overview["server_scheduler_tiles"],
+            "scheduled_jobs": server_overview["scheduled_jobs"],
+            "ticket_queues": TICKET_QUEUES,
+            "directory_results": [],
+            "relations": [],
+            "import_steps": IMPORT_STEPS,
+            "whatsapp_inbox": [],
+            "selected_timesheet": None,
+            "timesheet_stage": "all",
+            "timesheet_stage_items": [],
+            "timesheet_workflow_tabs": [],
+            "timesheet_tab": "overview",
+            "relation_tab": "candidates",
+            "show_relation_form": False,
+            "candidate_relations": [],
+            "principal_relations": [],
+            "candidates": [],
+            "tickets": [],
+            "vacancies": [],
+            "selected_relation": None,
+            "selected_vacancy": None,
+            "query": query,
+            "overview_data": {
+                "counts": {
+                    "candidates": 0,
+                    "principals": 0,
+                    "vacancies": 0,
+                    "whatsapp_timesheet_inbox": 0,
+                },
+                "recent": [],
+                "whatsapp_workflow": [],
+            },
+            "openai_usage": {"month_cost_usd": 0, "requests": 0, "total_tokens": 0},
+            "principal_options": [],
+            "project_options": [],
+            "timesheet_channel_tiles": [],
+            "country_options": [
+                "Nederland",
+                "Belgie",
+                "Duitsland",
+                "Polen",
+                "Roemenie",
+                "Bulgarije",
+                "Portugal",
+                "Spanje",
+                "Italie",
+                "Frankrijk",
+                "Overig",
+            ],
+        }
+
+    stats = get_dashboard_stats()
+    server_overview = get_server_overview()
+    organizations = list_organizations()
+    relations = list_relations(query=query if data_page == "relations" else "")
+    candidate_relations = list_relations(query=query if data_page == "relations" else "", relation_type="candidate")
+    principal_relations = list_relations(query=query if data_page == "relations" else "", relation_type="principal")
+    principals = list_principals(query=query if data_page == "relations" else "")
+    imported_candidates = list_candidates(query=query if data_page == "relations" else "")
+    imported_tickets = list_tickets()
+    imported_vacancies = list_vacancies(query=query if data_page == "vacancies" else "")
+    whatsapp_timesheets = list_whatsapp_timesheets()
+    overview_data = get_overview_data()
+    openai_usage = get_openai_usage_summary()
+    project_options = list_project_options()
+    selected_relation = get_relation(edit_id) if data_page == "relations" and edit_id else None
+    selected_vacancy = get_vacancy(edit_id) if data_page == "vacancies" and edit_id else None
+    relation_tab = relation_tab if relation_tab in {"candidates", "principals"} else "candidates"
+    show_relation_form = show_relation_form or bool(selected_relation)
+
+    whatsapp_inbox = whatsapp_timesheets
+    for item in whatsapp_inbox:
+        item.setdefault("parsed_map", {field.get("key", field["label"]): field for field in item.get("parsed_fields", [])})
+        item["workflow_stage"] = _timesheet_stage(item.get("status", ""))
+        item["workflow_stage_label"] = {
+            "controle": "Te controleren",
+            "valideren": "Te valideren",
+            "loon": "Loon berekenen",
+            "accorderen": "Accorderen",
+        }.get(item["workflow_stage"], "Te controleren")
+
+    workflow_stage = workflow_stage if workflow_stage in {"all", "controle", "valideren", "loon", "accorderen"} else "all"
+    timesheet_tab = timesheet_tab if timesheet_tab in {"overview", "task"} else "overview"
+    timesheet_stage_items = _filter_timesheets(whatsapp_inbox, query, workflow_stage)
+    selected_timesheet = next((item for item in whatsapp_inbox if item["id"] == timesheet_id), None) if timesheet_id else None
+    if timesheet_tab == "task" and not selected_timesheet:
+        timesheet_tab = "overview"
+
+    return {
+        "active_page": active_page,
+        "stats": stats["cards"],
+        "database": stats["database"],
+        "modules": MODULES,
+        "review_items": REVIEW_ITEMS,
+        "activity_items": ACTIVITY_ITEMS,
+        "server_metrics": server_overview["server_metrics"],
+        "server_system_tiles": server_overview["server_system_tiles"],
+        "server_scheduler_tiles": server_overview["server_scheduler_tiles"],
+        "scheduled_jobs": server_overview["scheduled_jobs"],
+        "ticket_queues": TICKET_QUEUES,
+        "directory_results": relations or principals or organizations,
+        "relations": relations,
+        "import_steps": IMPORT_STEPS,
+        "whatsapp_inbox": whatsapp_inbox,
+        "selected_timesheet": selected_timesheet,
+        "timesheet_stage": workflow_stage,
+        "timesheet_stage_items": timesheet_stage_items,
+        "timesheet_workflow_tabs": _timesheet_workflow_tabs(whatsapp_inbox, workflow_stage),
+        "timesheet_tab": timesheet_tab,
+        "relation_tab": relation_tab,
+        "show_relation_form": show_relation_form,
+        "candidate_relations": candidate_relations,
+        "principal_relations": principal_relations,
+        "candidates": imported_candidates,
+        "tickets": imported_tickets,
+        "vacancies": imported_vacancies,
+        "selected_relation": selected_relation,
+        "selected_vacancy": selected_vacancy,
+        "query": query,
+        "overview_data": overview_data,
+        "openai_usage": openai_usage,
+        "principal_options": principals,
+        "project_options": project_options,
+        "timesheet_channel_tiles": get_timesheet_channel_tiles(),
+        "country_options": [
+            "Nederland",
+            "Belgie",
+            "Duitsland",
+            "Polen",
+            "Roemenie",
+            "Bulgarije",
+            "Portugal",
+            "Spanje",
+            "Italie",
+            "Frankrijk",
+            "Overig",
+        ],
+    }
+
+
+def _render_dashboard(
+    request: Request,
+    active_page: str,
+    edit_id: int | None = None,
+    query: str = "",
+    timesheet_id: int | None = None,
+    workflow_stage: str = "all",
+    timesheet_tab: str = "overview",
+    relation_tab: str = "candidates",
+    show_relation_form: bool = False,
+):
+    return templates.TemplateResponse(
+        request,
+        "dashboard.html",
+        _dashboard_context(active_page, edit_id, query, timesheet_id, workflow_stage, timesheet_tab, relation_tab, show_relation_form),
+    )
+
+
+@router.get("/dashboard", response_class=HTMLResponse)
+def dashboard(request: Request):
+    return _render_dashboard(request, "overview")
+
+
+@router.get("/dashboard/candidates", response_class=HTMLResponse)
+def candidates_page(request: Request, edit: int | None = None, q: str = ""):
+    return RedirectResponse(_relations_url("candidates", edit, q), status_code=303)
+
+
+@router.get("/dashboard/principals", response_class=HTMLResponse)
+def principals_page(request: Request, edit: int | None = None, q: str = ""):
+    return RedirectResponse(_relations_url("principals", edit, q), status_code=303)
+
+
+@router.get("/dashboard/relations", response_class=HTMLResponse)
+def relations_page(request: Request, edit: int | None = None, q: str = "", tab: str = "candidates", new: bool = Query(False)):
+    return _render_dashboard(request, "relations", edit, q, relation_tab=tab, show_relation_form=new)
+
+
+@router.get("/dashboard/relations/photo/{relation_id}")
+def relation_photo(relation_id: int):
+    relation = get_relation(relation_id)
+    if relation and relation.get("photo_path"):
+        return FileResponse(relation["photo_path"])
+    return RedirectResponse("/dashboard/static/top-groep-nederland.png", status_code=303)
+
+
+@router.get("/dashboard/vacancies", response_class=HTMLResponse)
+def vacancies_page(request: Request, edit: int | None = None, q: str = ""):
+    return _render_dashboard(request, "vacancies", edit, q)
+
+
+@router.get("/dashboard/tickets", response_class=HTMLResponse)
+def tickets_page(request: Request):
+    return _render_dashboard(request, "tickets")
+
+
+@router.get("/dashboard/whatsapp", response_class=HTMLResponse)
+def whatsapp_page(request: Request):
+    return RedirectResponse("/dashboard/timesheets", status_code=303)
+
+
+@router.get("/dashboard/timesheets", response_class=HTMLResponse)
+def timesheets_page(request: Request, stage: str = "all", timesheet: int | None = None, tab: str = "overview", q: str = ""):
+    return _render_dashboard(request, "timesheets", query=q, timesheet_id=timesheet, workflow_stage=stage, timesheet_tab=tab)
+
+
+@router.get("/dashboard/whatsapp/document/{timesheet_id}")
+def whatsapp_document(timesheet_id: int):
+    for item in list_whatsapp_timesheets(limit=100):
+        if item["id"] == timesheet_id and item.get("media_path"):
+            return FileResponse(item["media_path"])
+    return RedirectResponse("/dashboard/timesheets", status_code=303)
+
+
+@router.get("/dashboard/timesheets/document/{timesheet_id}")
+def timesheet_document(timesheet_id: int):
+    return whatsapp_document(timesheet_id)
+
+
+@router.post("/api/whatsapp/timesheet-upload")
+async def upload_whatsapp_timesheet(
+    file: UploadFile = File(...),
+    sender_name: str = Form(""),
+    sender_phone: str = Form(""),
+):
+    content = await file.read()
+    record_id = save_timesheet_upload(
+        content=content,
+        filename=file.filename or "urenbriefje.jpg",
+        sender_name=sender_name,
+        sender_phone=sender_phone,
+        source_channel="manual_upload",
+        allow_openai=True,
+    )
+    return RedirectResponse(f"/dashboard/timesheets?tab=overview&stage=all&uploaded={record_id}#timesheet-inbox", status_code=303)
+
+
+@router.post("/api/whatsapp/timesheet/{timesheet_id}/corrections")
+async def correct_whatsapp_timesheet(timesheet_id: int, request: Request):
+    form = await request.form()
+    corrections = {
+        key.removeprefix("field_"): value
+        for key, value in form.items()
+        if key.startswith("field_")
+    }
+    save_field_corrections(timesheet_id, corrections)
+    return RedirectResponse(f"/dashboard/timesheets?stage=valideren&timesheet={timesheet_id}", status_code=303)
+
+
+@router.post("/api/whatsapp/timesheet/{timesheet_id}/reparse")
+def reparse_whatsapp_timesheet(timesheet_id: int):
+    reparse_timesheet_upload(timesheet_id, allow_openai=True)
+    return RedirectResponse(f"/dashboard/timesheets?stage=controle&timesheet={timesheet_id}", status_code=303)
+
+
+@router.post("/api/whatsapp/timesheet/{timesheet_id}/validate")
+def validate_whatsapp_timesheet(
+    timesheet_id: int,
+    principal_id: int | None = Form(None),
+    project_id: int | None = Form(None),
+):
+    validate_timesheet(timesheet_id, principal_id, project_id)
+    return RedirectResponse(f"/dashboard/timesheets?stage=loon&timesheet={timesheet_id}", status_code=303)
+
+
+@router.post("/api/whatsapp/timesheet/{timesheet_id}/payroll")
+def payroll_whatsapp_timesheet(timesheet_id: int):
+    send_to_payroll(timesheet_id)
+    return RedirectResponse(f"/dashboard/timesheets?stage=accorderen&timesheet={timesheet_id}", status_code=303)
+
+
+@router.post("/api/whatsapp/timesheet/{timesheet_id}/archive")
+def archive_whatsapp_message(timesheet_id: int):
+    archive_whatsapp_timesheet(timesheet_id)
+    return RedirectResponse("/dashboard/timesheets", status_code=303)
+
+
+@router.post("/api/whatsapp/timesheet/{timesheet_id}/delete")
+def delete_whatsapp_message(timesheet_id: int):
+    delete_whatsapp_timesheet(timesheet_id)
+    return RedirectResponse("/dashboard/timesheets", status_code=303)
+
+
+@router.get("/dashboard/server", response_class=HTMLResponse)
+def server_page(request: Request):
+    return _render_dashboard(request, "server")
+
+
+@router.get("/dashboard/settings", response_class=HTMLResponse)
+def settings_page(request: Request):
+    return _render_dashboard(request, "settings")
+
+
+@router.get("/api/health")
+def health():
+    return get_health()
+
+
+@router.get("/api/stats")
+def stats():
+    return get_dashboard_stats()
+
+
+@router.post("/api/customers")
+def create_customer(
+    organization_type: str = Form(...),
+    name: str = Form(...),
+    email: str = Form(""),
+    phone: str = Form(""),
+    website: str = Form(""),
+    city: str = Form(""),
+):
+    create_organization(
+        organization_type=organization_type,
+        name=name,
+        email=email,
+        phone=phone,
+        website=website,
+        city=city,
+    )
+    return RedirectResponse("/dashboard?created=1#relaties", status_code=303)
+
+
+async def _relation_photo_from_upload(photo: UploadFile | None):
+    if not photo or not photo.filename:
+        return None
+    content = await photo.read()
+    return save_relation_photo(content, photo.filename)
+
+
+@router.post("/api/relations")
+async def save_relation(
+    relation_type: str = Form("candidate"),
+    name: str = Form(""),
+    first_name: str = Form(""),
+    last_name: str = Form(""),
+    contact_name: str = Form(""),
+    email: str = Form(""),
+    phone: str = Form(""),
+    website: str = Form(""),
+    city: str = Form(""),
+    status: str = Form("Actief"),
+    source: str = Form(""),
+    street: str = Form(""),
+    house_number: str = Form(""),
+    house_number_addition: str = Form(""),
+    postal_code: str = Form(""),
+    country: str = Form("Nederland"),
+    owner: str = Form(""),
+    availability: str = Form(""),
+    hourly_rate: str = Form(""),
+    kvk_number: str = Form(""),
+    vat_number: str = Form(""),
+    notes: str = Form(""),
+    photo: UploadFile | None = File(None),
+):
+    photo_data = await _relation_photo_from_upload(photo)
+    record_id = create_relation(locals(), photo_data)
+    tab = "principals" if relation_type == "principal" else "candidates"
+    return RedirectResponse(_relations_url(tab, edit=record_id, anchor="#relatie-formulier"), status_code=303)
+
+
+@router.post("/api/relations/{relation_id}")
+async def edit_relation(
+    relation_id: int,
+    relation_type: str = Form("candidate"),
+    name: str = Form(""),
+    first_name: str = Form(""),
+    last_name: str = Form(""),
+    contact_name: str = Form(""),
+    email: str = Form(""),
+    phone: str = Form(""),
+    website: str = Form(""),
+    city: str = Form(""),
+    status: str = Form("Actief"),
+    source: str = Form(""),
+    street: str = Form(""),
+    house_number: str = Form(""),
+    house_number_addition: str = Form(""),
+    postal_code: str = Form(""),
+    country: str = Form("Nederland"),
+    owner: str = Form(""),
+    availability: str = Form(""),
+    hourly_rate: str = Form(""),
+    kvk_number: str = Form(""),
+    vat_number: str = Form(""),
+    notes: str = Form(""),
+    photo: UploadFile | None = File(None),
+):
+    photo_data = await _relation_photo_from_upload(photo)
+    update_relation(relation_id, locals(), photo_data)
+    tab = "principals" if relation_type == "principal" else "candidates"
+    return RedirectResponse(_relations_url(tab, edit=relation_id, anchor="#relatie-formulier"), status_code=303)
+
+
+@router.post("/api/relations/{relation_id}/delete")
+def remove_relation(relation_id: int):
+    archive_relation(relation_id)
+    return RedirectResponse(_relations_url(), status_code=303)
+
+
+@router.post("/api/relations/{relation_id}/archive")
+def archive_relation_record(relation_id: int):
+    archive_relation(relation_id)
+    return RedirectResponse(_relations_url(), status_code=303)
+
+
+@router.post("/api/candidates")
+def save_candidate(
+    first_name: str = Form(""),
+    last_name: str = Form(""),
+    email: str = Form(""),
+    phone: str = Form(""),
+    city: str = Form(""),
+    status: str = Form(""),
+    source: str = Form(""),
+    address: str = Form(""),
+    postal_code: str = Form(""),
+    country: str = Form(""),
+    owner: str = Form(""),
+    availability: str = Form(""),
+    hourly_rate: str = Form(""),
+    notes: str = Form(""),
+):
+    record_id = create_candidate(locals())
+    return RedirectResponse(_relations_url("candidates", edit=record_id, anchor="#relatie-formulier"), status_code=303)
+
+
+@router.post("/api/candidates/{candidate_id}")
+def edit_candidate(
+    candidate_id: int,
+    first_name: str = Form(""),
+    last_name: str = Form(""),
+    email: str = Form(""),
+    phone: str = Form(""),
+    city: str = Form(""),
+    status: str = Form(""),
+    source: str = Form(""),
+    address: str = Form(""),
+    postal_code: str = Form(""),
+    country: str = Form(""),
+    owner: str = Form(""),
+    availability: str = Form(""),
+    hourly_rate: str = Form(""),
+    notes: str = Form(""),
+):
+    update_candidate(candidate_id, locals())
+    return RedirectResponse(_relations_url("candidates", edit=candidate_id, anchor="#relatie-formulier"), status_code=303)
+
+
+@router.post("/api/candidates/{candidate_id}/delete")
+def remove_candidate(candidate_id: int):
+    delete_candidate(candidate_id)
+    return RedirectResponse(_relations_url("candidates", anchor="#relaties"), status_code=303)
+
+
+@router.post("/api/principals")
+def save_principal(
+    name: str = Form(""),
+    contact_name: str = Form(""),
+    email: str = Form(""),
+    phone: str = Form(""),
+    website: str = Form(""),
+    city: str = Form(""),
+    status: str = Form(""),
+    source: str = Form(""),
+    address: str = Form(""),
+    postal_code: str = Form(""),
+    country: str = Form(""),
+    kvk_number: str = Form(""),
+    vat_number: str = Form(""),
+    notes: str = Form(""),
+):
+    record_id = create_principal(locals())
+    return RedirectResponse(_relations_url("principals", edit=record_id, anchor="#relatie-formulier"), status_code=303)
+
+
+@router.post("/api/principals/{principal_id}")
+def edit_principal(
+    principal_id: int,
+    name: str = Form(""),
+    contact_name: str = Form(""),
+    email: str = Form(""),
+    phone: str = Form(""),
+    website: str = Form(""),
+    city: str = Form(""),
+    status: str = Form(""),
+    source: str = Form(""),
+    address: str = Form(""),
+    postal_code: str = Form(""),
+    country: str = Form(""),
+    kvk_number: str = Form(""),
+    vat_number: str = Form(""),
+    notes: str = Form(""),
+):
+    update_principal(principal_id, locals())
+    return RedirectResponse(_relations_url("principals", edit=principal_id, anchor="#relatie-formulier"), status_code=303)
+
+
+@router.post("/api/principals/{principal_id}/delete")
+def remove_principal(principal_id: int):
+    delete_principal(principal_id)
+    return RedirectResponse(_relations_url("principals", anchor="#relaties"), status_code=303)
+
+
+@router.post("/api/vacancies")
+def save_vacancy(
+    title: str = Form(""),
+    reference_number: str = Form(""),
+    status: str = Form(""),
+    owner: str = Form(""),
+    relation_name: str = Form(""),
+    location: str = Form(""),
+    publication_status: str = Form(""),
+    website_enabled: str = Form(""),
+    indeed_enabled: str = Form(""),
+    applicant_count: str = Form("0"),
+    category: str = Form(""),
+    subcategory: str = Form(""),
+    contact_email: str = Form(""),
+    contact_name: str = Form(""),
+    country: str = Form(""),
+    province: str = Form(""),
+    internal_notes: str = Form(""),
+    description: str = Form(""),
+    requirements: str = Form(""),
+    benefits: str = Form(""),
+    region: str = Form(""),
+    function_group: str = Form(""),
+    employment_type: str = Form(""),
+):
+    record_id = create_vacancy(locals())
+    return RedirectResponse(f"/dashboard/vacancies?edit={record_id}", status_code=303)
+
+
+@router.post("/api/vacancies/{vacancy_id}")
+def edit_vacancy(
+    vacancy_id: int,
+    title: str = Form(""),
+    reference_number: str = Form(""),
+    status: str = Form(""),
+    owner: str = Form(""),
+    relation_name: str = Form(""),
+    location: str = Form(""),
+    publication_status: str = Form(""),
+    website_enabled: str = Form(""),
+    indeed_enabled: str = Form(""),
+    applicant_count: str = Form("0"),
+    category: str = Form(""),
+    subcategory: str = Form(""),
+    contact_email: str = Form(""),
+    contact_name: str = Form(""),
+    country: str = Form(""),
+    province: str = Form(""),
+    internal_notes: str = Form(""),
+    description: str = Form(""),
+    requirements: str = Form(""),
+    benefits: str = Form(""),
+    region: str = Form(""),
+    function_group: str = Form(""),
+    employment_type: str = Form(""),
+):
+    update_vacancy(vacancy_id, locals())
+    return RedirectResponse(f"/dashboard/vacancies?edit={vacancy_id}", status_code=303)
+
+
+@router.post("/api/vacancies/{vacancy_id}/delete")
+def remove_vacancy(vacancy_id: int):
+    delete_vacancy(vacancy_id)
+    return RedirectResponse("/dashboard/vacancies", status_code=303)
+
+
+@router.post("/api/import/otys-export")
+async def import_otys_export(
+    file: UploadFile = File(...),
+    organization_type: str = Form(...),
+    mode: str = Form("dry_run"),
+):
+    content = await file.read()
+    rows, preview = parse_otys_csv(content, organization_type)
+
+    result = {
+        "filename": file.filename,
+        "mode": mode,
+        "organization_type": organization_type,
+        "total_rows": preview.total_rows,
+        "valid_rows": preview.valid_rows,
+        "skipped_rows": preview.skipped_rows,
+        "sample": preview.sample,
+        "errors": preview.errors,
+    }
+
+    if mode == "import":
+        result.update(import_otys_organizations(rows))
+
+    return result
+
+
+@router.post("/api/import/candidates")
+async def import_candidates_export(
+    file: UploadFile = File(...),
+    mode: str = Form("dry_run"),
+):
+    content = await file.read()
+    rows, preview = parse_csv(content, "candidate")
+    result = {
+        "filename": file.filename,
+        "mode": mode,
+        "target": "candidates",
+        "total_rows": preview.total_rows,
+        "valid_rows": preview.valid_rows,
+        "skipped_rows": preview.skipped_rows,
+        "sample": preview.sample,
+        "errors": preview.errors,
+    }
+    if mode == "import":
+        result.update(import_candidates(rows))
+    return result
+
+
+@router.post("/api/import/principals")
+async def import_principals_export(
+    file: UploadFile = File(...),
+    mode: str = Form("dry_run"),
+):
+    content = await file.read()
+    rows, preview = parse_csv(content, "principal")
+    result = {
+        "filename": file.filename,
+        "mode": mode,
+        "target": "principals",
+        "total_rows": preview.total_rows,
+        "valid_rows": preview.valid_rows,
+        "skipped_rows": preview.skipped_rows,
+        "sample": preview.sample,
+        "errors": preview.errors,
+    }
+    if mode == "import":
+        result.update(import_principals(rows))
+    return result
+
+
+@router.post("/api/import/vacancies")
+async def import_vacancies_export(
+    file: UploadFile = File(...),
+    mode: str = Form("dry_run"),
+):
+    content = await file.read()
+    rows, preview = parse_csv(content, "vacancy")
+    result = {
+        "filename": file.filename,
+        "mode": mode,
+        "target": "vacancies",
+        "total_rows": preview.total_rows,
+        "valid_rows": preview.valid_rows,
+        "skipped_rows": preview.skipped_rows,
+        "sample": preview.sample,
+        "errors": preview.errors,
+    }
+    if mode == "import":
+        result.update(import_vacancies(rows))
+    return result

@@ -1,0 +1,1086 @@
+<!doctype html>
+<html lang="nl">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>
+            {% if active_page == 'overview' %}Top Groep Nederland Dashboard
+            {% elif active_page == 'relations' %}Relaties - Top Groep Nederland
+            {% elif active_page == 'vacancies' %}Vacatures - Top Groep Nederland
+            {% elif active_page == 'tickets' %}Tickets - Top Groep Nederland
+            {% elif active_page == 'timesheets' %}Urenverwerking - Top Groep Nederland
+            {% elif active_page == 'server' %}Server info - Top Groep Nederland
+            {% elif active_page == 'settings' %}Instellingen - Top Groep Nederland
+            {% else %}Top Groep Nederland{% endif %}
+        </title>
+        <link rel="icon" href="/dashboard/static/favicon.ico" sizes="any">
+        <link rel="shortcut icon" href="/dashboard/static/favicon.ico">
+        <link rel="stylesheet" href="/dashboard/static/dashboard.css">
+    </head>
+    <body class="page-{{ active_page }}">
+        {% macro confidence_light(field) -%}
+            {% set confidence = field.confidence if field is defined and field.confidence is defined else 0 %}
+            {% set level = 'green' if confidence > 95 else 'orange' if confidence >= 80 else 'red' %}
+            <span class="field-light field-light--{{ level }}" title="Zekerheid {{ confidence }}%">
+                <span></span>{{ confidence }}%
+            </span>
+        {%- endmacro %}
+        <div class="app-shell">
+            <aside class="sidebar">
+                <a class="brand" href="/dashboard" aria-label="Top Groep Nederland dashboard">
+                    <img src="/dashboard/static/top-groep-nederland.png" alt="Top Groep Nederland">
+                </a>
+
+                <nav class="side-nav" aria-label="Hoofdnavigatie">
+                    <a class="side-nav__item {% if active_page == 'overview' %}side-nav__item--active{% endif %}" href="/dashboard">Overzicht</a>
+                    <a class="side-nav__item {% if active_page == 'relations' %}side-nav__item--active{% endif %}" href="/dashboard/relations">Relaties</a>
+                    <a class="side-nav__item {% if active_page == 'vacancies' %}side-nav__item--active{% endif %}" href="/dashboard/vacancies">Vacatures</a>
+                    <a class="side-nav__item {% if active_page == 'tickets' %}side-nav__item--active{% endif %}" href="/dashboard/tickets">Tickets</a>
+                    <a class="side-nav__item {% if active_page == 'timesheets' %}side-nav__item--active{% endif %}" href="/dashboard/timesheets">Urenverwerking</a>
+                    <a class="side-nav__item {% if active_page == 'server' %}side-nav__item--active{% endif %}" href="/dashboard/server">Server info</a>
+                    <a class="side-nav__item {% if active_page == 'settings' %}side-nav__item--active{% endif %}" href="/dashboard/settings">Instellingen</a>
+                </nav>
+
+                <div class="sidebar-footer">
+                    <div class="openai-cost-mini openai-cost-mini--sidebar">
+                        <span>OpenAI deze maand</span>
+                        <strong>${{ "%.4f"|format(openai_usage.month_cost_usd|float) }}</strong>
+                        <small>{{ openai_usage.requests }} parsing{% if openai_usage.requests != 1 %}s{% endif %} &middot; {{ openai_usage.total_tokens }} tokens</small>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="dashboard-shell">
+                <header class="dashboard-header">
+                    <div>
+                        <p class="eyebrow">Top Groep Nederland</p>
+                        <h1>
+                            {% if active_page == 'overview' %}Dashboard
+                            {% elif active_page == 'relations' %}Relaties
+                            {% elif active_page == 'vacancies' %}Vacatures
+                            {% elif active_page == 'tickets' %}Tickets
+                            {% elif active_page == 'timesheets' %}Urenverwerking
+                            {% elif active_page == 'server' %}Server info
+                            {% elif active_page == 'settings' %}Instellingen
+                            {% else %}Top Groep Nederland{% endif %}
+                        </h1>
+                        <p class="page-intro">
+                            {% if active_page == 'overview' %}Het centrale overzicht met aantallen, signalen en snelle ingangen naar de werkmodules.
+                            {% elif active_page == 'relations' %}Beheer kandidaten en opdrachtgevers op één plek, inclusief contactgegevens, status en koppelingen met vacatures en urenstaten.
+                            {% elif active_page == 'vacancies' %}Beheer openstaande vacatures voor publicatie richting website, Indeed en matching met kandidaten.
+                            {% elif active_page == 'tickets' %}Verzamel opvolgwerk uit e-mail, WhatsApp en urencontrole in een centrale takenlijst.
+                            {% elif active_page == 'timesheets' %}Verwerk urenbriefjes uit WhatsApp, e-mail, servermap of handmatige testupload.
+                            {% elif active_page == 'server' %}Controleer de technische status van dit dashboarddeel en de geplande achtergrondtaken.
+                            {% elif active_page == 'settings' %}Beheer weergave, gebruikers en rolverdeling voor het dashboard.
+                            {% else %}Werkmodule voor Top Groep Nederland.{% endif %}
+                        </p>
+                    </div>
+                </header>
+
+                <section class="stats-grid overview-only" aria-label="Dashboard statistieken">
+                    <a class="stat-card" href="/dashboard/relations?tab=candidates">
+                        <span class="stat-card__icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"></path><path d="M22 21v-2a4 4 0 0 0-3-3.9"></path><path d="M16 3.1a4 4 0 0 1 0 7.8"></path></svg>
+                        </span>
+                        <div class="stat-card__copy">
+                            <p>Kandidaten</p>
+                            <span>Database</span>
+                        </div>
+                        <strong>{{ overview_data.counts.candidates }}</strong>
+                    </a>
+                    <a class="stat-card" href="/dashboard/relations?tab=principals">
+                        <span class="stat-card__icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M3 21h18"></path><path d="M5 21V7l8-4v18"></path><path d="M19 21V11l-6-4"></path><path d="M9 9h1"></path><path d="M9 13h1"></path><path d="M9 17h1"></path></svg>
+                        </span>
+                        <div class="stat-card__copy">
+                            <p>Opdrachtgevers</p>
+                            <span>Database</span>
+                        </div>
+                        <strong>{{ overview_data.counts.principals }}</strong>
+                    </a>
+                    <a class="stat-card" href="/dashboard/vacancies">
+                        <span class="stat-card__icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M10 6h4"></path><path d="M10 6V4a2 2 0 0 1 2-2 2 2 0 0 1 2 2v2"></path><path d="M3 7h18v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"></path><path d="M3 13h18"></path></svg>
+                        </span>
+                        <div class="stat-card__copy">
+                            <p>Vacatures</p>
+                            <span>Openstaand / database</span>
+                        </div>
+                        <strong>{{ overview_data.counts.vacancies }}</strong>
+                    </a>
+                    <a class="stat-card" href="/dashboard/tickets">
+                        <span class="stat-card__icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3a2 2 0 1 0 0 4v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3a2 2 0 1 0 0-4Z"></path><path d="M9 9h6"></path><path d="M9 15h6"></path></svg>
+                        </span>
+                        <div class="stat-card__copy">
+                            <p>Tickets</p>
+                            <span>Opvolging</span>
+                        </div>
+                        <strong>{{ overview_data.counts.tickets }}</strong>
+                    </a>
+                    <a class="stat-card" href="/dashboard/timesheets">
+                        <span class="stat-card__icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M8 2v4"></path><path d="M16 2v4"></path><path d="M3 10h18"></path><path d="M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"></path><path d="M8 15h4"></path><path d="M8 18h8"></path></svg>
+                        </span>
+                        <div class="stat-card__copy">
+                            <p>Urenbriefjes</p>
+                            <span>Inbox</span>
+                        </div>
+                        <strong>{{ overview_data.counts.whatsapp_timesheet_inbox }}</strong>
+                    </a>
+                    <a class="stat-card" href="/dashboard/server">
+                        <span class="stat-card__icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M4 4h16v6H4Z"></path><path d="M4 14h16v6H4Z"></path><path d="M8 7h.01"></path><path d="M8 17h.01"></path></svg>
+                        </span>
+                        <div class="stat-card__copy">
+                            <p>Server</p>
+                            <span>{{ database.status }}</span>
+                        </div>
+                        <strong>{{ server_system_tiles|length }}</strong>
+                    </a>
+                    <a class="stat-card" href="/dashboard/settings">
+                        <span class="stat-card__icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M12 3v18"></path><path d="M18 8a6 6 0 0 0-12 0c0 7 12 7 12 0Z"></path></svg>
+                        </span>
+                        <div class="stat-card__copy">
+                            <p>OpenAI</p>
+                            <span>{{ openai_usage.requests }} parsings</span>
+                        </div>
+                        <strong>${{ "%.2f"|format(openai_usage.month_cost_usd|float) }}</strong>
+                    </a>
+                </section>
+
+                <section class="content-grid">
+                    <article class="panel panel--full panel--compact overview-only" aria-label="Urenverwerking">
+                        <div class="workflow-grid">
+                            {% for step in overview_data.whatsapp_workflow %}
+                            <a class="workflow-card workflow-card--{{ step.key }}" href="/dashboard/timesheets" title="{{ step.description }}">
+                                <span class="workflow-icon" aria-hidden="true">
+                                    {% if step.key == 'geupload' %}
+                                    <svg viewBox="0 0 24 24"><path d="M12 3v12"></path><path d="m7 8 5-5 5 5"></path><path d="M5 15v4h14v-4"></path></svg>
+                                    {% elif step.key == 'gematcht' %}
+                                    <svg viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.6 19.6 0 0 1-8.5-3 19.2 19.2 0 0 1-6-6A19.6 19.6 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z"></path></svg>
+                                    {% elif step.key == 'te_controleren' %}
+                                    <svg viewBox="0 0 24 24"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v5h5"></path><path d="M9 14h6"></path><path d="M9 18h4"></path></svg>
+                                    {% elif step.key == 'goed_te_keuren' %}
+                                    <svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"></path></svg>
+                                    {% elif step.key == 'loon_te_berekenen' %}
+                                    <svg viewBox="0 0 24 24"><path d="M4 6h16"></path><path d="M4 12h16"></path><path d="M4 18h10"></path><path d="M17 15l3 3-3 3"></path></svg>
+                                    {% else %}
+                                    <svg viewBox="0 0 24 24"><path d="M12 2v20"></path><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7H14a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                                    {% endif %}
+                                </span>
+                                <div class="workflow-copy">
+                                    <span>{{ step.label }}</span>
+                                    <small>{{ step.description }}</small>
+                                </div>
+                                <strong>{{ step.count }}</strong>
+                            </a>
+                            {% endfor %}
+                        </div>
+                    </article>
+
+                    <article class="panel panel--full settings-only">
+                        <div class="settings-grid">
+                            <section class="settings-card">
+                                <div>
+                                    <p class="section-label">Weergave</p>
+                                    <h2>Thema</h2>
+                                    <p>Schakel tussen donker en licht dashboardthema.</p>
+                                </div>
+                                <label class="theme-toggle">
+                                    <input type="checkbox" data-theme-toggle>
+                                    <span aria-hidden="true"></span>
+                                    <strong data-theme-label>Dark theme</strong>
+                                </label>
+                            </section>
+
+                            <section class="settings-card">
+                                <div>
+                                    <p class="section-label">Gebruikers</p>
+                                    <h2>Gebruikersbeheer</h2>
+                                    <p>Placeholder voor aanmaken, uitnodigen en activeren van dashboardgebruikers.</p>
+                                </div>
+                                <div class="user-placeholder-list">
+                                    <article>
+                                        <span>TD</span>
+                                        <div>
+                                            <strong>Thomas Deijkers</strong>
+                                            <small>Beheerder - alle modules</small>
+                                        </div>
+                                    </article>
+                                    <article>
+                                        <span>TV</span>
+                                        <div>
+                                            <strong>Tim Van Dueren Den Hollander</strong>
+                                            <small>Gebruiker - rol nog te bepalen</small>
+                                        </div>
+                                    </article>
+                                </div>
+                            </section>
+
+                            <section class="settings-card settings-card--wide">
+                                <div>
+                                    <p class="section-label">Rollen</p>
+                                    <h2>Rolverdeling</h2>
+                                    <p>Voorbereid voor rechten per gebruiker, zoals beheer, relaties, vacatures, urenverwerking en serverinformatie.</p>
+                                </div>
+                                <div class="role-placeholder-grid">
+                                    <span>Beheerder</span>
+                                    <span>Relaties</span>
+                                    <span>Vacatures</span>
+                                    <span>Urenverwerking</span>
+                                    <span>Rapportage</span>
+                                    <span>Server info</span>
+                                </div>
+                            </section>
+                        </div>
+                    </article>
+
+                    {% set active_relation_tab = request.query_params.get('tab', relation_tab|default('candidates')) if request is defined else relation_tab|default('candidates') %}
+                    {% if active_relation_tab not in ['candidates', 'principals'] %}
+                    {% set active_relation_tab = 'candidates' %}
+                    {% endif %}
+                    {% set all_relation_rows = relations|default([]) %}
+                    {% set candidate_rows = candidate_relations if candidate_relations is defined else all_relation_rows|selectattr('relation_type', 'equalto', 'candidate')|list %}
+                    {% set principal_rows = principal_relations if principal_relations is defined else all_relation_rows|selectattr('relation_type', 'equalto', 'principal')|list %}
+                    <article class="panel panel--full relations-only" id="relaties">
+                        <div class="panel-header">
+                            <div>
+                                <p class="section-label">Relaties</p>
+                                <h2>Relaties beheren</h2>
+                                <p>Zoek en beheer kandidaten en opdrachtgevers vanuit hun eigen lijst.</p>
+                            </div>
+                            <a class="ghost-button" href="/dashboard/relations?tab={{ active_relation_tab }}&new=1#relatie-formulier">Nieuwe relatie aanmaken</a>
+                        </div>
+
+                        <nav class="relation-tabs" aria-label="Relatie tabs">
+                            <a class="relation-tab {% if active_relation_tab == 'candidates' %}relation-tab--active{% endif %}" href="/dashboard/relations?tab=candidates#relaties">Kandidaten</a>
+                            <a class="relation-tab {% if active_relation_tab == 'principals' %}relation-tab--active{% endif %}" href="/dashboard/relations?tab=principals#relaties">Opdrachtgevers</a>
+                        </nav>
+
+                        {% set visible_relations = candidate_rows if active_relation_tab == 'candidates' else principal_rows %}
+                        {% set relation_label = 'kandidaten' if active_relation_tab == 'candidates' else 'opdrachtgevers' %}
+                        <form class="single-search" action="/dashboard/relations" method="get">
+                            <input type="hidden" name="tab" value="{{ active_relation_tab }}">
+                            <input type="search" name="q" value="{{ query }}" placeholder="Zoek in {{ relation_label }} op naam, telefoon, e-mail, plaats, status of OTYS ID">
+                            <button class="ghost-button" type="submit">Zoeken</button>
+                        </form>
+
+                        <div class="relation-layout relation-layout--wide">
+                            <div class="table-wrap">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Type</th>
+                                            <th>Foto/logo</th>
+                                            <th>Naam</th>
+                                            <th>Telefoonnummer</th>
+                                            <th>Adres</th>
+                                            <th>Plaats</th>
+                                            <th>Status</th>
+                                            <th>Actie</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for result in visible_relations %}
+                                        <tr>
+                                            <td>{{ result.type }}</td>
+                                            <td>
+                                                {% if result.has_photo %}
+                                                <span class="relation-thumb">
+                                                    <img src="/dashboard/relations/photo/{{ result.id }}" alt="">
+                                                </span>
+                                                {% else %}
+                                                <span class="relation-thumb relation-thumb--empty">{{ result.initials }}</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ result.name }}</td>
+                                            <td>{{ result.contact }}</td>
+                                            <td>{{ result.street }} {{ result.house_number }}{{ result.house_number_addition }}</td>
+                                            <td>{{ result.city }}</td>
+                                            <td><span class="status-tag">{{ result.status }}</span></td>
+                                            <td>
+                                                {% if result.id %}
+                                                <a class="table-link" href="/dashboard/relations?tab={{ active_relation_tab }}&edit={{ result.id }}#relatie-formulier">Open</a>
+                                                {% else %}
+                                                <span>-</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% else %}
+                                        <tr>
+                                            <td colspan="8">Nog geen {{ relation_label }} gevonden.</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                        </div>
+                    </article>
+
+                    {% set show_relation_editor = show_relation_form|default(false) or selected_relation or (request is defined and request.query_params.get('new')) %}
+                    {% if show_relation_editor %}
+                    <article class="panel panel--full relations-only" id="relatie-formulier">
+                        <div class="panel-header">
+                            <div>
+                                <p class="section-label">Database</p>
+                                <h2>{% if selected_relation %}Relatie bewerken{% else %}Relatie aanmaken{% endif %}</h2>
+                                <p>Kies het type relatie en vul alleen de velden in die nodig zijn. Foto's en logo's worden bij de relatie opgeslagen.</p>
+                            </div>
+                            {% if selected_relation %}
+                            <form action="/api/relations/{{ selected_relation.id }}/archive" method="post">
+                                <button class="ghost-button danger-button" type="submit">Archiveren</button>
+                            </form>
+                            {% endif %}
+                        </div>
+
+                        <form class="create-form relation-form" data-relation-form action="{% if selected_relation %}/api/relations/{{ selected_relation.id }}{% else %}/api/relations{% endif %}" method="post" enctype="multipart/form-data">
+                            <div class="relation-photo-panel">
+                                <div class="relation-photo-preview">
+                                    {% if selected_relation and selected_relation.photo_path %}
+                                    <img src="/dashboard/relations/photo/{{ selected_relation.id }}" alt="Relatie foto">
+                                    {% else %}
+                                    <span>{{ (selected_relation.name[:2] if selected_relation else 'OB')|upper }}</span>
+                                    {% endif %}
+                                </div>
+                                <label class="form-span-2">Foto of logo <input type="file" name="photo" accept="image/*"></label>
+                            </div>
+
+                            <label>Type
+                                <select name="relation_type" data-relation-type>
+                                    <option value="candidate" {% if (selected_relation and selected_relation.relation_type == 'candidate') or (not selected_relation and active_relation_tab == 'candidates') %}selected{% endif %}>Kandidaat</option>
+                                    <option value="principal" {% if (selected_relation and selected_relation.relation_type == 'principal') or (not selected_relation and active_relation_tab == 'principals') %}selected{% endif %}>Opdrachtgever</option>
+                                </select>
+                            </label>
+                            <label data-principal-field>Bedrijfsnaam <input type="text" name="name" value="{{ selected_relation.name if selected_relation and selected_relation.relation_type == 'principal' else '' }}" placeholder="Bedrijfsnaam"></label>
+                            <label data-candidate-field>Voornaam <input type="text" name="first_name" value="{{ selected_relation.first_name if selected_relation else '' }}"></label>
+                            <label data-candidate-field>Achternaam <input type="text" name="last_name" value="{{ selected_relation.last_name if selected_relation else '' }}"></label>
+                            <label data-principal-field>Naam contactpersoon <input type="text" name="contact_name" value="{{ selected_relation.contact_name if selected_relation else '' }}"></label>
+                            <label>E-mail <input type="email" name="email" value="{{ selected_relation.email if selected_relation else '' }}"></label>
+                            <label>Telefoon <input type="text" name="phone" value="{{ selected_relation.phone if selected_relation else '' }}"></label>
+                            <label data-principal-field>Website <input type="url" name="website" value="{{ selected_relation.website if selected_relation else '' }}"></label>
+                            <label>Plaats <input type="text" name="city" value="{{ selected_relation.city if selected_relation else '' }}"></label>
+                            <label>Status
+                                {% set selected_status = 'Archief' if selected_relation and (selected_relation.archived_at or (selected_relation.status|lower) in ['archief', 'gearchiveerd']) else 'Actief' %}
+                                <select name="status">
+                                    <option value="Actief" {% if selected_status == 'Actief' %}selected{% endif %}>Actief</option>
+                                    <option value="Archief" {% if selected_status == 'Archief' %}selected{% endif %}>Archief</option>
+                                </select>
+                            </label>
+                            <label>Bron <input type="text" name="source" value="{{ selected_relation.source if selected_relation else '' }}" placeholder="Website / OTYS export / handmatig"></label>
+                            <label>Straat <input type="text" name="street" value="{{ (selected_relation.street or selected_relation.address) if selected_relation else '' }}"></label>
+                            <label>Huisnummer <input type="text" name="house_number" value="{{ selected_relation.house_number if selected_relation else '' }}"></label>
+                            <label>Toevoeging <input type="text" name="house_number_addition" value="{{ selected_relation.house_number_addition if selected_relation else '' }}" placeholder="A / bis / rood"></label>
+                            <label>Postcode <input type="text" name="postal_code" value="{{ selected_relation.postal_code if selected_relation else '' }}"></label>
+                            <label>Land
+                                <select name="country">
+                                    {% set selected_country = selected_relation.country if selected_relation and selected_relation.country else 'Nederland' %}
+                                    {% for country in country_options %}
+                                    <option value="{{ country }}" {% if selected_country == country %}selected{% endif %}>{{ country }}</option>
+                                    {% endfor %}
+                                </select>
+                            </label>
+                            <label data-candidate-field>Eigenaar <input type="text" name="owner" value="{{ selected_relation.owner if selected_relation else '' }}" placeholder="Top Groep Nederland"></label>
+                            <label data-candidate-field>Beschikbaarheid <input type="text" name="availability" value="{{ selected_relation.availability if selected_relation else '' }}"></label>
+                            <label data-candidate-field>Uurtarief <input type="text" name="hourly_rate" value="{{ selected_relation.hourly_rate if selected_relation else '' }}"></label>
+                            <label data-principal-field>KvK <input type="text" name="kvk_number" value="{{ selected_relation.kvk_number if selected_relation else '' }}"></label>
+                            <label data-principal-field>BTW <input type="text" name="vat_number" value="{{ selected_relation.vat_number if selected_relation else '' }}"></label>
+                            <label class="form-span-2">Notities <textarea name="notes">{{ selected_relation.notes if selected_relation else '' }}</textarea></label>
+                            <button class="ghost-button create-form__submit" type="submit">Relatie opslaan</button>
+                        </form>
+                    </article>
+                    {% endif %}
+
+                    <div class="modal-backdrop" data-relation-modal hidden>
+                        <div class="relation-modal" role="dialog" aria-modal="true" aria-labelledby="relation-modal-title">
+                            <div class="relation-modal__header">
+                                <div>
+                                    <p class="section-label">Nieuwe relatie</p>
+                                    <h2 id="relation-modal-title">Wat wil je aanmaken?</h2>
+                                </div>
+                                <button class="modal-close" type="button" data-close-relation-modal aria-label="Sluiten">x</button>
+                            </div>
+                            <div class="relation-choice-grid">
+                                <button type="button" data-new-relation-type="candidate">
+                                    <strong>Kandidaat</strong>
+                                    <span>Persoon, kandidaatprofiel, telefoonmatch en beschikbaarheid.</span>
+                                </button>
+                                <button type="button" data-new-relation-type="principal">
+                                    <strong>Opdrachtgever</strong>
+                                    <span>Bedrijf, contactpersoon, KvK/BTW, website en opdrachten.</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <article class="panel panel--wide overview-only">
+                        <div class="panel-header">
+                            <div>
+                                <h2>Modules</h2>
+                                <p>Basisstructuur voor de eerste werkstromen.</p>
+                            </div>
+                        </div>
+
+                        <div class="module-grid">
+                            {% for module in modules %}
+                            <a class="module-card" href="#">
+                                <span>{{ module.name }}</span>
+                                <strong>{{ module.count }}</strong>
+                                <small>{{ module.status }}</small>
+                            </a>
+                            {% endfor %}
+                        </div>
+                    </article>
+
+                    <article class="panel overview-only">
+                        <div class="panel-header">
+                            <div>
+                                <h2>Te controleren</h2>
+                                <p>Werk dat aandacht nodig heeft.</p>
+                            </div>
+                        </div>
+
+                        <div class="task-list">
+                            {% for item in review_items %}
+                            <div class="task-item">
+                                <div>
+                                    <strong>{{ item.title }}</strong>
+                                    <span>{{ item.meta }}</span>
+                                </div>
+                                <small>{{ item.priority }}</small>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </article>
+
+                    <article class="panel overview-only">
+                        <div class="panel-header">
+                            <div>
+                                <h2>Recente activiteit</h2>
+                                <p>Auditspoor en voortgangsmeldingen voor database-acties komen hier samen.</p>
+                            </div>
+                        </div>
+
+                        <div class="activity-list">
+                            {% for item in activity_items %}
+                            <div class="activity-item">
+                                <span></span>
+                                <div>
+                                    <strong>{{ item.title }}</strong>
+                                    <small>{{ item.meta }}</small>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </article>
+
+                    <article class="panel panel--full vacancies-only" id="vacatures">
+                        <div class="panel-header">
+                            <div>
+                                <p class="section-label section-label--vacancy">Vacatures</p>
+                                <h2>Vacaturedatabase</h2>
+                                <p>Bekijk openstaande vacatures, filter gericht en open een vacature om publicatievelden bij te werken.</p>
+                            </div>
+                            <a class="ghost-button vacancy-button" href="/dashboard/vacancies#vacature-formulier">Nieuwe vacature</a>
+                        </div>
+
+                        <div class="vacancy-database-layout">
+                            <div class="table-wrap vacancy-table">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Titel</th>
+                                            <th>Ref.</th>
+                                            <th>Status</th>
+                                            <th>Eigenaar</th>
+                                            <th>Relatie</th>
+                                            <th>S</th>
+                                            <th>SV</th>
+                                            <th>Locatie</th>
+                                            <th>Sollicitanten</th>
+                                            <th>Actie</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for vacancy in vacancies %}
+                                        <tr>
+                                            <td>{{ vacancy.title }}</td>
+                                            <td>{{ vacancy.reference_number }}</td>
+                                            <td><span class="status-tag vacancy-status">{{ vacancy.status }}</span></td>
+                                            <td>{{ vacancy.owner }}</td>
+                                            <td>{{ vacancy.relation_name }}</td>
+                                            <td>0</td>
+                                            <td><span class="orange-count">0</span></td>
+                                            <td>{{ vacancy.location }}</td>
+                                            <td>{{ vacancy.applicant_count }}</td>
+                                            <td>
+                                                {% if vacancy.id %}
+                                                <a class="table-link" href="/dashboard/vacancies?edit={{ vacancy.id }}">Open</a>
+                                                {% else %}
+                                                <span>-</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <aside class="vacancy-search-panel">
+                                <div class="panel-search-title">
+                                    <strong>Zoeken</strong>
+                                    <a href="/dashboard/vacancies#vacature-formulier">+</a>
+                                </div>
+                                <form action="/dashboard/vacancies" method="get">
+                                    <input type="search" name="q" value="{{ query }}" placeholder="Trefwoord...">
+                                    <input type="search" placeholder="Semantische zoekopdracht...">
+                                    <input type="search" placeholder="Selecteer een relatie">
+                                    <button class="ghost-button" type="submit">Zoeken</button>
+                                </form>
+                                <a class="criterion-link" href="#">+ Criterium toevoegen</a>
+                            </aside>
+                        </div>
+                    </article>
+
+                    <article class="panel panel--full vacancies-only {% if not selected_vacancy %}new-vacancy-form{% endif %}" id="vacature-formulier">
+                        <div class="panel-header">
+                            <div>
+                                <p class="section-label section-label--vacancy">Database</p>
+                                <h2>{% if selected_vacancy %}Vacature bewerken{% else %}Vacature aanmaken{% endif %}</h2>
+                                <p>Beheer vacaturegegevens en publicatievelden voor website en Indeed.</p>
+                            </div>
+                            {% if selected_vacancy %}
+                            <form action="/api/vacancies/{{ selected_vacancy.id }}/delete" method="post">
+                                <button class="ghost-button danger-button" type="submit">Verwijderen</button>
+                            </form>
+                            {% endif %}
+                        </div>
+
+                        <form class="vacancy-form" action="{% if selected_vacancy %}/api/vacancies/{{ selected_vacancy.id }}{% else %}/api/vacancies{% endif %}" method="post">
+                            <section>
+                                <h3>Vacature informatie</h3>
+                                <div class="create-form">
+                                    <label class="form-span-2">Functietitel <input type="text" name="title" value="{{ selected_vacancy.title if selected_vacancy else '' }}" required></label>
+                                    <label>Referentie <input type="text" name="reference_number" value="{{ selected_vacancy.reference_number if selected_vacancy else '' }}"></label>
+                                    <label>Status <input type="text" name="status" value="{{ selected_vacancy.status if selected_vacancy else '' }}" placeholder="Lopend"></label>
+                                    <label>Eigenaar <input type="text" name="owner" value="{{ selected_vacancy.owner if selected_vacancy else '' }}"></label>
+                                    <label>Opdrachtgever <input type="text" name="relation_name" value="{{ selected_vacancy.relation_name if selected_vacancy else '' }}"></label>
+                                    <label>Locatie <input type="text" name="location" value="{{ selected_vacancy.location if selected_vacancy else '' }}"></label>
+                                    <label>Land <input type="text" name="country" value="{{ selected_vacancy.country if selected_vacancy else '' }}" placeholder="Nederland"></label>
+                                    <label>Provincie <input type="text" name="province" value="{{ selected_vacancy.province if selected_vacancy else '' }}"></label>
+                                    <label>Hoofdcategorie <input type="text" name="category" value="{{ selected_vacancy.category if selected_vacancy else '' }}"></label>
+                                    <label>Subcategorie <input type="text" name="subcategory" value="{{ selected_vacancy.subcategory if selected_vacancy else '' }}"></label>
+                                    <label>Contactpersoon <input type="text" name="contact_name" value="{{ selected_vacancy.contact_name if selected_vacancy else '' }}"></label>
+                                    <label>E-mail <input type="email" name="contact_email" value="{{ selected_vacancy.contact_email if selected_vacancy else '' }}"></label>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h3>Publicatie</h3>
+                                <div class="create-form">
+                                    <label>Publicatiestatus <input type="text" name="publication_status" value="{{ selected_vacancy.publication_status if selected_vacancy else 'concept' }}"></label>
+                                    <label>Aantal sollicitanten <input type="number" name="applicant_count" value="{{ selected_vacancy.applicant_count if selected_vacancy else 0 }}"></label>
+                                    <label class="checkbox-label"><input type="checkbox" name="website_enabled" {% if selected_vacancy and selected_vacancy.website_enabled %}checked{% endif %}> Website publiceren</label>
+                                    <label class="checkbox-label"><input type="checkbox" name="indeed_enabled" {% if selected_vacancy and selected_vacancy.indeed_enabled %}checked{% endif %}> Indeed klaarzetten</label>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h3>Vacaturetekst</h3>
+                                <div class="vacancy-text-grid">
+                                    <label>Interne opmerkingen <textarea name="internal_notes">{{ selected_vacancy.internal_notes if selected_vacancy else '' }}</textarea></label>
+                                    <label>Wat ga je doen? <textarea name="description">{{ selected_vacancy.description if selected_vacancy else '' }}</textarea></label>
+                                    <label>Wat zoeken wij? <textarea name="requirements">{{ selected_vacancy.requirements if selected_vacancy else '' }}</textarea></label>
+                                    <label>Wat kan je verwachten? <textarea name="benefits">{{ selected_vacancy.benefits if selected_vacancy else '' }}</textarea></label>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h3>Match criteria</h3>
+                                <div class="create-form">
+                                    <label>Regio <input type="text" name="region" value="{{ selected_vacancy.region if selected_vacancy else '' }}" placeholder="Utrecht, Noord-Holland"></label>
+                                    <label>Functiegroep <input type="text" name="function_group" value="{{ selected_vacancy.function_group if selected_vacancy else '' }}" placeholder="Timmerwerk"></label>
+                                    <label>Soort dienstverband <input type="text" name="employment_type" value="{{ selected_vacancy.employment_type if selected_vacancy else '' }}" placeholder="ZZP / loondienst"></label>
+                                    <button class="ghost-button create-form__submit" type="submit">Vacature opslaan</button>
+                                </div>
+                            </section>
+                        </form>
+                    </article>
+
+                    <article class="panel panel--full timesheets-only" id="timesheets">
+                        {% set active_timesheet_tab = timesheet_tab|default('overview') %}
+                        <div class="timesheet-compact-head">
+                            <div>
+                                <p class="section-label">Urenverwerking</p>
+                                <h2>Taken inbox</h2>
+                                <p>Alle urenbriefjes staan hier als taak met status, herkomst en zekerheid.</p>
+                                <nav class="timesheet-tabs" id="timesheet-tabs" aria-label="Urenbriefjes tabs">
+                                    <a class="timesheet-tab {% if active_timesheet_tab == 'overview' %}timesheet-tab--active{% endif %}" href="/dashboard/timesheets?tab=overview#timesheet-tabs">Overzicht</a>
+                                    {% if selected_timesheet %}
+                                    <a class="timesheet-tab {% if active_timesheet_tab == 'task' %}timesheet-tab--active{% endif %}" href="/dashboard/timesheets?tab=task&stage={{ selected_timesheet.workflow_stage }}&timesheet={{ selected_timesheet.id }}#timesheet-tabs">Actuele taak</a>
+                                    {% else %}
+                                    <span class="timesheet-tab timesheet-tab--disabled">Actuele taak</span>
+                                    {% endif %}
+                                </nav>
+                            </div>
+                            {% if active_timesheet_tab == 'overview' %}
+                            <form class="timesheet-dropzone timesheet-dropzone--compact" action="/api/whatsapp/timesheet-upload" method="post" enctype="multipart/form-data" data-timesheet-dropzone>
+                                <input type="hidden" name="sender_name" value="">
+                                <input type="hidden" name="sender_phone" value="onbekend">
+                                <input type="file" name="file" accept="image/*,.pdf" data-timesheet-drop-input hidden>
+                                <span class="timesheet-dropzone__icon">
+                                    <img src="https://api.iconify.design/lucide:file-up.svg" alt="">
+                                </span>
+                                <strong>Sleep urenbriefje hierheen</strong>
+                                <small>Afbeelding of PDF wordt direct een taak.</small>
+                                <button class="ghost-button" type="button" data-timesheet-drop-button>Bestand kiezen</button>
+                            </form>
+                            {% endif %}
+                        </div>
+
+                        {% if active_timesheet_tab == 'overview' %}
+                        <details class="manual-processing manual-processing--form" id="manual-processing">
+                            <summary>
+                                <span class="manual-processing__icon">
+                                    <img src="https://api.iconify.design/lucide:hand.svg" alt="">
+                                </span>
+                                <span>
+                                    <strong>Handmatig taak aanmaken</strong>
+                                    <small>Upload met naam en telefoonnummer</small>
+                                </span>
+                            </summary>
+                            <form class="whatsapp-upload-form whatsapp-upload-form--compact" action="/api/whatsapp/timesheet-upload" method="post" enctype="multipart/form-data">
+                                <label>Naam afzender <input type="text" name="sender_name" placeholder="Naam afzender"></label>
+                                <label>Telefoonnummer <input type="text" name="sender_phone" placeholder="+31 6 ... / automatisch uit briefje"></label>
+                                <label>Urenbriefje <input type="file" name="file" accept="image/*,.pdf" required></label>
+                                <button class="ghost-button" type="submit">Upload en parse</button>
+                            </form>
+                        </details>
+                        {% endif %}
+
+                        <div class="timesheet-inbox-layout" id="timesheet-inbox">
+                            {% if active_timesheet_tab == 'overview' %}
+                            <div class="timesheet-status-grid">
+                                {% for tab in timesheet_workflow_tabs %}
+                                <a href="/dashboard/timesheets?tab=overview&stage={{ tab.key }}{% if query %}&q={{ query|urlencode }}{% endif %}#timesheet-tabs" class="timesheet-status-tile {% if tab.active %}timesheet-status-tile--active{% endif %}">
+                                    <span>{{ tab.label }}</span>
+                                    <strong>{{ tab.count }}</strong>
+                                    <small>{{ tab.description }}</small>
+                                </a>
+                                {% endfor %}
+                            </div>
+
+                            <form class="timesheet-search" action="/dashboard/timesheets" method="get">
+                                <input type="hidden" name="tab" value="overview">
+                                <input type="hidden" name="stage" value="{{ timesheet_stage }}">
+                                <input type="search" name="q" value="{{ query }}" placeholder="Zoek op naam, telefoon, bestand, match, status of herkomst">
+                                <button class="ghost-button" type="submit">Zoeken</button>
+                                {% if query %}
+                                <a class="ghost-button" href="/dashboard/timesheets?tab=overview&stage={{ timesheet_stage }}#timesheet-tabs">Wissen</a>
+                                {% endif %}
+                            </form>
+
+                            <div class="table-wrap timesheet-message-table">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Taak</th>
+                                            <th>Herkomst</th>
+                                            <th>Status</th>
+                                            <th>Match</th>
+                                            <th>Zekerheid</th>
+                                            <th>Acties</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for message in timesheet_stage_items %}
+                                        <tr class="{% if selected_timesheet and selected_timesheet.id == message.id %}row-selected{% endif %}">
+                                            <td>
+                                                <a class="task-link" href="/dashboard/timesheets?tab=task&stage={{ message.workflow_stage }}&timesheet={{ message.id }}#timesheet-tabs">
+                                                    <strong>{{ message.employee_name or message.sender_name }}</strong>
+                                                    <span>{{ message.sender_phone }}{% if message.media_filename %} &middot; {{ message.media_filename }}{% endif %}</span>
+                                                </a>
+                                            </td>
+                                            <td>
+                                                {% set source_icon = 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/whatsapp.svg' if message.source_channel == 'whatsapp' else 'https://api.iconify.design/lucide:mail.svg' if message.source_channel == 'email' else 'https://api.iconify.design/lucide:folder-sync.svg' if message.source_channel == 'server_folder' else 'https://api.iconify.design/lucide:hand.svg' %}
+                                                <span class="source-pill source-pill--{{ message.source_channel }}" title="{{ message.source_channel_label }}" aria-label="{{ message.source_channel_label }}">
+                                                    <img src="{{ source_icon }}" alt="">
+                                                </span>
+                                            </td>
+                                            <td><span class="status-tag">{{ message.workflow_stage_label }}</span></td>
+                                            <td>{{ message.matched_name }}</td>
+                                            <td>
+                                                <span class="confidence-pill confidence-{{ 'high' if message.overall_confidence > 95 else 'medium' if message.overall_confidence >= 80 else 'low' }}">
+                                                    {{ message.overall_confidence }}%
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <div class="message-actions">
+                                                    <a class="icon-text-button" href="/dashboard/timesheets?tab=task&stage={{ message.workflow_stage }}&timesheet={{ message.id }}#timesheet-tabs">Open taak</a>
+                                                    <form action="/api/whatsapp/timesheet/{{ message.id }}/archive" method="post">
+                                                        <button class="icon-text-button" type="submit">Archiveren</button>
+                                                    </form>
+                                                    <form action="/api/whatsapp/timesheet/{{ message.id }}/delete" method="post">
+                                                        <button class="icon-text-button icon-text-button--danger" type="submit">Verwijderen</button>
+                                                    </form>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% else %}
+                                        <tr>
+                                            <td colspan="6">
+                                                <div class="empty-state">
+                                                    <strong>Geen urenbriefjes in de inbox</strong>
+                                                <span>Nieuwe uploads verschijnen hier automatisch als taak.</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% endif %}
+
+                            {% if active_timesheet_tab == 'task' and selected_timesheet %}
+                            <div class="timesheet-review-panel" id="timesheet-review">
+                                {% set selected_message = selected_timesheet %}
+                                <div class="compact-review-bar">
+                                    <div>
+                                        <p class="section-label">Controle</p>
+                                        <h2>{{ selected_message.employee_name or selected_message.sender_name }}</h2>
+                                        <span>{{ selected_message.sender_phone }} - match: {{ selected_message.matched_name }}</span>
+                                    </div>
+                                    <div class="compact-review-bar__right">
+                                        <span class="confidence-pill confidence-{{ 'high' if selected_message.overall_confidence > 95 else 'medium' if selected_message.overall_confidence >= 80 else 'low' }}">
+                                            {{ selected_message.overall_confidence }}%
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="review-message-actions compact-actions">
+                                    <form action="/api/whatsapp/timesheet/{{ selected_message.id }}/reparse" method="post">
+                                        <button class="ghost-button" type="submit">Opnieuw parsen met OpenAI</button>
+                                    </form>
+                                    <form action="/api/whatsapp/timesheet/{{ selected_message.id }}/archive" method="post">
+                                        <button class="ghost-button" type="submit">Bericht archiveren</button>
+                                    </form>
+                                    <form action="/api/whatsapp/timesheet/{{ selected_message.id }}/delete" method="post">
+                                        <button class="ghost-button danger-button" type="submit">Bericht verwijderen</button>
+                                    </form>
+                                </div>
+
+                                <div class="document-review-layout">
+                                    <div class="document-preview-panel">
+                                        <div class="document-preview-header">
+                                            <strong>Geupload document</strong>
+                                            <span>{{ selected_message.media_filename or 'Geen bestand' }}</span>
+                                        </div>
+                                        {% if selected_message.media_path %}
+                                        <div class="document-toolbar" data-rotation-controls="{{ selected_message.id }}">
+                                            <button class="icon-text-button" type="button" data-rotate-step="-90">Links</button>
+                                            <button class="icon-text-button" type="button" data-rotate-step="90">Rechts</button>
+                                            <button class="icon-text-button" type="button" data-rotate-reset>Reset</button>
+                                            <span data-rotation-label>0 graden</span>
+                                        </div>
+                                        <div class="document-frame document-frame--compact" data-document-frame="{{ selected_message.id }}">
+                                            <button class="document-zoom-button" type="button" data-document-zoom-open="{{ selected_message.id }}">
+                                                <img src="/dashboard/timesheets/document/{{ selected_message.id }}" alt="Geupload urenbriefje" data-rotatable-document>
+                                                <span>Klik om te vergroten</span>
+                                            </button>
+                                        </div>
+                                        {% else %}
+                                        <div class="document-frame document-frame--empty">
+                                            <span>Upload een urenbriefje om hier de preview te zien.</span>
+                                        </div>
+                                        {% endif %}
+                                        <small>Draai de preview totdat het urenbriefje goed leesbaar is.</small>
+                                    </div>
+
+                                    <aside class="parse-score-panel">
+                                        <p class="section-label">Parsing</p>
+                                        <h3>Algemene parsingscore</h3>
+                                        <strong class="parse-score parse-score--{{ 'green' if selected_message.overall_confidence > 95 else 'orange' if selected_message.overall_confidence >= 80 else 'red' }}">{{ selected_message.overall_confidence }}%</strong>
+                                        <dl>
+                                            <div>
+                                                <dt>Match</dt>
+                                                <dd>{{ selected_message.matched_name }}</dd>
+                                            </div>
+                                            <div>
+                                                <dt>Telefoon</dt>
+                                                <dd>{{ selected_message.sender_phone }}</dd>
+                                            </div>
+                                            <div>
+                                                <dt>Status</dt>
+                                                <dd>{{ selected_message.workflow_stage_label }}</dd>
+                                            </div>
+                                        </dl>
+                                        <div class="confidence-legend confidence-legend--stacked">
+                                            <span><i class="legend-dot legend-dot--red"></i>0-80% controleren</span>
+                                            <span><i class="legend-dot legend-dot--orange"></i>80-95% nalopen</span>
+                                            <span><i class="legend-dot legend-dot--green"></i>&gt;95% betrouwbaar</span>
+                                        </div>
+                                    </aside>
+                                </div>
+
+                                <form class="digital-timesheet-form correction-form" id="digital-timesheet" action="/api/whatsapp/timesheet/{{ selected_message.id }}/corrections" method="post">
+                                            <div class="digital-timesheet-header">
+                                                <div>
+                                                    <p class="section-label">Digitale weekstaat</p>
+                                                    <h3>Geparseerde urenstaat</h3>
+                                                </div>
+                                            </div>
+
+                                            <div class="digital-timesheet-grid">
+                                                <label><span class="field-title">Week {{ confidence_light(selected_message.parsed_map.week_number) }}</span><input name="field_week_number" value="{{ selected_message.parsed_map.week_number.value if selected_message.parsed_map.week_number is defined else '' }}"></label>
+                                                <label><span class="field-title">Datum {{ confidence_light(selected_message.parsed_map.date) }}</span><input name="field_date" value="{{ selected_message.parsed_map.date.value if selected_message.parsed_map.date is defined else selected_message.work_date or '' }}"></label>
+                                                <label><span class="field-title">Opdrachtgever {{ confidence_light(selected_message.parsed_map.principal_name) }}</span>
+                                                    <select name="field_principal_name">
+                                                        <option value="">Kies opdrachtgever</option>
+                                                        {% for principal in principal_options %}
+                                                        <option value="{{ principal.name }}" data-id="{{ principal.id }}" {% if selected_message.selected_principal_id == principal.id or selected_message.principal_name == principal.name %}selected{% endif %}>{{ principal.name }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </label>
+                                                <label><span class="field-title">Projectnummer {{ confidence_light(selected_message.parsed_map.project_number) }}</span><input name="field_project_number" value="{{ selected_message.parsed_map.project_number.value if selected_message.parsed_map.project_number is defined else '' }}"></label>
+                                                <label>
+                                                    <span class="field-title">Naam werknemer {{ confidence_light(selected_message.parsed_map.employee_name) }}</span>
+                                                    <input name="field_employee_name" value="{{ selected_message.parsed_map.employee_name.value if selected_message.parsed_map.employee_name is defined else selected_message.employee_name }}">
+                                                    {% if selected_message.matched_name and selected_message.matched_name != 'Geen match' %}
+                                                    <button class="field-suggestion" type="button" data-fill-field="field_employee_name" data-fill-value="{{ selected_message.matched_name }}">
+                                                        Suggestie: {{ selected_message.matched_name }}
+                                                    </button>
+                                                    {% endif %}
+                                                </label>
+                                                <label><span class="field-title">Telefoon werknemer {{ confidence_light(selected_message.parsed_map.employee_phone) }}</span><input name="field_employee_phone" value="{{ selected_message.parsed_map.employee_phone.value if selected_message.parsed_map.employee_phone is defined else selected_message.sender_phone }}"></label>
+                                                <label><span class="field-title">Naam ondertekenaar {{ confidence_light(selected_message.parsed_map.signer_name) }}</span><input name="field_signer_name" value="{{ selected_message.parsed_map.signer_name.value if selected_message.parsed_map.signer_name is defined else '' }}"></label>
+                                                <label><span class="field-title">Telefoon ondertekenaar {{ confidence_light(selected_message.parsed_map.signer_phone) }}</span><input name="field_signer_phone" value="{{ selected_message.parsed_map.signer_phone.value if selected_message.parsed_map.signer_phone is defined else '' }}"></label>
+                                                <label><span class="field-title">Project {{ confidence_light(selected_message.parsed_map.work_name) }}</span>
+                                                    <select name="field_work_name">
+                                                        <option value="">Kies project</option>
+                                                        {% for project in project_options %}
+                                                        <option value="{{ project.title }}" data-id="{{ project.id }}" {% if selected_message.selected_project_id == project.id or selected_message.project_name == project.title %}selected{% endif %}>{{ project.title }}{% if project.reference_number %} &middot; {{ project.reference_number }}{% endif %}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </label>
+                                                <label><span class="field-title">Werknummer {{ confidence_light(selected_message.parsed_map.work_number) }}</span><input name="field_work_number" value="{{ selected_message.parsed_map.work_number.value if selected_message.parsed_map.work_number is defined else '' }}"></label>
+                                                <label><span class="field-title">Plaats {{ confidence_light(selected_message.parsed_map.location) }}</span><input name="field_location" value="{{ selected_message.parsed_map.location.value if selected_message.parsed_map.location is defined else selected_message.employee_city }}"></label>
+                                                <label><span class="field-title">Kilometers enkele reis {{ confidence_light(selected_message.parsed_map.single_trip_km) }}</span><input name="field_single_trip_km" value="{{ selected_message.parsed_map.single_trip_km.value if selected_message.parsed_map.single_trip_km is defined else '' }}"></label>
+                                            </div>
+
+                                            <div class="digital-week-table digital-week-table--with-total">
+                                                <label><span class="week-head">Ma {{ confidence_light(selected_message.parsed_map.monday_hours) }}</span><input name="field_monday_hours" value="{{ selected_message.parsed_map.monday_hours.value if selected_message.parsed_map.monday_hours is defined else '' }}"></label>
+                                                <label><span class="week-head">Di {{ confidence_light(selected_message.parsed_map.tuesday_hours) }}</span><input name="field_tuesday_hours" value="{{ selected_message.parsed_map.tuesday_hours.value if selected_message.parsed_map.tuesday_hours is defined else '' }}"></label>
+                                                <label><span class="week-head">Wo {{ confidence_light(selected_message.parsed_map.wednesday_hours) }}</span><input name="field_wednesday_hours" value="{{ selected_message.parsed_map.wednesday_hours.value if selected_message.parsed_map.wednesday_hours is defined else '' }}"></label>
+                                                <label><span class="week-head">Do {{ confidence_light(selected_message.parsed_map.thursday_hours) }}</span><input name="field_thursday_hours" value="{{ selected_message.parsed_map.thursday_hours.value if selected_message.parsed_map.thursday_hours is defined else '' }}"></label>
+                                                <label><span class="week-head">Vr {{ confidence_light(selected_message.parsed_map.friday_hours) }}</span><input name="field_friday_hours" value="{{ selected_message.parsed_map.friday_hours.value if selected_message.parsed_map.friday_hours is defined else '' }}"></label>
+                                                <label><span class="week-head">Za {{ confidence_light(selected_message.parsed_map.saturday_hours) }}</span><input name="field_saturday_hours" value="{{ selected_message.parsed_map.saturday_hours.value if selected_message.parsed_map.saturday_hours is defined else '' }}"></label>
+                                                <label><span class="week-head">Zo {{ confidence_light(selected_message.parsed_map.sunday_hours) }}</span><input name="field_sunday_hours" value="{{ selected_message.parsed_map.sunday_hours.value if selected_message.parsed_map.sunday_hours is defined else '' }}"></label>
+                                                <label><span class="week-head">Totaal {{ confidence_light(selected_message.parsed_map.total_hours) }}</span><input name="field_total_hours" value="{{ selected_message.parsed_map.total_hours.value if selected_message.parsed_map.total_hours is defined else selected_message.hours or '' }}"></label>
+                                            </div>
+
+                                            <div class="digital-week-table digital-week-table--with-total">
+                                                <label><span class="week-head">Km ma {{ confidence_light(selected_message.parsed_map.monday_km) }}</span><input name="field_monday_km" value="{{ selected_message.parsed_map.monday_km.value if selected_message.parsed_map.monday_km is defined else '' }}"></label>
+                                                <label><span class="week-head">Km di {{ confidence_light(selected_message.parsed_map.tuesday_km) }}</span><input name="field_tuesday_km" value="{{ selected_message.parsed_map.tuesday_km.value if selected_message.parsed_map.tuesday_km is defined else '' }}"></label>
+                                                <label><span class="week-head">Km wo {{ confidence_light(selected_message.parsed_map.wednesday_km) }}</span><input name="field_wednesday_km" value="{{ selected_message.parsed_map.wednesday_km.value if selected_message.parsed_map.wednesday_km is defined else '' }}"></label>
+                                                <label><span class="week-head">Km do {{ confidence_light(selected_message.parsed_map.thursday_km) }}</span><input name="field_thursday_km" value="{{ selected_message.parsed_map.thursday_km.value if selected_message.parsed_map.thursday_km is defined else '' }}"></label>
+                                                <label><span class="week-head">Km vr {{ confidence_light(selected_message.parsed_map.friday_km) }}</span><input name="field_friday_km" value="{{ selected_message.parsed_map.friday_km.value if selected_message.parsed_map.friday_km is defined else '' }}"></label>
+                                                <label><span class="week-head">Km za {{ confidence_light(selected_message.parsed_map.saturday_km) }}</span><input name="field_saturday_km" value="{{ selected_message.parsed_map.saturday_km.value if selected_message.parsed_map.saturday_km is defined else '' }}"></label>
+                                                <label><span class="week-head">Km zo {{ confidence_light(selected_message.parsed_map.sunday_km) }}</span><input name="field_sunday_km" value="{{ selected_message.parsed_map.sunday_km.value if selected_message.parsed_map.sunday_km is defined else '' }}"></label>
+                                                <label><span class="week-head">Totaal km {{ confidence_light(selected_message.parsed_map.total_km) }}</span><input name="field_total_km" value="{{ selected_message.parsed_map.total_km.value if selected_message.parsed_map.total_km is defined else '' }}"></label>
+                                            </div>
+
+                                            <div class="digital-week-table digital-week-table--codes">
+                                                <label><span class="week-head">Code ma {{ confidence_light(selected_message.parsed_map.monday_code) }}</span><input name="field_monday_code" value="{{ selected_message.parsed_map.monday_code.value if selected_message.parsed_map.monday_code is defined else '' }}"></label>
+                                                <label><span class="week-head">Code di {{ confidence_light(selected_message.parsed_map.tuesday_code) }}</span><input name="field_tuesday_code" value="{{ selected_message.parsed_map.tuesday_code.value if selected_message.parsed_map.tuesday_code is defined else '' }}"></label>
+                                                <label><span class="week-head">Code wo {{ confidence_light(selected_message.parsed_map.wednesday_code) }}</span><input name="field_wednesday_code" value="{{ selected_message.parsed_map.wednesday_code.value if selected_message.parsed_map.wednesday_code is defined else '' }}"></label>
+                                                <label><span class="week-head">Code do {{ confidence_light(selected_message.parsed_map.thursday_code) }}</span><input name="field_thursday_code" value="{{ selected_message.parsed_map.thursday_code.value if selected_message.parsed_map.thursday_code is defined else '' }}"></label>
+                                                <label><span class="week-head">Code vr {{ confidence_light(selected_message.parsed_map.friday_code) }}</span><input name="field_friday_code" value="{{ selected_message.parsed_map.friday_code.value if selected_message.parsed_map.friday_code is defined else '' }}"></label>
+                                                <label><span class="week-head">Code za {{ confidence_light(selected_message.parsed_map.saturday_code) }}</span><input name="field_saturday_code" value="{{ selected_message.parsed_map.saturday_code.value if selected_message.parsed_map.saturday_code is defined else '' }}"></label>
+                                                <label><span class="week-head">Code zo {{ confidence_light(selected_message.parsed_map.sunday_code) }}</span><input name="field_sunday_code" value="{{ selected_message.parsed_map.sunday_code.value if selected_message.parsed_map.sunday_code is defined else '' }}"></label>
+                                            </div>
+
+                                            <div class="digital-timesheet-grid">
+                                                <label><span class="field-title">Berekend totaal {{ confidence_light(selected_message.parsed_map.calculated_total_hours) }}</span><input name="field_calculated_total_hours" value="{{ selected_message.parsed_map.calculated_total_hours.value if selected_message.parsed_map.calculated_total_hours is defined else '' }}" readonly></label>
+                                                <label><span class="field-title">Controle totaal {{ confidence_light(selected_message.parsed_map.total_hours_check) }}</span><input name="field_total_hours_check" value="{{ selected_message.parsed_map.total_hours_check.value if selected_message.parsed_map.total_hours_check is defined else '' }}" readonly></label>
+                                                <label><span class="field-title">Berekend km totaal {{ confidence_light(selected_message.parsed_map.calculated_total_km) }}</span><input name="field_calculated_total_km" value="{{ selected_message.parsed_map.calculated_total_km.value if selected_message.parsed_map.calculated_total_km is defined else '' }}" readonly></label>
+                                                <label><span class="field-title">Controle km totaal {{ confidence_light(selected_message.parsed_map.total_km_check) }}</span><input name="field_total_km_check" value="{{ selected_message.parsed_map.total_km_check.value if selected_message.parsed_map.total_km_check is defined else '' }}" readonly></label>
+                                                <label><span class="field-title">Verzuimcode {{ confidence_light(selected_message.parsed_map.absence_code) }}</span><input name="field_absence_code" value="{{ selected_message.parsed_map.absence_code.value if selected_message.parsed_map.absence_code is defined else '' }}"></label>
+                                                <label><span class="field-title">Opmerking {{ confidence_light(selected_message.parsed_map.remarks) }}</span><input name="field_remarks" value="{{ selected_message.parsed_map.remarks.value if selected_message.parsed_map.remarks is defined else '' }}"></label>
+                                                <label><span class="field-title">Kosten {{ confidence_light(selected_message.parsed_map.expenses) }}</span><input name="field_expenses" value="{{ selected_message.parsed_map.expenses.value if selected_message.parsed_map.expenses is defined else '' }}"></label>
+                                                <label><span class="field-title">Parkeerkosten {{ confidence_light(selected_message.parsed_map.parking_costs) }}</span><input name="field_parking_costs" value="{{ selected_message.parsed_map.parking_costs.value if selected_message.parsed_map.parking_costs is defined else '' }}"></label>
+                                                <label><span class="field-title">Factureren met tegenbon {{ confidence_light(selected_message.parsed_map.invoice_with_receipt) }}</span><input name="field_invoice_with_receipt" value="{{ selected_message.parsed_map.invoice_with_receipt.value if selected_message.parsed_map.invoice_with_receipt is defined else '' }}"></label>
+                                                <label>
+                                                    <span class="field-title">Handtekening {{ confidence_light(selected_message.parsed_map.signature) }}</span>
+                                                    <input name="field_signature" value="{{ selected_message.parsed_map.signature.value if selected_message.parsed_map.signature is defined else '' }}">
+                                                    <button class="field-suggestion" type="button" data-fill-field="field_signature" data-fill-value="aanwezig">Aanwezig</button>
+                                                </label>
+                                                <label>
+                                                    <span class="field-title">Handtekening opdrachtgever {{ confidence_light(selected_message.parsed_map.client_signature) }}</span>
+                                                    <input name="field_client_signature" value="{{ selected_message.parsed_map.client_signature.value if selected_message.parsed_map.client_signature is defined else '' }}">
+                                                    <button class="field-suggestion" type="button" data-fill-field="field_client_signature" data-fill-value="aanwezig">Aanwezig</button>
+                                                </label>
+                                            </div>
+
+                                            <div class="preview-actions">
+                                                <button class="ghost-button" type="button">Koppel kandidaat</button>
+                                                <button class="ghost-button" type="submit">Correcties opslaan</button>
+                                            </div>
+                                </form>
+                                <form class="workflow-actions" action="/api/whatsapp/timesheet/{{ selected_message.id }}/validate" method="post">
+                                    <input type="hidden" name="principal_id" value="{{ selected_message.selected_principal_id or '' }}" data-workflow-principal-id>
+                                    <input type="hidden" name="project_id" value="{{ selected_message.selected_project_id or '' }}" data-workflow-project-id>
+                                    <button class="ghost-button" type="submit">Uren valideren voor loonberekening</button>
+                                </form>
+                                <form class="workflow-actions" action="/api/whatsapp/timesheet/{{ selected_message.id }}/payroll" method="post">
+                                    <button class="ghost-button" type="submit">Doorsturen naar loonadministratie</button>
+                                </form>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </article>
+
+                    <div class="document-zoom-backdrop" data-document-zoom-modal hidden>
+                        <div class="document-zoom-modal" role="dialog" aria-modal="true" aria-label="Urenbriefje vergroten">
+                            <button class="modal-close document-zoom-close" type="button" data-document-zoom-close aria-label="Sluiten">x</button>
+                            <img src="" alt="Vergroot urenbriefje" data-document-zoom-image>
+                        </div>
+                    </div>
+
+                    <article class="panel panel--full server-only" id="server">
+                        <div class="panel-header">
+                            <div>
+                                <p class="section-label">Server</p>
+                                <h2>Server overzicht</h2>
+                                <p>Live systeem-, database- en scheduler-signalen van de VPS.</p>
+                            </div>
+                            <div class="server-actions">
+                                <a class="ghost-button" href="/dashboard/server">Refresh</a>
+                            </div>
+                        </div>
+
+                        <div class="server-section-heading">
+                            <h3>Systeem</h3>
+                            <p>Een rij met de belangrijkste technische signalen.</p>
+                        </div>
+                        {% set system_tiles = server_system_tiles|default([], true) %}
+                        {% if not system_tiles %}
+                            {% set system_tiles = [
+                                {'label': 'Database connectie', 'value': 'Laden', 'meta': 'live status na serverherstart', 'level': 0, 'tone': 'neutral'},
+                                {'label': 'Server belasting', 'value': 'Laden', 'meta': 'CPU / load wordt opgehaald', 'level': 0, 'tone': 'neutral'},
+                                {'label': 'Geheugen', 'value': 'Laden', 'meta': 'RAM wordt opgehaald', 'level': 0, 'tone': 'neutral'},
+                                {'label': 'Database gebruik', 'value': 'Laden', 'meta': 'databasegrootte wordt opgehaald', 'level': 0, 'tone': 'neutral'}
+                            ] %}
+                        {% endif %}
+                        <div class="server-grid server-grid--single-row">
+                            {% for metric in system_tiles %}
+                            <div class="server-card server-card--{{ metric.tone|default('neutral') }}">
+                                <span>{{ metric.label }}</span>
+                                <strong>{{ metric.value }}</strong>
+                                <small>{{ metric.meta }}</small>
+                                <div class="meter" aria-hidden="true">
+                                    <span style="width: {{ metric.level }}%"></span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="server-section-heading">
+                            <h3>Scheduler</h3>
+                            <p>Cronjobs staan klaar als placeholder totdat de echte scheduler gekoppeld is.</p>
+                        </div>
+                        {% set scheduler_tiles = server_scheduler_tiles|default([], true) %}
+                        {% if not scheduler_tiles %}
+                            {% set scheduler_tiles = [
+                                {'label': 'Cronjobs', 'value': '4 klaar', 'meta': '0 fout', 'level': 100, 'tone': 'good'},
+                                {'label': 'Laatste succes', 'value': '-', 'meta': 'nog geen run', 'level': 0, 'tone': 'neutral'},
+                                {'label': 'Laatste fout', 'value': '-', 'meta': 'geen fout bekend', 'level': 0, 'tone': 'good'},
+                                {'label': 'Volgende run', 'value': '-', 'meta': 'scheduler placeholder', 'level': 0, 'tone': 'neutral'}
+                            ] %}
+                        {% endif %}
+                        <div class="server-grid server-grid--single-row">
+                            {% for metric in scheduler_tiles %}
+                            <div class="server-card server-card--{{ metric.tone|default('neutral') }}">
+                                <span>{{ metric.label }}</span>
+                                <strong>{{ metric.value }}</strong>
+                                <small>{{ metric.meta }}</small>
+                                <div class="meter" aria-hidden="true">
+                                    <span style="width: {{ metric.level }}%"></span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </article>
+
+                    <article class="panel panel--full tickets-only" id="tickets">
+                        <div class="panel-header">
+                            <div>
+                                <p class="section-label">Tickets</p>
+                                <h2>Ticketsysteem</h2>
+                                <p>Voor mails, berichten en urenstaatvragen die opgevolgd moeten worden.</p>
+                            </div>
+                            <button class="ghost-button" type="button">Nieuwe ticket</button>
+                        </div>
+
+                        <div class="ticket-grid">
+                            {% for queue in ticket_queues %}
+                            <a class="ticket-card" href="#">
+                                <span>{{ queue.name }}</span>
+                                <strong>{{ queue.count }}</strong>
+                                <small>{{ queue.meta }}</small>
+                            </a>
+                            {% endfor %}
+                        </div>
+
+                        <div class="table-wrap ticket-table">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Ticket</th>
+                                        <th>Afzender</th>
+                                        <th>Kanaal</th>
+                                        <th>Categorie</th>
+                                        <th>Prioriteit</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% if tickets %}
+                                        {% for ticket in tickets %}
+                                        <tr>
+                                            <td>{{ ticket.title }}</td>
+                                            <td>{{ ticket.sender }}</td>
+                                            <td>{{ ticket.channel }}</td>
+                                            <td>{{ ticket.category }}</td>
+                                            <td>{{ ticket.priority }}</td>
+                                            <td><span class="status-tag">{{ ticket.status }}</span></td>
+                                        </tr>
+                                        {% endfor %}
+                                    {% else %}
+                                        <tr>
+                                            <td>Modelovereenkomst controleren</td>
+                                            <td>Robin van Leeuwen</td>
+                                            <td>E-mail</td>
+                                            <td>Contract</td>
+                                            <td>Hoog</td>
+                                            <td><span class="status-tag">nieuw</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>Urenstaat week 22 ontbreekt</td>
+                                            <td>Urenverwerking</td>
+                                            <td>Urenbriefje</td>
+                                            <td>Urenstaat</td>
+                                            <td>Normaal</td>
+                                            <td><span class="status-tag">open</span></td>
+                                        </tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </article>
+                </section>
+            </main>
+        </div>
+        <script src="/dashboard/static/dashboard.js"></script>
+    </body>
+</html>

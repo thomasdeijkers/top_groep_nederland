@@ -1,0 +1,15 @@
+ALTER TABLE vacancies
+    ADD COLUMN IF NOT EXISTS introduction_date DATE,
+    ADD COLUMN IF NOT EXISTS category TEXT,
+    ADD COLUMN IF NOT EXISTS subcategory TEXT,
+    ADD COLUMN IF NOT EXISTS contact_email TEXT,
+    ADD COLUMN IF NOT EXISTS contact_name TEXT,
+    ADD COLUMN IF NOT EXISTS country TEXT,
+    ADD COLUMN IF NOT EXISTS province TEXT,
+    ADD COLUMN IF NOT EXISTS internal_notes TEXT,
+    ADD COLUMN IF NOT EXISTS description TEXT,
+    ADD COLUMN IF NOT EXISTS requirements TEXT,
+    ADD COLUMN IF NOT EXISTS benefits TEXT,
+    ADD COLUMN IF NOT EXISTS region TEXT,
+    ADD COLUMN IF NOT EXISTS function_group TEXT,
+    ADD COLUMN IF NOT EXISTS employment_type TEXT;

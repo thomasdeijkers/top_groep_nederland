@@ -1,0 +1,17 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+
+runtime/uploads/*
+runtime/logs/*
+runtime/exports/*
+
+.vscode/
+.idea/
+
+# Local source/test files that can contain personal or customer data.
+PHOTO-*.jpg
+*.xlsx
+*.xls
+*.csv

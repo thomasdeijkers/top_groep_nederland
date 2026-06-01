@@ -1,0 +1,16 @@
+[Unit]
+Description=Top Groep Nederland dashboard
+After=network.target
+
+[Service]
+Type=simple
+User=opticore
+Group=opticore
+WorkingDirectory=/home/opticore/projects/extern/top_groep_nederland
+EnvironmentFile=/home/opticore/projects/extern/top_groep_nederland/.env
+ExecStart=/home/opticore/projects/extern/top_groep_nederland/.venv/bin/python -m uvicorn apps.api.main:app --host 127.0.0.1 --port 8050
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,50 @@
+name: Deploy TGN dashboard
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.TGN_SSH_KEY }}" > ~/.ssh/tgn_deploy_key
+          chmod 600 ~/.ssh/tgn_deploy_key
+          ssh-keyscan -p "${{ secrets.TGN_SSH_PORT || '22' }}" "${{ secrets.TGN_SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Upload application
+        run: |
+          rsync -az --delete \
+            --exclude ".git" \
+            --exclude ".github" \
+            --exclude ".venv" \
+            --exclude ".env" \
+            --exclude "__pycache__" \
+            --exclude "*.pyc" \
+            --exclude "runtime/uploads" \
+            --exclude "runtime/logs" \
+            --exclude "runtime/exports" \
+            -e "ssh -i ~/.ssh/tgn_deploy_key -p ${{ secrets.TGN_SSH_PORT || '22' }}" \
+            ./ "${{ secrets.TGN_SSH_USER }}@${{ secrets.TGN_SSH_HOST }}:/home/opticore/projects/extern/top_groep_nederland/"
+
+      - name: Configure and restart service
+        run: |
+          ssh -i ~/.ssh/tgn_deploy_key -p "${{ secrets.TGN_SSH_PORT || '22' }}" "${{ secrets.TGN_SSH_USER }}@${{ secrets.TGN_SSH_HOST }}" <<'EOF'
+          set -euo pipefail
+          cd /home/opticore/projects/extern/top_groep_nederland
+          python3 -m venv .venv
+          .venv/bin/python -m pip install --upgrade pip
+          .venv/bin/python -m pip install -r requirements.txt
+          mkdir -p runtime/uploads runtime/logs runtime/exports
+          sudo systemctl restart top-groep-nederland
+          sudo systemctl status top-groep-nederland --no-pager
+          EOF
