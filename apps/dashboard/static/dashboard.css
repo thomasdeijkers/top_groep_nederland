@@ -3122,6 +3122,33 @@ body[data-theme="light"] .theme-toggle strong {
     padding-bottom: 9px;
 }
 
+.sort-header {
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 900;
+    padding: 0;
+    text-align: left;
+    text-transform: inherit;
+}
+
+.sort-header::after {
+    content: "↕";
+    margin-left: 6px;
+    color: #7fd1a0;
+    font-size: 0.72rem;
+}
+
+.sort-header[data-sort-direction="asc"]::after {
+    content: "↑";
+}
+
+.sort-header[data-sort-direction="desc"]::after {
+    content: "↓";
+}
+
 .timesheet-message-table {
     order: 1;
 }

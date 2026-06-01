@@ -20,6 +20,37 @@
         setTheme(themeToggle.checked ? "light" : "dark");
     });
 
+    document.querySelectorAll("[data-sort-table]").forEach((table) => {
+        const tbody = table.tBodies[0];
+        if (!tbody) {
+            return;
+        }
+        table.querySelectorAll("[data-sort-column]").forEach((button) => {
+            button.addEventListener("click", () => {
+                const column = Number(button.dataset.sortColumn);
+                const currentDirection = button.dataset.sortDirection === "asc" ? "desc" : "asc";
+                table.querySelectorAll("[data-sort-column]").forEach((item) => {
+                    item.dataset.sortDirection = "";
+                });
+                button.dataset.sortDirection = currentDirection;
+                const rows = Array.from(tbody.querySelectorAll("tr"));
+                rows.sort((left, right) => {
+                    const leftCell = left.children[column];
+                    const rightCell = right.children[column];
+                    const leftValue = leftCell?.dataset.sortValue || leftCell?.textContent || "";
+                    const rightValue = rightCell?.dataset.sortValue || rightCell?.textContent || "";
+                    const leftNumber = Number(leftValue);
+                    const rightNumber = Number(rightValue);
+                    const result = Number.isFinite(leftNumber) && Number.isFinite(rightNumber)
+                        ? leftNumber - rightNumber
+                        : leftValue.trim().localeCompare(rightValue.trim(), "nl", { numeric: true, sensitivity: "base" });
+                    return currentDirection === "asc" ? result : -result;
+                });
+                rows.forEach((row) => tbody.appendChild(row));
+            });
+        });
+    });
+
     const normalizeRotation = (value) => {
         const rotated = Number(value) || 0;
         return ((rotated % 360) + 360) % 360;

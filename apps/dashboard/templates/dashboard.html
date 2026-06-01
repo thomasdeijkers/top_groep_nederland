@@ -18,7 +18,7 @@
         </title>
         <link rel="icon" href="/dashboard/static/favicon.ico" sizes="any">
         <link rel="shortcut icon" href="/dashboard/static/favicon.ico">
-        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260601-2">
+        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260601-3">
     </head>
     <body class="page-{{ active_page }}">
         {% macro confidence_light(field) -%}
@@ -1215,35 +1215,40 @@
                             </form>
 
                             <div class="table-wrap timesheet-message-table">
-                                <table>
+                                <table data-sort-table>
                                     <thead>
                                         <tr>
-                                            <th>Taak</th>
-                                            <th>Herkomst</th>
-                                            <th>Status</th>
-                                            <th>Match</th>
-                                            <th>Zekerheid</th>
+                                            <th><button class="sort-header" type="button" data-sort-column="0">Taak</button></th>
+                                            <th><button class="sort-header" type="button" data-sort-column="1">Datum</button></th>
+                                            <th><button class="sort-header" type="button" data-sort-column="2">Herkomst</button></th>
+                                            <th><button class="sort-header" type="button" data-sort-column="3">Status</button></th>
+                                            <th><button class="sort-header" type="button" data-sort-column="4">Match</button></th>
+                                            <th><button class="sort-header" type="button" data-sort-column="5">Zekerheid</button></th>
                                             <th>Acties</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {% for message in timesheet_stage_items %}
                                         <tr class="{% if selected_timesheet and selected_timesheet.id == message.id %}row-selected{% endif %}">
-                                            <td>
+                                            <td data-sort-value="{{ message.employee_name or message.sender_name }}">
                                                 <a class="task-link" href="/dashboard/timesheets?tab=task&stage={{ message.workflow_stage }}&timesheet={{ message.id }}#timesheet-tabs">
                                                     <strong>{{ message.employee_name or message.sender_name }}</strong>
-                                                    <span>{{ message.sender_phone }}{% if message.media_filename %} &middot; {{ message.media_filename }}{% endif %}</span>
+                                                    {% set show_sender_phone = message.sender_phone and message.sender_phone not in ['onbekend', '-'] %}
+                                                    {% if show_sender_phone or message.media_filename %}
+                                                    <span>{% if show_sender_phone %}{{ message.sender_phone }}{% if message.media_filename %} &middot; {% endif %}{% endif %}{{ message.media_filename }}</span>
+                                                    {% endif %}
                                                 </a>
                                             </td>
-                                            <td>
+                                            <td data-sort-value="{{ message.received_at_sort }}">{{ message.received_at_display }}</td>
+                                            <td data-sort-value="{{ message.source_channel_label }}">
                                                 {% set source_icon = 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/whatsapp.svg' if message.source_channel == 'whatsapp' else 'https://api.iconify.design/lucide:mail.svg' if message.source_channel == 'email' else 'https://api.iconify.design/lucide:folder-sync.svg' if message.source_channel == 'server_folder' else 'https://api.iconify.design/lucide:hand.svg' %}
                                                 <span class="source-pill source-pill--{{ message.source_channel }}" title="{{ message.source_channel_label }}" aria-label="{{ message.source_channel_label }}">
                                                     <img src="{{ source_icon }}" alt="">
                                                 </span>
                                             </td>
-                                            <td><span class="status-tag">{{ message.workflow_stage_label }}</span></td>
-                                            <td>{{ message.matched_name }}</td>
-                                            <td>
+                                            <td data-sort-value="{{ message.workflow_stage_label }}"><span class="status-tag">{{ message.workflow_stage_label }}</span></td>
+                                            <td data-sort-value="{{ message.matched_name }}">{{ message.matched_name }}</td>
+                                            <td data-sort-value="{{ message.overall_confidence }}">
                                                 <span class="confidence-pill confidence-{{ 'high' if message.overall_confidence > 95 else 'medium' if message.overall_confidence >= 80 else 'low' }}">
                                                     {{ message.overall_confidence }}%
                                                 </span>
@@ -1262,7 +1267,7 @@
                                         </tr>
                                         {% else %}
                                         <tr>
-                                            <td colspan="6">
+                                            <td colspan="7">
                                                 <div class="empty-state">
                                                     <strong>Geen urenbriefjes in de inbox</strong>
                                                 <span>Nieuwe uploads verschijnen hier automatisch als taak.</span>
@@ -1628,6 +1633,6 @@
                 </section>
             </main>
         </div>
-        <script src="/dashboard/static/dashboard.js?v=20260601-2"></script>
+        <script src="/dashboard/static/dashboard.js?v=20260601-3"></script>
     </body>
 </html>
