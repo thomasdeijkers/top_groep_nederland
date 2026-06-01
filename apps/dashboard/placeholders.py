@@ -13,9 +13,46 @@ REVIEW_ITEMS = [
 ]
 
 ACTIVITY_ITEMS = [
-    {"title": "Document toegevoegd", "meta": "Nieuwe documenten"},
-    {"title": "Urenstaat klaargezet", "meta": "Gewerkte uren"},
-    {"title": "Klantprofiel bijgewerkt", "meta": "Klanten"},
+    {
+        "title": "Urenbriefje gevalideerd",
+        "meta": "Ruben Hellemons - Renovatie Rotterdam Centrum",
+        "user": "Sanne Vermeer",
+        "time": "09:42",
+        "status": "Loon berekenen",
+        "detail": "40 uur geboekt op Bouw & Infra en gekoppeld aan periode 5.",
+    },
+    {
+        "title": "Project geopend",
+        "meta": "Afbouw Den Haag Zuid",
+        "user": "Thomas Deijkers",
+        "time": "09:18",
+        "status": "Controle",
+        "detail": "Projecturen bekeken en CAO SAVG gecontroleerd.",
+    },
+    {
+        "title": "Kandidaattarief aangepast",
+        "meta": "Frank Stouthart",
+        "user": "Mila Jansen",
+        "time": "08:55",
+        "status": "Relaties",
+        "detail": "Uurtarief bijgewerkt voor periodeverloning.",
+    },
+    {
+        "title": "CAO regel opgeslagen",
+        "meta": "Bouw & Infra - Demo 2026",
+        "user": "Tim van Dueren",
+        "time": "Gisteren",
+        "status": "Instellingen",
+        "detail": "Overwerkpercentages en reiskosten per kilometer vastgelegd.",
+    },
+    {
+        "title": "Vacature bijgewerkt",
+        "meta": "Uitvoerder Utrecht Oost",
+        "user": "Noor Bakker",
+        "time": "Gisteren",
+        "status": "Vacatures",
+        "detail": "Status op voorbereiding gezet en opdrachtgever gekoppeld.",
+    },
 ]
 
 SERVER_METRICS = [

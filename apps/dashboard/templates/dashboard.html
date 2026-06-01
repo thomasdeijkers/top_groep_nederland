@@ -8,6 +8,7 @@
             {% elif active_page == 'relations' %}Relaties - Top Groep Nederland
             {% elif active_page == 'vacancies' %}Vacatures - Top Groep Nederland
             {% elif active_page == 'projects' %}Projecten - Top Groep Nederland
+            {% elif active_page == 'periods' %}Periodes - Top Groep Nederland
             {% elif active_page == 'tickets' %}Tickets - Top Groep Nederland
             {% elif active_page == 'timesheets' %}Urenverwerking - Top Groep Nederland
             {% elif active_page == 'server' %}Server info - Top Groep Nederland
@@ -33,14 +34,15 @@
                 </a>
 
                 <nav class="side-nav" aria-label="Hoofdnavigatie">
-                    <a class="side-nav__item {% if active_page == 'overview' %}side-nav__item--active{% endif %}" href="/dashboard">Overzicht</a>
-                    <a class="side-nav__item {% if active_page == 'relations' %}side-nav__item--active{% endif %}" href="/dashboard/relations">Relaties</a>
-                    <a class="side-nav__item {% if active_page == 'vacancies' %}side-nav__item--active{% endif %}" href="/dashboard/vacancies">Vacatures</a>
-                    <a class="side-nav__item {% if active_page == 'projects' %}side-nav__item--active{% endif %}" href="/dashboard/projects">Projecten</a>
-                    <a class="side-nav__item {% if active_page == 'tickets' %}side-nav__item--active{% endif %}" href="/dashboard/tickets">Tickets</a>
-                    <a class="side-nav__item {% if active_page == 'timesheets' %}side-nav__item--active{% endif %}" href="/dashboard/timesheets">Urenverwerking</a>
-                    <a class="side-nav__item {% if active_page == 'server' %}side-nav__item--active{% endif %}" href="/dashboard/server">Server info</a>
-                    <a class="side-nav__item {% if active_page == 'settings' %}side-nav__item--active{% endif %}" href="/dashboard/settings">Instellingen</a>
+                    <a class="side-nav__item {% if active_page == 'overview' %}side-nav__item--active{% endif %}" href="/dashboard"><span>Overzicht</span><i class="module-status module-status--green" title="Klaar om te testen"></i></a>
+                    <a class="side-nav__item {% if active_page == 'relations' %}side-nav__item--active{% endif %}" href="/dashboard/relations"><span>Relaties</span><i class="module-status module-status--green" title="Klaar om te testen"></i></a>
+                    <a class="side-nav__item {% if active_page == 'vacancies' %}side-nav__item--active{% endif %}" href="/dashboard/vacancies"><span>Vacatures</span><i class="module-status module-status--orange" title="Basis staat"></i></a>
+                    <a class="side-nav__item {% if active_page == 'projects' %}side-nav__item--active{% endif %}" href="/dashboard/projects"><span>Projecten</span><i class="module-status module-status--orange" title="Basis staat"></i></a>
+                    <a class="side-nav__item {% if active_page == 'periods' %}side-nav__item--active{% endif %}" href="/dashboard/periods"><span>Periodes</span><i class="module-status module-status--orange" title="Basis staat"></i></a>
+                    <a class="side-nav__item {% if active_page == 'tickets' %}side-nav__item--active{% endif %}" href="/dashboard/tickets"><span>Tickets</span><i class="module-status module-status--red" title="Nog te ontwikkelen"></i></a>
+                    <a class="side-nav__item {% if active_page == 'timesheets' %}side-nav__item--active{% endif %}" href="/dashboard/timesheets"><span>Urenverwerking</span><i class="module-status module-status--green" title="Klaar om te testen"></i></a>
+                    <a class="side-nav__item {% if active_page == 'server' %}side-nav__item--active{% endif %}" href="/dashboard/server"><span>Server info</span><i class="module-status module-status--green" title="Klaar om te testen"></i></a>
+                    <a class="side-nav__item {% if active_page == 'settings' %}side-nav__item--active{% endif %}" href="/dashboard/settings"><span>Instellingen</span><i class="module-status module-status--orange" title="Basis staat"></i></a>
                 </nav>
 
                 <div class="sidebar-footer">
@@ -61,6 +63,7 @@
                             {% elif active_page == 'relations' %}Relaties
                             {% elif active_page == 'vacancies' %}Vacatures
                             {% elif active_page == 'projects' %}Projecten
+                            {% elif active_page == 'periods' %}Periodes
                             {% elif active_page == 'tickets' %}Tickets
                             {% elif active_page == 'timesheets' %}Urenverwerking
                             {% elif active_page == 'server' %}Server info
@@ -72,6 +75,7 @@
                             {% elif active_page == 'relations' %}Beheer kandidaten en opdrachtgevers op één plek, inclusief contactgegevens, status en koppelingen met vacatures en urenstaten.
                             {% elif active_page == 'vacancies' %}Beheer openstaande vacatures voor publicatie richting website, Indeed en matching met kandidaten.
                             {% elif active_page == 'projects' %}Maak projecten aan en gebruik ze direct bij de urenverwerking.
+                            {% elif active_page == 'periods' %}Beheer vierwekelijkse loonperiodes voor bouwverloning en loonstrookvoorbereiding.
                             {% elif active_page == 'tickets' %}Verzamel opvolgwerk uit e-mail, WhatsApp en urencontrole in een centrale takenlijst.
                             {% elif active_page == 'timesheets' %}Verwerk urenbriefjes uit WhatsApp, e-mail, servermap of handmatige testupload.
                             {% elif active_page == 'server' %}Controleer de technische status van dit dashboarddeel en de geplande achtergrondtaken.
@@ -224,35 +228,45 @@
                             </section>
 
                             <section class="settings-card settings-card--wide" id="cao-instellingen">
-                                <div>
-                                    <p class="section-label">Verloning</p>
-                                    <h2>CAO instellingen</h2>
-                                    <p>Leg de basisregels handmatig vast. Deze regels kunnen later worden gebruikt in de stap Loon berekenen en eventueel via een externe bron worden bijgewerkt.</p>
+                                <div class="settings-card-heading">
+                                    <div>
+                                        <p class="section-label">Verloning</p>
+                                        <h2>CAO instellingen</h2>
+                                        <p>Maak CAO's aan en open ze om de loonregels te bewerken.</p>
+                                    </div>
+                                    <a class="ghost-button" href="/dashboard/settings?cao=new#cao-instellingen">Nieuwe CAO</a>
                                 </div>
 
-                                <form class="payroll-settings-form" action="/api/settings/cao" method="post">
-                                    <label>Naam CAO / regelset <input type="text" name="name" placeholder="Bijvoorbeeld Bouw & Infra" required></label>
-                                    <label>Versie <input type="text" name="version_label" placeholder="2026 periode 5"></label>
-                                    <label>Geldig vanaf <input type="date" name="effective_from"></label>
-                                    <label>Geldig tot <input type="date" name="effective_until"></label>
-                                    <label>Normale uren/week <input type="number" step="0.01" name="standard_week_hours" placeholder="40"></label>
-                                    <label>Overwerk vanaf <input type="number" step="0.01" name="overtime_after_hours" placeholder="40"></label>
-                                    <label>Overwerk % <input type="number" step="0.01" name="weekday_overtime_percent" placeholder="125"></label>
-                                    <label>Zaterdag % <input type="number" step="0.01" name="saturday_percent" placeholder="150"></label>
-                                    <label>Zondag % <input type="number" step="0.01" name="sunday_percent" placeholder="200"></label>
-                                    <label>Feestdag % <input type="number" step="0.01" name="holiday_percent" placeholder="200"></label>
-                                    <label>Reiskosten/km <input type="number" step="0.001" name="travel_cost_per_km" placeholder="0.23"></label>
-                                    <label>Basis uurloon <input type="number" step="0.01" name="default_hourly_wage" placeholder="18.50"></label>
+                                {% if show_cao_form %}
+                                {% set cao_form = selected_cao_setting if selected_cao_setting else {} %}
+                                <form class="payroll-settings-form payroll-settings-form--compact" action="{% if selected_cao_setting %}/api/settings/cao/{{ selected_cao_setting.id }}{% else %}/api/settings/cao{% endif %}" method="post">
+                                    <label>Naam CAO <input type="text" name="name" value="{{ cao_form.name or '' }}" placeholder="Bouw & Infra" required></label>
+                                    <label>Versie <input type="text" name="version_label" value="{{ cao_form.version_label or '' }}" placeholder="2026"></label>
+                                    <label>Vanaf <input type="date" name="effective_from" value="{{ cao_form.effective_from_input or '' }}"></label>
+                                    <label>Tot <input type="date" name="effective_until" value="{{ cao_form.effective_until_input or '' }}"></label>
+                                    <label>Uren/week <input type="number" step="0.01" name="standard_week_hours" value="{{ cao_form.standard_week_hours or '' }}" placeholder="40"></label>
+                                    <label>Overwerk vanaf <input type="number" step="0.01" name="overtime_after_hours" value="{{ cao_form.overtime_after_hours or '' }}" placeholder="40"></label>
+                                    <label>Overwerk % <input type="number" step="0.01" name="weekday_overtime_percent" value="{{ cao_form.weekday_overtime_percent or '' }}" placeholder="125"></label>
+                                    <label>Zaterdag % <input type="number" step="0.01" name="saturday_percent" value="{{ cao_form.saturday_percent or '' }}" placeholder="150"></label>
+                                    <label>Zondag % <input type="number" step="0.01" name="sunday_percent" value="{{ cao_form.sunday_percent or '' }}" placeholder="200"></label>
+                                    <label>Feestdag % <input type="number" step="0.01" name="holiday_percent" value="{{ cao_form.holiday_percent or '' }}" placeholder="200"></label>
+                                    <label>Reiskosten/km <input type="number" step="0.001" name="travel_cost_per_km" value="{{ cao_form.travel_cost_per_km or '' }}" placeholder="0.23"></label>
+                                    <label>Basis uurloon <input type="number" step="0.01" name="default_hourly_wage" value="{{ cao_form.default_hourly_wage or '' }}" placeholder="18.50"></label>
                                     <label>Status
                                         <select name="status">
-                                            <option value="concept">Concept</option>
-                                            <option value="actief">Actief</option>
-                                            <option value="archief">Archief</option>
+                                            {% set cao_status = cao_form.status or 'concept' %}
+                                            <option value="concept" {% if cao_status == 'concept' %}selected{% endif %}>Concept</option>
+                                            <option value="actief" {% if cao_status == 'actief' %}selected{% endif %}>Actief</option>
+                                            <option value="archief" {% if cao_status == 'archief' %}selected{% endif %}>Archief</option>
                                         </select>
                                     </label>
-                                    <label class="payroll-settings-form__notes">Notitie <input type="text" name="notes" placeholder="Bijvoorbeeld afwijkende afspraak of bron"></label>
-                                    <button class="ghost-button" type="submit">CAO regel opslaan</button>
+                                    <label class="payroll-settings-form__notes">Notitie <input type="text" name="notes" value="{{ cao_form.notes or '' }}" placeholder="Afspraak of bron"></label>
+                                    <div class="form-actions-inline">
+                                        <button class="ghost-button" type="submit">{% if selected_cao_setting %}CAO bijwerken{% else %}CAO aanmaken{% endif %}</button>
+                                        <a class="ghost-button ghost-button--subtle" href="/dashboard/settings#cao-instellingen">Sluiten</a>
+                                    </div>
                                 </form>
+                                {% endif %}
 
                                 <div class="table-wrap payroll-settings-table">
                                     <table>
@@ -264,6 +278,7 @@
                                                 <th>Toeslagen</th>
                                                 <th>Reiskosten</th>
                                                 <th>Status</th>
+                                                <th></th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -278,10 +293,11 @@
                                                 <td>OW {{ cao.weekday_overtime_percent or '-' }}% · Za {{ cao.saturday_percent or '-' }}% · Zo {{ cao.sunday_percent or '-' }}%</td>
                                                 <td>{{ cao.travel_cost_per_km or '-' }}</td>
                                                 <td><span class="status-tag">{{ cao.status }}</span></td>
+                                                <td><a class="table-link" href="/dashboard/settings?cao={{ cao.id }}#cao-instellingen">Open</a></td>
                                             </tr>
                                             {% else %}
                                             <tr>
-                                                <td colspan="6">
+                                                <td colspan="7">
                                                     <div class="empty-state">
                                                         <strong>Nog geen CAO instellingen</strong>
                                                         <span>Sla hierboven de eerste handmatige regelset op.</span>
@@ -423,7 +439,7 @@
                                 <label class="form-span-2">Foto of logo <input type="file" name="photo" accept="image/*"></label>
                             </div>
 
-                            <label>Type
+                            <label class="relation-type-field">Type
                                 <select name="relation_type" data-relation-type>
                                     <option value="candidate" {% if (selected_relation and selected_relation.relation_type == 'candidate') or (not selected_relation and active_relation_tab == 'candidates') %}selected{% endif %}>Kandidaat</option>
                                     <option value="principal" {% if (selected_relation and selected_relation.relation_type == 'principal') or (not selected_relation and active_relation_tab == 'principals') %}selected{% endif %}>Opdrachtgever</option>
@@ -444,7 +460,7 @@
                                     <option value="Archief" {% if selected_status == 'Archief' %}selected{% endif %}>Archief</option>
                                 </select>
                             </label>
-                            <label>Bron <input type="text" name="source" value="{{ selected_relation.source if selected_relation else '' }}" placeholder="Website / OTYS export / handmatig"></label>
+                            <input type="hidden" name="source" value="{{ selected_relation.source if selected_relation and selected_relation.source else 'handmatig' }}">
                             <label>Straat <input type="text" name="street" value="{{ (selected_relation.street or selected_relation.address) if selected_relation else '' }}"></label>
                             <label>Huisnummer <input type="text" name="house_number" value="{{ selected_relation.house_number if selected_relation else '' }}"></label>
                             <label>Toevoeging <input type="text" name="house_number_addition" value="{{ selected_relation.house_number_addition if selected_relation else '' }}" placeholder="A / bis / rood"></label>
@@ -459,7 +475,12 @@
                             </label>
                             <label data-candidate-field>Eigenaar <input type="text" name="owner" value="{{ selected_relation.owner if selected_relation else '' }}" placeholder="Top Groep Nederland"></label>
                             <label data-candidate-field>Beschikbaarheid <input type="text" name="availability" value="{{ selected_relation.availability if selected_relation else '' }}"></label>
-                            <label data-candidate-field>Uurtarief <input type="text" name="hourly_rate" value="{{ selected_relation.hourly_rate if selected_relation else '' }}"></label>
+                            <label class="currency-field" data-candidate-field>Uurtarief
+                                <span class="currency-input">
+                                    <span>&euro;</span>
+                                    <input type="number" step="0.01" name="hourly_rate" value="{{ selected_relation.hourly_rate if selected_relation else '' }}" placeholder="0,00">
+                                </span>
+                            </label>
                             <label data-principal-field>KvK <input type="text" name="kvk_number" value="{{ selected_relation.kvk_number if selected_relation else '' }}"></label>
                             <label data-principal-field>BTW <input type="text" name="vat_number" value="{{ selected_relation.vat_number if selected_relation else '' }}"></label>
                             <label class="form-span-2">Notities <textarea name="notes">{{ selected_relation.notes if selected_relation else '' }}</textarea></label>
@@ -530,10 +551,10 @@
                         </div>
                     </article>
 
-                    <article class="panel overview-only">
+                    <article class="panel overview-only audit-panel">
                         <div class="panel-header">
                             <div>
-                                <h2>Recente activiteit</h2>
+                                <h2>Auditspoor</h2>
                                 <p>Auditspoor en voortgangsmeldingen voor database-acties komen hier samen.</p>
                             </div>
                         </div>
@@ -545,6 +566,12 @@
                                 <div>
                                     <strong>{{ item.title }}</strong>
                                     <small>{{ item.meta }}</small>
+                                    <p>{{ item.detail }}</p>
+                                    <div class="activity-meta-row">
+                                        <em>{{ item.user }}</em>
+                                        <time>{{ item.time }}</time>
+                                        <b>{{ item.status }}</b>
+                                    </div>
                                 </div>
                             </div>
                             {% endfor %}
@@ -556,10 +583,18 @@
                             <div>
                                 <p class="section-label section-label--vacancy">Vacatures</p>
                                 <h2>Vacaturedatabase</h2>
-                                <p>Bekijk openstaande vacatures, filter gericht en open een vacature om publicatievelden bij te werken.</p>
+                                <p>Bekijk openstaande vacatures en open een vacature om publicatievelden bij te werken.</p>
                             </div>
                             <a class="ghost-button vacancy-button" href="/dashboard/vacancies#vacature-formulier">Nieuwe vacature</a>
                         </div>
+
+                        <form class="single-search vacancy-top-search" action="/dashboard/vacancies" method="get">
+                            <input type="search" name="q" value="{{ query }}" placeholder="Zoek op titel, referentie, opdrachtgever, plaats of status">
+                            <button class="ghost-button" type="submit">Zoeken</button>
+                            {% if query %}
+                            <a class="ghost-button" href="/dashboard/vacancies#vacatures">Wissen</a>
+                            {% endif %}
+                        </form>
 
                         <div class="vacancy-database-layout">
                             <div class="table-wrap vacancy-table">
@@ -592,7 +627,12 @@
                                             <td>{{ vacancy.applicant_count }}</td>
                                             <td>
                                                 {% if vacancy.id %}
-                                                <a class="table-link" href="/dashboard/vacancies?edit={{ vacancy.id }}">Open</a>
+                                                <div class="table-actions">
+                                                    <a class="table-link" href="/dashboard/vacancies?edit={{ vacancy.id }}">Open</a>
+                                                    <form action="/api/vacancies/{{ vacancy.id }}/delete" method="post">
+                                                        <button class="table-action-danger" type="submit">Verwijderen</button>
+                                                    </form>
+                                                </div>
                                                 {% else %}
                                                 <span>-</span>
                                                 {% endif %}
@@ -602,20 +642,6 @@
                                     </tbody>
                                 </table>
                             </div>
-
-                            <aside class="vacancy-search-panel">
-                                <div class="panel-search-title">
-                                    <strong>Zoeken</strong>
-                                    <a href="/dashboard/vacancies#vacature-formulier">+</a>
-                                </div>
-                                <form action="/dashboard/vacancies" method="get">
-                                    <input type="search" name="q" value="{{ query }}" placeholder="Trefwoord...">
-                                    <input type="search" placeholder="Semantische zoekopdracht...">
-                                    <input type="search" placeholder="Selecteer een relatie">
-                                    <button class="ghost-button" type="submit">Zoeken</button>
-                                </form>
-                                <a class="criterion-link" href="#">+ Criterium toevoegen</a>
-                            </aside>
                         </div>
                     </article>
 
@@ -684,6 +710,196 @@
                         </form>
                     </article>
 
+                    {% if not selected_payroll_period %}
+                    <article class="panel panel--full periods-only" id="periodes">
+                        <div class="panel-header">
+                            <div>
+                                <p class="section-label">Vier weken loon</p>
+                                <h2>Periodes beheren</h2>
+                                <p>Maak loonperiodes aan met vier vaste weken. Deze periodes vormen straks de basis voor loonstrookvoorbereiding.</p>
+                            </div>
+                        </div>
+
+                        <form class="period-create-form" action="/api/periods" method="post">
+                            <label>Jaar <input type="number" name="year" value="2026" min="2020" max="2100" required></label>
+                            <label>Periode <input type="number" name="period_number" min="1" max="14" placeholder="5" required></label>
+                            <label>Naam <input type="text" name="name" placeholder="Periode 5 - 2026"></label>
+                            <label>Startdatum <input type="date" name="start_date" required></label>
+                            <label>Einddatum <input type="date" name="end_date"></label>
+                            <label>Status
+                                <select name="status">
+                                    <option value="concept">Concept</option>
+                                    <option value="open">Open</option>
+                                    <option value="controle">Controle</option>
+                                    <option value="afgesloten">Afgesloten</option>
+                                </select>
+                            </label>
+                            <label class="period-create-form__notes">Notitie <input type="text" name="notes" placeholder="Bijvoorbeeld: aansluitend op bouw periodekalender"></label>
+                            <button class="ghost-button" type="submit">Periode aanmaken</button>
+                        </form>
+
+                        <div class="table-wrap period-table">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Periode</th>
+                                        <th>Datum</th>
+                                        <th>Weken</th>
+                                        <th>Boekingen</th>
+                                        <th>Uren</th>
+                                        <th>Status</th>
+                                        <th>Gewijzigd</th>
+                                        <th>Actie</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for period in payroll_periods %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ period.name }}</strong>
+                                            <span>{{ period.year }} / periode {{ period.period_number }}</span>
+                                        </td>
+                                        <td>{{ period.start_date }} t/m {{ period.end_date }}</td>
+                                        <td>{{ period.week_count }} weken</td>
+                                        <td>{{ period.booking_count }}</td>
+                                        <td>{{ period.total_hours }}</td>
+                                        <td><span class="status-tag">{{ period.status }}</span></td>
+                                        <td>{{ period.updated_at }}</td>
+                                        <td><a class="table-link" href="/dashboard/periods?period={{ period.id }}#periode-verloning">Open verloning</a></td>
+                                    </tr>
+                                    <tr class="period-weeks-row">
+                                        <td colspan="8">
+                                            <div class="period-week-grid">
+                                                {% for week in period.weeks %}
+                                                <div>
+                                                    <span>Week {{ week.week_index }}</span>
+                                                    <strong>WK{{ week.week_number }}</strong>
+                                                    <small>{{ week.start_date }} t/m {{ week.end_date }}</small>
+                                                </div>
+                                                {% else %}
+                                                <div>
+                                                    <span>Geen weken</span>
+                                                    <strong>-</strong>
+                                                    <small>Maak de periode opnieuw aan.</small>
+                                                </div>
+                                                {% endfor %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="8">
+                                            <div class="empty-state">
+                                                <strong>Nog geen loonperiodes</strong>
+                                                <span>Maak hierboven de eerste vierwekelijkse periode aan.</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </article>
+                    {% endif %}
+
+                    {% if selected_payroll_period %}
+                    <article class="panel panel--full periods-only" id="periode-verloning">
+                        <div class="panel-header">
+                            <div>
+                                <p class="section-label">Periode verloning</p>
+                                <h2>{{ selected_payroll_period.name }}</h2>
+                                <p>{{ selected_payroll_period.start_date }} t/m {{ selected_payroll_period.end_date }}. Eerste vertaling van het Excel periodeblad naar kandidaat-totalen.</p>
+                            </div>
+                            <a class="ghost-button" href="/dashboard/periods#periodes">Sluiten</a>
+                        </div>
+
+                        <div class="period-payroll-summary">
+                            <div>
+                                <span>Kandidaten</span>
+                                <strong>{{ selected_payroll_period.payroll_totals.employees }}</strong>
+                            </div>
+                            <div>
+                                <span>Boekingen</span>
+                                <strong>{{ selected_payroll_period.payroll_totals.bookings }}</strong>
+                            </div>
+                            <div>
+                                <span>Dagen</span>
+                                <strong>{{ selected_payroll_period.payroll_totals.days }}</strong>
+                            </div>
+                            <div>
+                                <span>Uren</span>
+                                <strong>{{ selected_payroll_period.payroll_totals.hours }}</strong>
+                            </div>
+                        </div>
+
+                        <div class="period-week-grid period-week-grid--compact">
+                            {% for week in selected_payroll_period.weeks %}
+                            <div>
+                                <span>Week {{ week.week_index }}</span>
+                                <strong>WK{{ week.week_number }}</strong>
+                                <small>{{ week.start_date }} t/m {{ week.end_date }}</small>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="table-wrap period-payroll-table">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Kandidaat</th>
+                                        <th>CAO</th>
+                                        <th>Projecten</th>
+                                        <th>Dagen</th>
+                                        <th>WK1</th>
+                                        <th>WK2</th>
+                                        <th>WK3</th>
+                                        <th>WK4</th>
+                                        <th>Totaal</th>
+                                        <th>Normaal</th>
+                                        <th>Overwerk</th>
+                                        <th>Uurtarief</th>
+                                        <th>Bruto indicatie</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in selected_payroll_period.payroll_rows %}
+                                    <tr>
+                                        <td><strong>{{ row.employee_name }}</strong></td>
+                                        <td>{{ row.cao_name }}</td>
+                                        <td>{{ row.projects }}</td>
+                                        <td>{{ row.worked_days }}</td>
+                                        <td>{{ row.week_hours[0] }}</td>
+                                        <td>{{ row.week_hours[1] }}</td>
+                                        <td>{{ row.week_hours[2] }}</td>
+                                        <td>{{ row.week_hours[3] }}</td>
+                                        <td><strong>{{ row.total_hours }}</strong></td>
+                                        <td>{{ row.normal_hours }}</td>
+                                        <td>{{ row.overtime_hours }}</td>
+                                        <td>
+                                            <strong>{{ row.hourly_wage }}</strong>
+                                            <span>{{ row.hourly_wage_source }}</span>
+                                        </td>
+                                        <td><strong>{{ row.gross_amount }}</strong></td>
+                                        <td><span class="status-tag">{{ row.status }}</span></td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="14">
+                                            <div class="empty-state">
+                                                <strong>Nog geen uren in deze periode</strong>
+                                                <span>Boek uren op projecten binnen de periode om hier kandidaat-totalen te zien.</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </article>
+                    {% endif %}
+
+                    {% if not selected_project %}
                     <article class="panel panel--full projects-only" id="projecten">
                         <div class="panel-header">
                             <div>
@@ -739,11 +955,12 @@
                                         <th>Laatste uren</th>
                                         <th>Status</th>
                                         <th>Gewijzigd</th>
+                                        <th>Actie</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {% for project in projects %}
-                                    <tr>
+                                    <tr class="{% if selected_project and selected_project.id == project.id %}row-selected{% endif %}">
                                         <td><strong>{{ project.title }}</strong></td>
                                         <td>{{ project.reference_number or '-' }}</td>
                                         <td>{{ project.relation_name or '-' }}</td>
@@ -754,9 +971,10 @@
                                         <td>{{ project.last_booking_date }}</td>
                                         <td><span class="status-tag">{{ project.status }}</span></td>
                                         <td>{{ project.updated_at }}</td>
+                                        <td><a class="table-link" href="/dashboard/projects?project={{ project.id }}#project-detail">Open</a></td>
                                     </tr>
                                     <tr class="project-bookings-row">
-                                        <td colspan="10">
+                                        <td colspan="11">
                                             <details class="project-bookings">
                                                 <summary>
                                                     <span>Geboekte uren</span>
@@ -784,7 +1002,7 @@
                                     </tr>
                                     {% else %}
                                     <tr>
-                                        <td colspan="10">
+                                        <td colspan="11">
                                             <div class="empty-state">
                                                 <strong>Nog geen projecten</strong>
                                                 <span>Maak hierboven het eerste project aan.</span>
@@ -796,6 +1014,86 @@
                             </table>
                         </div>
                     </article>
+
+                    {% endif %}
+
+                    {% if selected_project %}
+                    <article class="panel panel--full projects-only" id="project-detail">
+                        <div class="panel-header">
+                            <div>
+                                <p class="section-label">Project uren</p>
+                                <h2>{{ selected_project.title }}</h2>
+                                <p>{{ selected_project.relation_name or 'Geen opdrachtgever' }} · {{ selected_project.cao_name or 'Geen CAO gekoppeld' }}</p>
+                            </div>
+                            <a class="ghost-button" href="/dashboard/projects#projecten">Sluiten</a>
+                        </div>
+
+                        <div class="project-detail-summary">
+                            <div>
+                                <span>Boekingen</span>
+                                <strong>{{ selected_project.booking_count }}</strong>
+                            </div>
+                            <div>
+                                <span>Totaal uren</span>
+                                <strong>{{ selected_project.total_hours }}</strong>
+                            </div>
+                            <div>
+                                <span>Laatste uren</span>
+                                <strong>{{ selected_project.last_booking_date }}</strong>
+                            </div>
+                            <div>
+                                <span>Status</span>
+                                <strong>{{ selected_project.status }}</strong>
+                            </div>
+                        </div>
+
+                        <div class="table-wrap project-detail-table">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Datum</th>
+                                        <th>Medewerker</th>
+                                        <th>Uren</th>
+                                        <th>Opdrachtgever</th>
+                                        <th>CAO</th>
+                                        <th>Periode</th>
+                                        <th>Status</th>
+                                        <th>Urenbriefje</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for booking in selected_project.bookings %}
+                                    <tr>
+                                        <td>{{ booking.work_date }}</td>
+                                        <td><strong>{{ booking.employee_name }}</strong></td>
+                                        <td>{{ booking.hours }}</td>
+                                        <td>{{ booking.principal_name }}</td>
+                                        <td>{{ booking.cao_name }}</td>
+                                        <td>
+                                            {% if booking.period_number %}
+                                            {{ booking.period_name }} · P{{ booking.period_number }} {{ booking.period_year }}
+                                            {% else %}
+                                            {{ booking.period_name }}
+                                            {% endif %}
+                                        </td>
+                                        <td><span class="status-tag">{{ booking.status }}</span></td>
+                                        <td><a class="table-link" href="/dashboard/timesheets?tab=task&stage=loon&timesheet={{ booking.timesheet_inbox_id }}#timesheet-tabs">Open</a></td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="8">
+                                            <div class="empty-state">
+                                                <strong>Nog geen uren geboekt</strong>
+                                                <span>Na validatie van urenbriefjes verschijnen alle projecturen hier.</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </article>
+                    {% endif %}
 
                     <article class="panel panel--full timesheets-only" id="timesheets">
                         {% set active_timesheet_tab = timesheet_tab|default('overview') %}

@@ -10,11 +10,22 @@
 }
 
 body {
+    position: relative;
     margin: 0;
     min-height: 100vh;
     background:
         radial-gradient(circle at 78% 8%, rgba(62, 132, 92, 0.2), transparent 24rem),
         linear-gradient(135deg, #0f1215 0%, #161b1f 52%, #101316 100%);
+}
+
+body::before {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: url("/dashboard/static/achtergrond.webp") center / cover no-repeat;
+    content: "";
+    opacity: 0.12;
 }
 
 body[data-theme="light"] {
@@ -29,6 +40,7 @@ body:not(.page-overview) .overview-only,
 body:not(.page-relations) .relations-only,
 body:not(.page-vacancies) .vacancies-only,
 body:not(.page-projects) .projects-only,
+body:not(.page-periods) .periods-only,
 body:not(.page-tickets) .tickets-only,
 body:not(.page-timesheets) .timesheets-only,
 body:not(.page-server) .server-only,
@@ -42,6 +54,8 @@ a {
 }
 
 .app-shell {
+    position: relative;
+    z-index: 1;
     display: grid;
     grid-template-columns: 230px minmax(0, 1fr);
     min-height: 100vh;
@@ -83,12 +97,42 @@ a {
 .side-nav__item {
     display: flex;
     align-items: center;
+    justify-content: space-between;
+    gap: 10px;
     min-height: 42px;
     padding: 0 12px;
     border: 1px solid transparent;
     border-radius: 8px;
     color: #b9c2cb;
     font-size: 0.94rem;
+}
+
+.side-nav__item span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.module-status {
+    display: inline-flex;
+    flex: 0 0 auto;
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.05);
+}
+
+.module-status--red {
+    background: #ee6658;
+}
+
+.module-status--orange {
+    background: #f4a340;
+}
+
+.module-status--green {
+    background: #5ed68e;
 }
 
 .side-nav__item:hover,
@@ -203,8 +247,33 @@ h2 {
     margin: 4px 0 6px;
 }
 
+.settings-card-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.payroll-settings-form--compact {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    margin: 12px 0 10px;
+    padding: 12px;
+    border: 1px solid rgba(127, 209, 160, 0.16);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.035);
+}
+
+.period-create-form {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr)) auto;
+    gap: 10px;
+    align-items: end;
+    margin: 16px 0;
+}
+
 .project-create-form label,
 .payroll-settings-form label,
+.period-create-form label,
 .upload-meta-modal label {
     display: grid;
     gap: 6px;
@@ -217,6 +286,8 @@ h2 {
 .project-create-form select,
 .payroll-settings-form input,
 .payroll-settings-form select,
+.period-create-form input,
+.period-create-form select,
 .upload-meta-modal input {
     min-height: 40px;
     width: 100%;
@@ -235,8 +306,131 @@ h2 {
     grid-column: span 2;
 }
 
+.form-actions-inline {
+    display: flex;
+    align-items: end;
+    gap: 8px;
+}
+
+.ghost-button--subtle {
+    opacity: 0.78;
+}
+
+.period-create-form__notes {
+    grid-column: span 2;
+}
+
 .payroll-settings-form .ghost-button {
     min-height: 40px;
+}
+
+.payroll-settings-form--compact label {
+    gap: 4px;
+    font-size: 0.76rem;
+}
+
+.payroll-settings-form--compact input,
+.payroll-settings-form--compact select,
+.payroll-settings-form--compact .ghost-button {
+    min-height: 34px;
+    padding: 0 9px;
+}
+
+.period-create-form .ghost-button {
+    min-height: 40px;
+}
+
+.period-table td > span {
+    display: block;
+    margin-top: 3px;
+    color: #9fb0bd;
+    font-size: 0.78rem;
+}
+
+.period-weeks-row td {
+    padding-top: 0;
+    background: rgba(255, 255, 255, 0.025);
+}
+
+.period-week-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(120px, 1fr));
+    gap: 8px;
+}
+
+.period-week-grid div {
+    display: grid;
+    gap: 3px;
+    min-height: 72px;
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: rgba(11, 22, 29, 0.5);
+}
+
+.period-week-grid span,
+.period-week-grid small {
+    color: #aebbc8;
+    font-size: 0.8rem;
+}
+
+.period-week-grid strong {
+    color: #ffffff;
+    font-size: 1rem;
+}
+
+.period-week-grid--compact {
+    margin: 10px 0 12px;
+}
+
+.period-week-grid--compact div {
+    min-height: 58px;
+    padding: 8px 10px;
+}
+
+.period-payroll-summary {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    margin: 10px 0 12px;
+}
+
+.period-payroll-summary div {
+    display: grid;
+    gap: 5px;
+    min-height: 58px;
+    padding: 10px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 8px;
+    background: rgba(12, 31, 50, 0.5);
+}
+
+.period-payroll-summary span {
+    color: #aebbc8;
+    font-size: 0.74rem;
+    font-weight: 800;
+}
+
+.period-payroll-summary strong {
+    color: #ffffff;
+    font-size: 1.08rem;
+}
+
+.period-payroll-table table {
+    min-width: 1120px;
+}
+
+.period-payroll-table th,
+.period-payroll-table td {
+    padding: 10px 12px;
+    font-size: 0.8rem;
+}
+
+.period-payroll-table td span {
+    display: block;
+    margin-top: 2px;
+    color: #9fb0bd;
+    font-size: 0.72rem;
 }
 
 .payroll-settings-table {
@@ -254,9 +448,25 @@ h2 {
     margin-top: 8px;
 }
 
+.page-projects th,
+.page-projects td {
+    padding: 10px 12px;
+    font-size: 0.82rem;
+}
+
+.page-projects .status-tag {
+    min-height: 24px;
+    padding: 0 8px;
+    font-size: 0.72rem;
+}
+
 .project-bookings-row td {
     padding-top: 0;
     background: rgba(255, 255, 255, 0.025);
+}
+
+.project-bookings-row {
+    display: none;
 }
 
 .project-bookings {
@@ -319,6 +529,38 @@ h2 {
 .project-bookings-list strong {
     color: #ffffff;
     font-size: 0.86rem;
+}
+
+.project-detail-summary {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    margin: 10px 0 12px;
+}
+
+.project-detail-summary div {
+    display: grid;
+    gap: 5px;
+    min-height: 58px;
+    padding: 10px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 8px;
+    background: rgba(12, 31, 50, 0.5);
+}
+
+.project-detail-summary span {
+    color: #aebbc8;
+    font-size: 0.74rem;
+    font-weight: 800;
+}
+
+.project-detail-summary strong {
+    color: #ffffff;
+    font-size: 1.08rem;
+}
+
+.project-detail-table {
+    margin-top: 10px;
 }
 
 .processing-status {
@@ -460,7 +702,7 @@ h2 {
 }
 
 .page-overview .content-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1.45fr) minmax(340px, 0.55fr);
 }
 
 .panel {
@@ -477,6 +719,11 @@ h2 {
 
 .panel--full {
     grid-column: 1 / -1;
+}
+
+.audit-panel {
+    grid-column: 2;
+    grid-row: span 2;
 }
 
 .panel-header {
@@ -508,14 +755,16 @@ h2 {
 
 .module-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 8px;
 }
 
 .module-card {
     display: grid;
-    min-height: 132px;
-    padding: 18px;
+    min-height: 76px;
+    padding: 10px 12px;
+    align-content: center;
+    gap: 4px;
 }
 
 .module-card:hover {
@@ -525,16 +774,20 @@ h2 {
 
 .module-card span {
     color: #eef3f5;
-    font-size: 0.98rem;
+    font-size: 0.82rem;
+    font-weight: 750;
 }
 
 .module-card strong {
-    align-self: end;
-    font-size: 2.1rem;
+    font-size: 1.45rem;
     line-height: 1;
 }
 
-.module-card small,
+.module-card small {
+    color: #9ca7b1;
+    font-size: 0.74rem;
+}
+
 .task-item span,
 .task-item small,
 .activity-item small {
@@ -545,7 +798,7 @@ h2 {
 .task-list,
 .activity-list {
     display: grid;
-    gap: 10px;
+    gap: 8px;
 }
 
 .task-item {
@@ -567,10 +820,15 @@ h2 {
 }
 
 .activity-item {
-    display: flex;
+    display: grid;
+    grid-template-columns: 14px minmax(0, 1fr);
     align-items: flex-start;
-    gap: 12px;
-    min-height: 58px;
+    gap: 10px;
+    min-height: 82px;
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
 }
 
 .activity-item > span {
@@ -580,6 +838,40 @@ h2 {
     border-radius: 99px;
     background: #7fd1a0;
     box-shadow: 0 0 0 5px rgba(127, 209, 160, 0.12);
+}
+
+.activity-item p {
+    margin: 5px 0 8px;
+    color: #d5dde4;
+    font-size: 0.78rem;
+    line-height: 1.35;
+}
+
+.activity-meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+
+.activity-meta-row em,
+.activity-meta-row time,
+.activity-meta-row b {
+    display: inline-flex;
+    min-height: 24px;
+    align-items: center;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #aebbc8;
+    font-size: 0.7rem;
+    font-style: normal;
+    font-weight: 800;
+}
+
+.activity-meta-row b {
+    border: 1px solid rgba(127, 209, 160, 0.22);
+    color: #a9ecc0;
 }
 
 .server-grid {
@@ -1043,6 +1335,41 @@ select option {
     font-weight: 700;
 }
 
+.relation-type-field {
+    display: none !important;
+}
+
+.currency-field {
+    max-width: 190px;
+}
+
+.currency-input {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr);
+    align-items: center;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.07);
+}
+
+.currency-input > span {
+    display: grid;
+    place-items: center;
+    min-height: 36px;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    color: #9fe5b9;
+    font-weight: 900;
+}
+
+.currency-input input {
+    min-height: 36px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 0 10px;
+}
+
 .create-form__submit {
     align-self: end;
 }
@@ -1086,6 +1413,30 @@ select option {
 .table-link {
     color: #9fe5b9;
     font-weight: 700;
+}
+
+.table-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.table-actions form {
+    margin: 0;
+}
+
+.table-action-danger {
+    border: 0;
+    background: transparent;
+    color: #ffad9b;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 800;
+}
+
+.table-action-danger:hover {
+    color: #ffd1c7;
 }
 
 .candidate-toolbar {
@@ -1518,13 +1869,17 @@ body[data-theme="light"] .side-nav__item--active {
     background: rgba(66, 138, 87, 0.12);
 }
 
+body[data-theme="light"] .module-status {
+    box-shadow: 0 0 0 3px rgba(23, 32, 39, 0.06);
+}
+
 body[data-theme="light"] .stat-card,
 body[data-theme="light"] .panel,
 body[data-theme="light"] .module-card,
 body[data-theme="light"] .workflow-card,
 body[data-theme="light"] .settings-card {
     border-color: rgba(28, 42, 50, 0.12);
-    background: rgba(255, 255, 255, 0.82);
+    background: rgba(255, 255, 255, 0.94);
     box-shadow: 0 18px 44px rgba(23, 32, 39, 0.1);
 }
 
@@ -1546,11 +1901,126 @@ body[data-theme="light"] .role-placeholder-grid span {
     color: #27353e;
 }
 
+body[data-theme="light"] .activity-item {
+    border-color: rgba(28, 42, 50, 0.1);
+    background: rgba(247, 251, 248, 0.84);
+}
+
+body[data-theme="light"] .activity-item p {
+    color: #32424c;
+}
+
+body[data-theme="light"] .activity-meta-row em,
+body[data-theme="light"] .activity-meta-row time,
+body[data-theme="light"] .activity-meta-row b {
+    background: rgba(28, 42, 50, 0.06);
+    color: #52616a;
+}
+
+body[data-theme="light"] .activity-meta-row b {
+    border-color: rgba(66, 138, 87, 0.24);
+    color: #116b3d;
+}
+
 body[data-theme="light"] .stat-card strong,
 body[data-theme="light"] .workflow-card strong,
 body[data-theme="light"] .settings-card strong,
 body[data-theme="light"] .user-placeholder-list strong {
     color: #111820;
+}
+
+body[data-theme="light"] .section-label,
+body[data-theme="light"] th,
+body[data-theme="light"] .project-create-form label,
+body[data-theme="light"] .payroll-settings-form label,
+body[data-theme="light"] .period-create-form label,
+body[data-theme="light"] .upload-meta-modal label {
+    color: #5f7180;
+}
+
+body[data-theme="light"] td,
+body[data-theme="light"] .payroll-settings-table td span:not(.status-tag),
+body[data-theme="light"] .period-payroll-table td span,
+body[data-theme="light"] .period-table td > span,
+body[data-theme="light"] .empty-state span {
+    color: #22303a;
+}
+
+body[data-theme="light"] .project-create-form input,
+body[data-theme="light"] .project-create-form select,
+body[data-theme="light"] .payroll-settings-form input,
+body[data-theme="light"] .payroll-settings-form select,
+body[data-theme="light"] .period-create-form input,
+body[data-theme="light"] .period-create-form select,
+body[data-theme="light"] .upload-meta-modal input {
+    border-color: rgba(28, 42, 50, 0.18);
+    background: rgba(255, 255, 255, 0.98);
+    color: #172027;
+}
+
+body[data-theme="light"] .project-create-form input::placeholder,
+body[data-theme="light"] .payroll-settings-form input::placeholder,
+body[data-theme="light"] .period-create-form input::placeholder {
+    color: #81919d;
+}
+
+body[data-theme="light"] .payroll-settings-form--compact {
+    border-color: rgba(66, 138, 87, 0.18);
+    background: rgba(247, 251, 248, 0.82);
+}
+
+body[data-theme="light"] .period-payroll-summary div,
+body[data-theme="light"] .project-detail-summary div {
+    border-color: rgba(28, 42, 50, 0.1);
+    background: rgba(247, 251, 248, 0.88);
+}
+
+body[data-theme="light"] .period-payroll-summary span,
+body[data-theme="light"] .project-detail-summary span {
+    color: #60717d;
+}
+
+body[data-theme="light"] .period-payroll-summary strong,
+body[data-theme="light"] .project-detail-summary strong {
+    color: #172027;
+}
+
+body[data-theme="light"] .table-link {
+    color: #116b3d;
+}
+
+body[data-theme="light"] .table-action-danger {
+    color: #b84939;
+}
+
+body[data-theme="light"] .table-action-danger:hover {
+    color: #8f2f23;
+}
+
+body[data-theme="light"] .ghost-button,
+body[data-theme="light"] .status-pill {
+    border-color: rgba(28, 42, 50, 0.16);
+    background: rgba(255, 255, 255, 0.72);
+    color: #24333c;
+}
+
+body[data-theme="light"] .currency-input {
+    border-color: rgba(28, 42, 50, 0.18);
+    background: rgba(255, 255, 255, 0.98);
+}
+
+body[data-theme="light"] .currency-input > span {
+    border-right-color: rgba(28, 42, 50, 0.12);
+    color: #116b3d;
+}
+
+body[data-theme="light"] .ghost-button:hover {
+    border-color: rgba(66, 138, 87, 0.34);
+    color: #0f3f25;
+}
+
+body[data-theme="light"] .theme-toggle strong {
+    color: #172027;
 }
 
 .candidate-layout {
@@ -1732,9 +2202,7 @@ body[data-theme="light"] .user-placeholder-list strong {
 }
 
 .vacancy-database-layout {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 340px;
-    gap: 12px;
+    display: block;
 }
 
 .vacancy-filters button {
@@ -1747,7 +2215,11 @@ body[data-theme="light"] .user-placeholder-list strong {
 }
 
 .vacancy-database-layout .vacancy-table table {
-    min-width: 1160px;
+    min-width: 1040px;
+}
+
+.vacancy-top-search {
+    margin: 10px 0 14px;
 }
 
 .orange-count {
@@ -3162,6 +3634,10 @@ body[data-theme="light"] .user-placeholder-list strong {
     .settings-grid,
     .project-create-form,
     .payroll-settings-form,
+    .period-create-form,
+    .period-week-grid,
+    .period-payroll-summary,
+    .project-detail-summary,
     .project-bookings-list a,
     .workflow-grid,
     .channel-grid,
@@ -3170,6 +3646,15 @@ body[data-theme="light"] .user-placeholder-list strong {
     .relation-layout,
     .inbox-layout {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .page-overview .content-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .audit-panel {
+        grid-column: auto;
+        grid-row: auto;
     }
 
     .relation-layout,
@@ -3188,8 +3673,15 @@ body[data-theme="light"] .user-placeholder-list strong {
     }
 
     .project-create-form__notes,
-    .payroll-settings-form__notes {
+    .payroll-settings-form__notes,
+    .period-create-form__notes {
         grid-column: auto;
+    }
+
+    .settings-card-heading,
+    .form-actions-inline {
+        align-items: flex-start;
+        flex-direction: column;
     }
 }
 
@@ -3223,6 +3715,10 @@ body[data-theme="light"] .user-placeholder-list strong {
     .processing-status,
     .project-create-form,
     .payroll-settings-form,
+    .period-create-form,
+    .period-week-grid,
+    .period-payroll-summary,
+    .project-detail-summary,
     .project-bookings-list a,
     .search-bar,
     .relation-layout,
@@ -3240,6 +3736,10 @@ body[data-theme="light"] .user-placeholder-list strong {
     .digital-timesheet-grid,
     .import-strip,
     .inline-import-form {
+        grid-template-columns: 1fr;
+    }
+
+    .page-overview .content-grid {
         grid-template-columns: 1fr;
     }
 }

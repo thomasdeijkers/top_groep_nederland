@@ -18,10 +18,15 @@ from apps.dashboard.openai_usage import get_openai_usage_summary
 from apps.dashboard.records import (
     create_cao_setting,
     create_project,
+    create_payroll_period,
+    get_cao_setting,
+    get_payroll_period,
+    get_project,
     get_overview_data,
     get_timesheet_channel_tiles,
     list_cao_settings,
     list_projects,
+    list_payroll_periods,
     list_candidates,
     list_project_options,
     list_principals,
@@ -29,6 +34,7 @@ from apps.dashboard.records import (
     list_tickets,
     list_vacancies,
     list_whatsapp_timesheets,
+    update_cao_setting,
 )
 from apps.dashboard.relations import (
     create_candidate,
@@ -133,6 +139,10 @@ def _dashboard_context(
     timesheet_tab: str = "overview",
     relation_tab: str = "candidates",
     show_relation_form: bool = False,
+    project_id: int | None = None,
+    period_id: int | None = None,
+    cao_id: int | None = None,
+    show_cao_form: bool = False,
 ):
     data_page = "timesheets" if active_page in {"timesheets", "whatsapp"} else "relations" if active_page in {"relations", "candidates", "principals"} else active_page
     if active_page == "server":
@@ -183,7 +193,12 @@ def _dashboard_context(
             "principal_options": [],
             "project_options": [],
             "projects": [],
+            "selected_project": None,
+            "selected_payroll_period": None,
+            "payroll_periods": [],
             "cao_settings": [],
+            "selected_cao_setting": None,
+            "show_cao_form": False,
             "timesheet_channel_tiles": [],
             "country_options": [
                 "Nederland",
@@ -215,7 +230,11 @@ def _dashboard_context(
     openai_usage = get_openai_usage_summary()
     project_options = list_project_options()
     projects = list_projects(query=query if data_page == "projects" else "")
+    selected_project = get_project(project_id) if data_page == "projects" and project_id else None
+    payroll_periods = list_payroll_periods()
+    selected_payroll_period = get_payroll_period(period_id) if data_page == "periods" and period_id else None
     cao_settings = list_cao_settings()
+    selected_cao_setting = get_cao_setting(cao_id) if data_page == "settings" and cao_id else None
     selected_relation = get_relation(edit_id) if data_page == "relations" and edit_id else None
     selected_vacancy = get_vacancy(edit_id) if data_page == "vacancies" and edit_id else None
     relation_tab = relation_tab if relation_tab in {"candidates", "principals"} else "candidates"
@@ -275,7 +294,12 @@ def _dashboard_context(
         "principal_options": principals,
         "project_options": project_options,
         "projects": projects,
+        "selected_project": selected_project,
+        "selected_payroll_period": selected_payroll_period,
+        "payroll_periods": payroll_periods,
         "cao_settings": cao_settings,
+        "selected_cao_setting": selected_cao_setting,
+        "show_cao_form": show_cao_form or bool(selected_cao_setting),
         "timesheet_channel_tiles": get_timesheet_channel_tiles(),
         "country_options": [
             "Nederland",
@@ -303,11 +327,15 @@ def _render_dashboard(
     timesheet_tab: str = "overview",
     relation_tab: str = "candidates",
     show_relation_form: bool = False,
+    project_id: int | None = None,
+    period_id: int | None = None,
+    cao_id: int | None = None,
+    show_cao_form: bool = False,
 ):
     return templates.TemplateResponse(
         request,
         "dashboard.html",
-        _dashboard_context(active_page, edit_id, query, timesheet_id, workflow_stage, timesheet_tab, relation_tab, show_relation_form),
+        _dashboard_context(active_page, edit_id, query, timesheet_id, workflow_stage, timesheet_tab, relation_tab, show_relation_form, project_id, period_id, cao_id, show_cao_form),
     )
 
 
@@ -345,8 +373,13 @@ def vacancies_page(request: Request, edit: int | None = None, q: str = ""):
 
 
 @router.get("/dashboard/projects", response_class=HTMLResponse)
-def projects_page(request: Request, q: str = ""):
-    return _render_dashboard(request, "projects", query=q)
+def projects_page(request: Request, q: str = "", project: int | None = None):
+    return _render_dashboard(request, "projects", query=q, project_id=project)
+
+
+@router.get("/dashboard/periods", response_class=HTMLResponse)
+def periods_page(request: Request, period: int | None = None):
+    return _render_dashboard(request, "periods", period_id=period)
 
 
 @router.get("/dashboard/tickets", response_class=HTMLResponse)
@@ -447,8 +480,9 @@ def server_page(request: Request):
 
 
 @router.get("/dashboard/settings", response_class=HTMLResponse)
-def settings_page(request: Request):
-    return _render_dashboard(request, "settings")
+def settings_page(request: Request, cao: str = ""):
+    cao_id = int(cao) if cao.isdigit() else None
+    return _render_dashboard(request, "settings", cao_id=cao_id, show_cao_form=cao == "new")
 
 
 @router.post("/api/settings/cao")
@@ -469,6 +503,28 @@ def save_cao_setting(
     notes: str = Form(""),
 ):
     setting_id = create_cao_setting(locals())
+    return RedirectResponse(f"/dashboard/settings?cao={setting_id}#cao-instellingen", status_code=303)
+
+
+@router.post("/api/settings/cao/{setting_id}")
+def edit_cao_setting(
+    setting_id: int,
+    name: str = Form(""),
+    version_label: str = Form(""),
+    effective_from: str = Form(""),
+    effective_until: str = Form(""),
+    standard_week_hours: str = Form(""),
+    overtime_after_hours: str = Form(""),
+    weekday_overtime_percent: str = Form(""),
+    saturday_percent: str = Form(""),
+    sunday_percent: str = Form(""),
+    holiday_percent: str = Form(""),
+    travel_cost_per_km: str = Form(""),
+    default_hourly_wage: str = Form(""),
+    status: str = Form("concept"),
+    notes: str = Form(""),
+):
+    update_cao_setting(setting_id, locals())
     return RedirectResponse(f"/dashboard/settings?cao={setting_id}#cao-instellingen", status_code=303)
 
 
@@ -514,6 +570,20 @@ def save_project(
 ):
     project_id = create_project(locals())
     return RedirectResponse(f"/dashboard/projects?created={project_id}#projecten", status_code=303)
+
+
+@router.post("/api/periods")
+def save_payroll_period(
+    year: str = Form(""),
+    period_number: str = Form(""),
+    name: str = Form(""),
+    start_date: str = Form(""),
+    end_date: str = Form(""),
+    status: str = Form("concept"),
+    notes: str = Form(""),
+):
+    period_id = create_payroll_period(locals())
+    return RedirectResponse(f"/dashboard/periods?created={period_id}#periodes", status_code=303)
 
 
 async def _relation_photo_from_upload(photo: UploadFile | None):

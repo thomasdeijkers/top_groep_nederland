@@ -1,4 +1,5 @@
 import json
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from apps.dashboard.data_store import ensure_dashboard_tables
@@ -90,18 +91,6 @@ def get_overview_data() -> dict:
 
 def _whatsapp_workflow(statuses: dict) -> list[dict]:
     definitions = [
-        {
-            "key": "geupload",
-            "label": "Geuploade urenbriefjes",
-            "description": "Via gekoppelde kanalen of testupload binnengekomen",
-            "statuses": ("nieuw", "geupload", "uploaded"),
-        },
-        {
-            "key": "gematcht",
-            "label": "Gematcht op telefoon",
-            "description": "Telefoonnummer gekoppeld aan kandidaat",
-            "statuses": ("gematcht", "matched"),
-        },
         {
             "key": "te_controleren",
             "label": "Te controleren parsing",
@@ -474,6 +463,74 @@ def list_projects(limit: int = 100, query: str = "") -> list[dict]:
         return []
 
 
+def get_project(project_id: int | None) -> dict | None:
+    if not project_id:
+        return None
+    projects = list_projects(limit=500)
+    project = next((item for item in projects if item["id"] == project_id), None)
+    if not project:
+        return None
+    project["bookings"] = list_project_time_bookings(project_id)
+    return project
+
+
+def list_project_time_bookings(project_id: int, limit: int = 250) -> list[dict]:
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT b.id,
+                           b.timesheet_inbox_id,
+                           b.work_date,
+                           b.hours,
+                           b.status,
+                           COALESCE(r.name, w.employee_name, w.matched_candidate_name, ''),
+                           COALESCE(p.name, ''),
+                           COALESCE(c.name, ''),
+                           pp.name,
+                           pp.year,
+                           pp.period_number,
+                           b.updated_at
+                    FROM project_time_bookings b
+                    LEFT JOIN relations r
+                        ON r.id = b.relation_id
+                    LEFT JOIN relations p
+                        ON p.id = b.principal_id
+                    LEFT JOIN payroll_cao_settings c
+                        ON c.id = b.payroll_cao_setting_id
+                    LEFT JOIN payroll_periods pp
+                        ON pp.id = b.payroll_period_id
+                    LEFT JOIN whatsapp_timesheet_inbox w
+                        ON w.id = b.timesheet_inbox_id
+                    WHERE b.project_id = %s
+                    ORDER BY b.work_date DESC NULLS LAST, b.updated_at DESC, b.id DESC
+                    LIMIT %s;
+                    """,
+                    (project_id, limit),
+                )
+                return [
+                    {
+                        "id": row[0],
+                        "timesheet_inbox_id": row[1],
+                        "work_date": row[2].strftime("%d-%m-%Y") if row[2] else "-",
+                        "hours": _format_number(row[3]),
+                        "status": row[4] or "",
+                        "employee_name": row[5] or "Onbekend",
+                        "principal_name": row[6] or "-",
+                        "cao_name": row[7] or "Nog niet gekoppeld",
+                        "period_name": row[8] or "-",
+                        "period_year": row[9],
+                        "period_number": row[10],
+                        "updated_at": row[11].strftime("%d-%m-%Y %H:%M") if row[11] else "-",
+                    }
+                    for row in cursor.fetchall()
+                ]
+    except Exception:
+        return []
+
+
 def create_project(data: dict) -> int:
     ensure_dashboard_tables()
     raw_data = {
@@ -527,10 +584,30 @@ def _number_or_none(value):
     return text or None
 
 
+def _decimal_or_none(value):
+    text = str(value or "").strip().replace("€", "").replace(" ", "").replace(",", ".")
+    if not text:
+        return None
+    try:
+        return Decimal(text)
+    except Exception:
+        return None
+
+
 def _int_or_none(value):
     try:
         text = str(value or "").strip()
         return int(text) if text else None
+    except Exception:
+        return None
+
+
+def _date_or_none(value):
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return datetime.strptime(text, "%Y-%m-%d").date()
     except Exception:
         return None
 
@@ -542,6 +619,312 @@ def _format_number(value) -> str:
     if "." in text:
         text = text.rstrip("0").rstrip(".")
     return text or "0"
+
+
+def _format_money(value) -> str:
+    if value is None:
+        return "€ 0,00"
+    amount = Decimal(str(value)).quantize(Decimal("0.01"))
+    text = f"{amount:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return f"€ {text}"
+
+
+def list_payroll_periods(limit: int = 25) -> list[dict]:
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT p.id,
+                           p.year,
+                           p.period_number,
+                           p.name,
+                           p.start_date,
+                           p.end_date,
+                           p.status,
+                           p.notes,
+                           COALESCE(w.week_count, 0),
+                           COALESCE(b.booking_count, 0),
+                           COALESCE(b.total_hours, 0),
+                           p.updated_at
+                    FROM payroll_periods p
+                    LEFT JOIN (
+                        SELECT payroll_period_id, COUNT(*) AS week_count
+                        FROM payroll_period_weeks
+                        GROUP BY payroll_period_id
+                    ) w ON w.payroll_period_id = p.id
+                    LEFT JOIN (
+                        SELECT p2.id AS payroll_period_id,
+                               COUNT(b.id) AS booking_count,
+                               SUM(b.hours) AS total_hours
+                        FROM payroll_periods p2
+                        LEFT JOIN project_time_bookings b
+                            ON b.payroll_period_id = p2.id
+                            OR (b.payroll_period_id IS NULL AND b.work_date BETWEEN p2.start_date AND p2.end_date)
+                        GROUP BY p2.id
+                    ) b ON b.payroll_period_id = p.id
+                    ORDER BY p.year DESC, p.period_number DESC
+                    LIMIT %s;
+                    """,
+                    (limit,),
+                )
+                periods = [
+                    {
+                        "id": row[0],
+                        "year": row[1],
+                        "period_number": row[2],
+                        "name": row[3],
+                        "start_date": row[4].strftime("%d-%m-%Y") if row[4] else "-",
+                        "end_date": row[5].strftime("%d-%m-%Y") if row[5] else "-",
+                        "status": row[6] or "concept",
+                        "notes": row[7] or "",
+                        "week_count": row[8] or 0,
+                        "booking_count": row[9] or 0,
+                        "total_hours": _format_number(row[10]),
+                        "updated_at": row[11].strftime("%d-%m-%Y %H:%M") if row[11] else "-",
+                        "weeks": [],
+                    }
+                    for row in cursor.fetchall()
+                ]
+                _attach_period_weeks(cursor, periods)
+                return periods
+    except Exception:
+        return []
+
+
+def get_payroll_period(period_id: int | None) -> dict | None:
+    if not period_id:
+        return None
+    period = next((item for item in list_payroll_periods(limit=200) if item["id"] == period_id), None)
+    if period:
+        period["payroll_rows"] = list_payroll_period_payroll(period_id)
+        period["payroll_totals"] = _payroll_period_totals(period["payroll_rows"])
+    return period
+
+
+def list_payroll_period_payroll(period_id: int) -> list[dict]:
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT id, start_date, end_date
+                    FROM payroll_periods
+                    WHERE id = %s;
+                    """,
+                    (period_id,),
+                )
+                period_row = cursor.fetchone()
+                if not period_row:
+                    return []
+                _, start_date, end_date = period_row
+                cursor.execute(
+                    """
+                    SELECT week_index, start_date, end_date
+                    FROM payroll_period_weeks
+                    WHERE payroll_period_id = %s
+                    ORDER BY week_index;
+                    """,
+                    (period_id,),
+                )
+                weeks = cursor.fetchall()
+                cursor.execute(
+                    """
+                    SELECT b.id,
+                           b.relation_id,
+                           COALESCE(r.name, w.employee_name, w.matched_candidate_name, 'Onbekend') AS employee_name,
+                           COALESCE(c.name, 'Geen CAO') AS cao_name,
+                           COALESCE(c.standard_week_hours, 40) AS standard_week_hours,
+                           COALESCE(c.weekday_overtime_percent, 125) AS weekday_overtime_percent,
+                           r.hourly_rate,
+                           COALESCE(c.default_hourly_wage, 0) AS cao_hourly_wage,
+                           COALESCE(v.title, w.project_name, '-') AS project_name,
+                           COALESCE(p.name, w.principal_name, '-') AS principal_name,
+                           b.work_date,
+                           COALESCE(b.hours, 0) AS hours,
+                           b.status
+                    FROM project_time_bookings b
+                    LEFT JOIN relations r
+                        ON r.id = b.relation_id
+                    LEFT JOIN relations p
+                        ON p.id = b.principal_id
+                    LEFT JOIN vacancies v
+                        ON v.id = b.project_id
+                    LEFT JOIN payroll_cao_settings c
+                        ON c.id = b.payroll_cao_setting_id
+                    LEFT JOIN whatsapp_timesheet_inbox w
+                        ON w.id = b.timesheet_inbox_id
+                    WHERE b.payroll_period_id = %s
+                       OR (b.payroll_period_id IS NULL AND b.work_date BETWEEN %s AND %s)
+                    ORDER BY employee_name, b.work_date, b.id;
+                    """,
+                    (period_id, start_date, end_date),
+                )
+                aggregates: dict[tuple, dict] = {}
+                for row in cursor.fetchall():
+                    key = (row[1], row[2], row[3])
+                    item = aggregates.setdefault(
+                        key,
+                        {
+                            "employee_name": row[2],
+                            "cao_name": row[3],
+                            "standard_week_hours_raw": Decimal(str(row[4] or 40)),
+                            "overtime_percent_raw": Decimal(str(row[5] or 125)),
+                            "candidate_hourly_wage_raw": _decimal_or_none(row[6]),
+                            "cao_hourly_wage_raw": Decimal(str(row[7] or 0)),
+                            "projects": set(),
+                            "principals": set(),
+                            "statuses": set(),
+                            "dates": set(),
+                            "booking_count": 0,
+                            "total_hours_raw": Decimal("0"),
+                            "week_hours_raw": [Decimal("0"), Decimal("0"), Decimal("0"), Decimal("0")],
+                        },
+                    )
+                    hours = Decimal(str(row[11] or 0))
+                    item["booking_count"] += 1
+                    item["total_hours_raw"] += hours
+                    item["projects"].add(row[8] or "-")
+                    item["principals"].add(row[9] or "-")
+                    item["statuses"].add(row[12] or "concept")
+                    if row[10]:
+                        item["dates"].add(row[10])
+                        for week_index, week_start, week_end in weeks:
+                            if week_start <= row[10] <= week_end and 1 <= week_index <= 4:
+                                item["week_hours_raw"][week_index - 1] += hours
+                                break
+                rows = []
+                for item in aggregates.values():
+                    standard = item["standard_week_hours_raw"]
+                    overtime_percent = item["overtime_percent_raw"] / Decimal("100")
+                    candidate_wage = item["candidate_hourly_wage_raw"]
+                    wage = candidate_wage if candidate_wage is not None else item["cao_hourly_wage_raw"]
+                    normal_hours = sum(min(week_hours, standard) for week_hours in item["week_hours_raw"])
+                    overtime_hours = sum(max(Decimal("0"), week_hours - standard) for week_hours in item["week_hours_raw"])
+                    gross_amount = (normal_hours * wage) + (overtime_hours * wage * overtime_percent)
+                    rows.append(
+                        {
+                            "employee_name": item["employee_name"],
+                            "cao_name": item["cao_name"],
+                            "projects": ", ".join(sorted(item["projects"])),
+                            "principals": ", ".join(sorted(item["principals"])),
+                            "booking_count": item["booking_count"],
+                            "worked_days": len(item["dates"]),
+                            "total_hours": _format_number(item["total_hours_raw"]),
+                            "week_hours": [_format_number(value) for value in item["week_hours_raw"]],
+                            "normal_hours": _format_number(normal_hours),
+                            "overtime_hours": _format_number(overtime_hours),
+                            "hourly_wage": _format_money(wage),
+                            "hourly_wage_source": "Kandidaat" if candidate_wage is not None else "CAO default",
+                            "gross_amount": _format_money(gross_amount),
+                            "status": ", ".join(sorted(item["statuses"])),
+                        }
+                    )
+                return sorted(rows, key=lambda item: item["employee_name"])
+    except Exception:
+        return []
+
+
+def _payroll_period_totals(rows: list[dict]) -> dict:
+    total_hours = sum(Decimal(str(row["total_hours"]).replace(",", ".")) for row in rows) if rows else Decimal("0")
+    total_bookings = sum(int(row["booking_count"] or 0) for row in rows)
+    total_days = sum(int(row["worked_days"] or 0) for row in rows)
+    return {
+        "employees": len(rows),
+        "bookings": total_bookings,
+        "days": total_days,
+        "hours": _format_number(total_hours),
+    }
+
+
+def create_payroll_period(data: dict) -> int:
+    ensure_dashboard_tables()
+    year = _int_or_none(data.get("year")) or date.today().year
+    period_number = _int_or_none(data.get("period_number")) or 1
+    start_date = _date_or_none(data.get("start_date")) or date.today()
+    end_date = _date_or_none(data.get("end_date")) or start_date + timedelta(days=27)
+    name = (data.get("name") or "").strip() or f"Periode {period_number} - {year}"
+    status = (data.get("status") or "").strip() or "concept"
+    notes = (data.get("notes") or "").strip()
+
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO payroll_periods (
+                    year, period_number, name, start_date, end_date, status, notes,
+                    created_at, updated_at
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+                ON CONFLICT (year, period_number)
+                DO UPDATE SET
+                    name = EXCLUDED.name,
+                    start_date = EXCLUDED.start_date,
+                    end_date = EXCLUDED.end_date,
+                    status = EXCLUDED.status,
+                    notes = EXCLUDED.notes,
+                    updated_at = NOW()
+                RETURNING id;
+                """,
+                (year, period_number, name, start_date, end_date, status, notes),
+            )
+            period_id = cursor.fetchone()[0]
+            cursor.execute("DELETE FROM payroll_period_weeks WHERE payroll_period_id = %s;", (period_id,))
+            for week_index in range(1, 5):
+                week_start = start_date + timedelta(days=(week_index - 1) * 7)
+                week_end = min(week_start + timedelta(days=6), end_date)
+                cursor.execute(
+                    """
+                    INSERT INTO payroll_period_weeks (
+                        payroll_period_id, week_index, week_number, start_date, end_date,
+                        created_at, updated_at
+                    )
+                    VALUES (%s, %s, %s, %s, %s, NOW(), NOW());
+                    """,
+                    (period_id, week_index, week_start.isocalendar().week, week_start, week_end),
+                )
+            cursor.execute(
+                """
+                UPDATE project_time_bookings
+                SET payroll_period_id = %s,
+                    updated_at = NOW()
+                WHERE work_date BETWEEN %s AND %s
+                  AND payroll_period_id IS NULL;
+                """,
+                (period_id, start_date, end_date),
+            )
+        conn.commit()
+    return period_id
+
+
+def _attach_period_weeks(cursor, periods: list[dict]) -> None:
+    period_ids = [period["id"] for period in periods]
+    if not period_ids:
+        return
+    cursor.execute(
+        """
+        SELECT payroll_period_id, week_index, week_number, start_date, end_date
+        FROM payroll_period_weeks
+        WHERE payroll_period_id = ANY(%s)
+        ORDER BY payroll_period_id, week_index;
+        """,
+        (period_ids,),
+    )
+    period_map = {period["id"]: period for period in periods}
+    for row in cursor.fetchall():
+        period = period_map.get(row[0])
+        if not period:
+            continue
+        period["weeks"].append(
+            {
+                "week_index": row[1],
+                "week_number": row[2],
+                "start_date": row[3].strftime("%d-%m-%Y") if row[3] else "-",
+                "end_date": row[4].strftime("%d-%m-%Y") if row[4] else "-",
+            }
+        )
 
 
 def _attach_project_bookings(cursor, projects: list[dict], per_project: int = 5) -> None:
@@ -641,7 +1024,9 @@ def list_cao_settings(limit: int = 25) -> list[dict]:
                         "name": row[1],
                         "version_label": row[2] or "",
                         "effective_from": row[3].strftime("%d-%m-%Y") if row[3] else "-",
+                        "effective_from_input": row[3].strftime("%Y-%m-%d") if row[3] else "",
                         "effective_until": row[4].strftime("%d-%m-%Y") if row[4] else "-",
+                        "effective_until_input": row[4].strftime("%Y-%m-%d") if row[4] else "",
                         "standard_week_hours": row[5],
                         "overtime_after_hours": row[6],
                         "weekday_overtime_percent": row[7],
@@ -659,6 +1044,12 @@ def list_cao_settings(limit: int = 25) -> list[dict]:
                 ]
     except Exception:
         return []
+
+
+def get_cao_setting(setting_id: int | None) -> dict | None:
+    if not setting_id:
+        return None
+    return next((item for item in list_cao_settings(limit=200) if item["id"] == setting_id), None)
 
 
 def create_cao_setting(data: dict) -> int:
@@ -709,6 +1100,51 @@ def create_cao_setting(data: dict) -> int:
             setting_id = cursor.fetchone()[0]
         conn.commit()
     return setting_id
+
+
+def update_cao_setting(setting_id: int, data: dict) -> None:
+    ensure_dashboard_tables()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE payroll_cao_settings
+                SET name = %s,
+                    version_label = %s,
+                    effective_from = %s,
+                    effective_until = %s,
+                    standard_week_hours = %s,
+                    overtime_after_hours = %s,
+                    weekday_overtime_percent = %s,
+                    saturday_percent = %s,
+                    sunday_percent = %s,
+                    holiday_percent = %s,
+                    travel_cost_per_km = %s,
+                    default_hourly_wage = %s,
+                    status = %s,
+                    notes = %s,
+                    updated_at = NOW()
+                WHERE id = %s;
+                """,
+                (
+                    _empty_to_none(data.get("name")) or "CAO instelling",
+                    _empty_to_none(data.get("version_label")),
+                    _empty_to_none(data.get("effective_from")),
+                    _empty_to_none(data.get("effective_until")),
+                    _number_or_none(data.get("standard_week_hours")),
+                    _number_or_none(data.get("overtime_after_hours")),
+                    _number_or_none(data.get("weekday_overtime_percent")),
+                    _number_or_none(data.get("saturday_percent")),
+                    _number_or_none(data.get("sunday_percent")),
+                    _number_or_none(data.get("holiday_percent")),
+                    _number_or_none(data.get("travel_cost_per_km")),
+                    _number_or_none(data.get("default_hourly_wage")),
+                    _empty_to_none(data.get("status")) or "concept",
+                    _empty_to_none(data.get("notes")),
+                    setting_id,
+                ),
+            )
+        conn.commit()
 
 
 def list_tickets(limit: int = 25) -> list[dict]:
@@ -888,7 +1324,7 @@ def _format_whatsapp_row(row) -> dict:
 
 def _decimal_or_none(value):
     try:
-        text = str(value or "").replace(",", ".").strip()
+        text = str(value or "").strip().replace("€", "").replace(" ", "").replace(",", ".")
         return Decimal(text) if text else None
     except Exception:
         return None
