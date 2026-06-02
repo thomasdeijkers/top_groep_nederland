@@ -1,11 +1,18 @@
 import requests
 import time
 
+from apps.dashboard.otys_usage import (
+    OTYS_REQUESTS_PER_MINUTE_LIMIT,
+    OTYS_SAFE_REQUESTS_PER_MINUTE,
+    get_otys_minute_call_count,
+)
 from shared.config.otys import OtysSettings, get_otys_settings
 
 
 RATE_LIMIT_MIN_REMAINING = 5
 RATE_LIMIT_MAX_RETRIES = 5
+RATE_LIMIT_PREFLIGHT_SLEEP_SECONDS = 5
+RATE_LIMIT_PREFLIGHT_MAX_PAUSES = 12
 
 
 class OtysClient:
@@ -43,6 +50,7 @@ class OtysClient:
         }
 
         for attempt in range(RATE_LIMIT_MAX_RETRIES + 1):
+            self._pause_before_rate_limit_window_is_full()
             started = time.monotonic()
             response = self.session.post(self.settings.ows_url, json=payload, timeout=30)
             duration_ms = int((time.monotonic() - started) * 1000)
@@ -103,6 +111,23 @@ class OtysClient:
                 flush=True,
             )
             time.sleep(wait_seconds)
+
+    def _pause_before_rate_limit_window_is_full(self) -> None:
+        for pause_index in range(RATE_LIMIT_PREFLIGHT_MAX_PAUSES):
+            minute_calls = get_otys_minute_call_count()
+            if minute_calls < OTYS_SAFE_REQUESTS_PER_MINUTE:
+                return
+
+            print(
+                "OTYS_RATE_LIMIT_PREFLIGHT_PAUSE "
+                f"minute_calls={minute_calls} "
+                f"safe_limit={OTYS_SAFE_REQUESTS_PER_MINUTE} "
+                f"official_limit={OTYS_REQUESTS_PER_MINUTE_LIMIT} "
+                f"pause={pause_index + 1}/{RATE_LIMIT_PREFLIGHT_MAX_PAUSES} "
+                f"seconds={RATE_LIMIT_PREFLIGHT_SLEEP_SECONDS}",
+                flush=True,
+            )
+            time.sleep(RATE_LIMIT_PREFLIGHT_SLEEP_SECONDS)
 
     def _record_usage_event(
         self,

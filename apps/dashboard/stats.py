@@ -8,7 +8,7 @@ from datetime import datetime
 from psycopg2 import sql
 
 from shared.db.connection import get_connection
-from apps.dashboard.otys_usage import get_otys_usage_summary
+from apps.dashboard.otys_usage import OTYS_LOW_REMAINING_THRESHOLD, get_otys_usage_summary
 
 
 STAT_DEFINITIONS = [
@@ -191,6 +191,12 @@ def _placeholder_scheduled_jobs():
 
 def _otys_usage_tiles():
     usage = get_otys_usage_summary()
+    minute_calls = usage.get("minute_calls", 0)
+    hour_calls = usage.get("hour_calls", 0)
+    day_calls = usage.get("day_calls", 0)
+    official_limit = usage.get("limit_per_minute", 350)
+    safe_limit = usage.get("safe_limit_per_minute", 330)
+    safe_remaining = usage.get("safe_remaining_minute", max(safe_limit - minute_calls, 0))
     latest_remaining = usage.get("latest_remaining")
     min_remaining = usage.get("min_remaining_hour")
     blocked = usage.get("day_blocked", 0)
@@ -206,20 +212,27 @@ def _otys_usage_tiles():
     if latest_remaining is None:
         remaining_tone = "neutral"
         remaining_level = 0
-    elif latest_remaining <= 25:
+    elif latest_remaining <= OTYS_LOW_REMAINING_THRESHOLD:
         remaining_tone = "warning"
         remaining_level = 15
     else:
         remaining_tone = "good"
-        remaining_level = min((latest_remaining / 350) * 100, 100)
+        remaining_level = min((latest_remaining / official_limit) * 100, 100)
 
     return [
         {
             "label": "OTYS calls minuut",
-            "value": str(usage.get("minute_calls", 0)),
-            "meta": f"{usage.get('hour_calls', 0)} in 1 uur, {usage.get('day_calls', 0)} in 24 uur",
-            "level": min((usage.get("minute_calls", 0) / 350) * 100, 100),
-            "tone": "warning" if usage.get("minute_calls", 0) >= 300 else "good",
+            "value": f"{minute_calls}/{official_limit}",
+            "meta": f"veilige marge: {safe_remaining} over, {hour_calls} in 1 uur",
+            "level": min((minute_calls / official_limit) * 100, 100),
+            "tone": "warning" if minute_calls >= safe_limit else "good",
+        },
+        {
+            "label": "OTYS veilige ruimte",
+            "value": str(safe_remaining),
+            "meta": f"throttle actief vanaf {safe_limit}/min",
+            "level": min((safe_remaining / safe_limit) * 100, 100) if safe_limit else 0,
+            "tone": "warning" if safe_remaining <= OTYS_LOW_REMAINING_THRESHOLD else "good",
         },
         {
             "label": "OTYS resterend",
@@ -231,7 +244,7 @@ def _otys_usage_tiles():
         {
             "label": "OTYS blokkades",
             "value": str(blocked),
-            "meta": "laatste 24 uur",
+            "meta": f"laatste 24 uur, {day_calls} calls",
             "level": 100 if blocked else 0,
             "tone": "danger" if blocked else "good",
         },
@@ -246,8 +259,8 @@ def _otys_usage_tiles():
             "label": "OTYS laagste rest",
             "value": "-" if min_remaining is None else str(min_remaining),
             "meta": "laagste gemeten restant dit uur",
-            "level": 0 if min_remaining is None else min((min_remaining / 350) * 100, 100),
-            "tone": "warning" if min_remaining is not None and min_remaining <= 25 else "good",
+            "level": 0 if min_remaining is None else min((min_remaining / official_limit) * 100, 100),
+            "tone": "warning" if min_remaining is not None and min_remaining <= OTYS_LOW_REMAINING_THRESHOLD else "good",
         },
     ]
 

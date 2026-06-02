@@ -2,6 +2,10 @@ from apps.dashboard.data_store import ensure_dashboard_tables
 from shared.db.connection import get_connection
 
 
+OTYS_REQUESTS_PER_MINUTE_LIMIT = 350
+OTYS_SAFE_REQUESTS_PER_MINUTE = 330
+OTYS_LOW_REMAINING_THRESHOLD = 25
+
 _TABLES_READY = False
 
 
@@ -124,6 +128,9 @@ def get_otys_usage_summary() -> dict:
             "hour_calls": hour_calls,
             "day_calls": day_calls,
             "day_blocked": day_blocked,
+            "limit_per_minute": OTYS_REQUESTS_PER_MINUTE_LIMIT,
+            "safe_limit_per_minute": OTYS_SAFE_REQUESTS_PER_MINUTE,
+            "safe_remaining_minute": max(OTYS_SAFE_REQUESTS_PER_MINUTE - minute_calls, 0),
             "latest_remaining": latest_remaining,
             "latest_timeframe": latest_timeframe,
             "latest_created": latest_created,
@@ -138,6 +145,9 @@ def get_otys_usage_summary() -> dict:
             "hour_calls": 0,
             "day_calls": 0,
             "day_blocked": 0,
+            "limit_per_minute": OTYS_REQUESTS_PER_MINUTE_LIMIT,
+            "safe_limit_per_minute": OTYS_SAFE_REQUESTS_PER_MINUTE,
+            "safe_remaining_minute": OTYS_SAFE_REQUESTS_PER_MINUTE,
             "latest_remaining": None,
             "latest_timeframe": None,
             "latest_created": None,
@@ -146,6 +156,23 @@ def get_otys_usage_summary() -> dict:
             "last_error": "",
             "min_remaining_hour": None,
         }
+
+
+def get_otys_minute_call_count() -> int:
+    try:
+        _ensure_tables_once()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM otys_api_usage_events
+                    WHERE created_at >= NOW() - INTERVAL '1 minute';
+                    """
+                )
+                return int(cursor.fetchone()[0] or 0)
+    except Exception:
+        return 0
 
 
 def _service_from_method(method: str) -> str:
