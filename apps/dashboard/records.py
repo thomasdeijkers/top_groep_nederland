@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from psycopg2.extras import Json
 
+from apps.dashboard.addressing import split_street_house_number
 from apps.dashboard.data_store import ensure_dashboard_tables
 from shared.db.connection import get_connection
 
@@ -642,15 +643,27 @@ def list_relations(limit: int = 15, query: str = "", relation_type: str = "", st
                 )
                 rows = []
                 for row in cursor.fetchall():
+                    street, house_number, house_number_addition = split_street_house_number(row[10], row[11], row[12])
+                    postal_code = row[13]
+                    country = row[14]
+                    required_fields = [
+                        row[2],  # naam
+                        row[5],  # telefoon
+                        street,
+                        house_number,
+                        postal_code,
+                        row[6],  # plaats
+                    ]
                     completion_fields = [
                         row[2],
                         row[4],
                         row[5],
                         row[6],
                         row[7],
-                        row[10],
-                        row[13],
-                        row[14],
+                        street,
+                        house_number,
+                        postal_code,
+                        country,
                         row[15],
                     ]
                     if row[1] == "principal":
@@ -658,6 +671,16 @@ def list_relations(limit: int = 15, query: str = "", relation_type: str = "", st
                     filled_count = sum(1 for value in completion_fields if str(value or "").strip())
                     completion_total = len(completion_fields)
                     completion_percent = round((filled_count / completion_total) * 100) if completion_total else 0
+                    has_required_details = all(str(value or "").strip() for value in required_fields)
+                    if completion_percent > 75 and has_required_details:
+                        completion_tone = "green"
+                        completion_status = "Compleet"
+                    elif completion_percent >= 50:
+                        completion_tone = "orange"
+                        completion_status = "Basis"
+                    else:
+                        completion_tone = "red"
+                        completion_status = "Onvolledig"
                     rows.append({
                         "id": row[0],
                         "relation_type": row[1],
@@ -671,19 +694,83 @@ def list_relations(limit: int = 15, query: str = "", relation_type: str = "", st
                         "source": row[8] or "",
                         "has_photo": bool(row[9]),
                         "initials": _initials(row[2]),
-                        "street": row[10] or "",
-                        "house_number": row[11] or "",
-                        "house_number_addition": row[12] or "",
+                        "street": street,
+                        "house_number": house_number,
+                        "house_number_addition": house_number_addition,
                         "postal_code": row[13] or "",
                         "country": row[14] or "",
                         "external_id": row[15] or "",
                         "updated_at": row[16].strftime("%d-%m-%Y %H:%M") if row[16] else "",
                         "completion_percent": completion_percent,
                         "completion_label": f"{completion_percent}%",
+                        "completion_status": completion_status,
+                        "completion_tone": completion_tone,
+                        "completion_required_complete": has_required_details,
                     })
                 return rows
     except Exception:
         return []
+
+
+def search_candidate_matches(query: str = "", limit: int = 40) -> list[dict]:
+    search = str(query or "").strip()
+    limit = max(1, min(int(limit or 40), 80))
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                params = []
+                where_relation = """
+                    relation_type = 'candidate'
+                    AND archived_at IS NULL
+                    AND LOWER(COALESCE(status, '')) NOT IN ('archief', 'gearchiveerd', 'archived')
+                """
+                if search:
+                    where_relation += """
+                        AND (
+                            name ILIKE %s
+                            OR email ILIKE %s
+                            OR phone ILIKE %s
+                            OR city ILIKE %s
+                            OR external_id ILIKE %s
+                        )
+                    """
+                    like = f"%{search}%"
+                    params.extend([like] * 5)
+                params.append(limit)
+                cursor.execute(
+                    f"""
+                    SELECT id::text AS value, name, phone, city, 'Dashboard' AS source
+                    FROM relations
+                    WHERE {where_relation}
+                    ORDER BY
+                        CASE WHEN %s = '' THEN updated_at ELSE NULL END DESC NULLS LAST,
+                        name ASC
+                    LIMIT %s;
+                    """,
+                    tuple([*params[:-1], search, params[-1]]),
+                )
+                return [
+                    {
+                        "value": row[0],
+                        "name": row[1] or "",
+                        "phone": row[2] or "",
+                        "city": row[3] or "",
+                        "source": row[4],
+                    }
+                    for row in cursor.fetchall()
+                ]
+    except Exception:
+        return []
+
+
+def ensure_relation_for_candidate_match(match_value: str) -> int | None:
+    value = str(match_value or "").strip()
+    if not value:
+        return None
+    if value.isdigit():
+        return int(value)
+    return None
 
 
 def list_principals(limit: int = 25, query: str = "") -> list[dict]:

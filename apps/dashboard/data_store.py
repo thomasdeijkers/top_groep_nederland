@@ -28,6 +28,7 @@ def ensure_dashboard_tables():
         Path("migrations/021_audit_events.sql"),
         Path("migrations/022_otys_staging_tables.sql"),
         Path("migrations/023_otys_api_usage.sql"),
+        Path("migrations/024_otys_relations_backfill.sql"),
     ]
 
     with get_connection() as conn:

@@ -261,6 +261,9 @@
         const employeeNameInput = form?.querySelector('[name="field_employee_name"]');
         const employeePhoneInput = form?.querySelector('[name="field_employee_phone"]');
         const suggestionsTarget = form?.querySelector("[data-candidate-suggestions]");
+        const searchUrl = select.dataset.candidateSearchUrl;
+        let candidateSearchTimer = null;
+        let candidateSearchSequence = 0;
 
         const normalize = (value) => (value || "")
             .toString()
@@ -333,24 +336,54 @@
             }
         };
 
-        const filterCandidates = () => {
-            const query = (searchInput?.value || "").trim().toLowerCase();
-            let firstVisible = null;
-            [...select.options].forEach((option) => {
-                if (!option.value) {
-                    option.hidden = false;
-                    return;
-                }
-                const haystack = `${option.textContent || ""} ${option.dataset.name || ""} ${option.dataset.phone || ""}`.toLowerCase();
-                const visible = query ? haystack.includes(query) : option.selected;
-                option.hidden = !visible;
-                if (visible && !firstVisible) {
-                    firstVisible = option;
-                }
+        const renderCandidateOptions = (results, selectedValue = "") => {
+            const emptyOption = select.querySelector('option[value=""]')?.cloneNode(true)
+                || new Option("Geen kandidaat gekoppeld", "");
+            select.innerHTML = "";
+            select.append(emptyOption);
+            results.forEach((candidate) => {
+                const parts = [candidate.name, candidate.phone, candidate.city].filter(Boolean);
+                const option = new Option(`${parts.join(" | ")}${candidate.source ? ` - ${candidate.source}` : ""}`, candidate.value);
+                option.dataset.name = candidate.name || "";
+                option.dataset.phone = candidate.phone || "";
+                option.dataset.city = candidate.city || "";
+                option.dataset.source = candidate.source || "";
+                select.append(option);
             });
-            if (query && firstVisible) {
-                select.value = firstVisible.value;
+            if (selectedValue && [...select.options].some((option) => option.value === selectedValue)) {
+                select.value = selectedValue;
             }
+        };
+
+        const filterCandidates = () => {
+            const query = (searchInput?.value || "").trim();
+            if (!searchUrl || query.length < 2) {
+                return;
+            }
+            window.clearTimeout(candidateSearchTimer);
+            candidateSearchTimer = window.setTimeout(async () => {
+                const sequence = candidateSearchSequence + 1;
+                candidateSearchSequence = sequence;
+                const previousValue = select.value;
+                try {
+                    const response = await fetch(`${searchUrl}?q=${encodeURIComponent(query)}&limit=50`);
+                    if (!response.ok || sequence !== candidateSearchSequence) {
+                        return;
+                    }
+                    const data = await response.json();
+                    const results = Array.isArray(data.results) ? data.results : [];
+                    renderCandidateOptions(results, previousValue);
+                    if (!select.value && results.length) {
+                        select.value = results[0].value;
+                    }
+                    renderSuggestions();
+                    if (select.value) {
+                        applySelectedCandidate();
+                    }
+                } catch (error) {
+                    console.warn("Kandidaten zoeken mislukt", error);
+                }
+            }, 180);
         };
 
         const renderSuggestions = () => {
@@ -391,7 +424,10 @@
         employeeNameInput?.addEventListener("input", renderSuggestions);
         employeePhoneInput?.addEventListener("input", renderSuggestions);
         renderSuggestions();
-        filterCandidates();
+        if (employeeNameInput?.value && searchUrl) {
+            searchInput.value = employeeNameInput.value;
+            filterCandidates();
+        }
         if (select.value) {
             applySelectedCandidate();
         }

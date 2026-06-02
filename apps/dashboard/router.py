@@ -27,6 +27,7 @@ from apps.dashboard.records import (
     get_overview_data,
     get_payroll_period_defaults,
     get_timesheet_channel_tiles,
+    ensure_relation_for_candidate_match,
     list_audit_events,
     list_cao_settings,
     list_projects,
@@ -44,6 +45,7 @@ from apps.dashboard.records import (
     list_vacancy_statuses,
     list_whatsapp_timesheets,
     log_audit_event,
+    search_candidate_matches,
     update_cao_setting,
 )
 from apps.dashboard.relations import (
@@ -546,13 +548,18 @@ async def correct_whatsapp_timesheet(timesheet_id: int, request: Request):
         for key, value in form.items()
         if key.startswith("field_")
     }
-    matched_relation_id = int(form["matched_relation_id"]) if str(form.get("matched_relation_id") or "").isdigit() else None
+    matched_relation_id = ensure_relation_for_candidate_match(str(form.get("matched_relation_id") or ""))
     save_field_corrections(timesheet_id, corrections, matched_relation_id=matched_relation_id)
     description = _audit_changed_fields(corrections)
     if matched_relation_id:
         description += f" Kandidaatkaart #{matched_relation_id} gekoppeld."
     _audit("Urenbriefje gecorrigeerd", "urenbriefje", timesheet_id, f"Urenbriefje {timesheet_id}", description, "Controle")
     return RedirectResponse(f"/dashboard/timesheets?stage=valideren&timesheet={timesheet_id}", status_code=303)
+
+
+@router.get("/api/candidates/search")
+def search_candidates(q: str = "", limit: int = Query(40, ge=1, le=80)):
+    return {"results": search_candidate_matches(q, limit)}
 
 
 @router.post("/api/whatsapp/timesheet/{timesheet_id}/reparse")

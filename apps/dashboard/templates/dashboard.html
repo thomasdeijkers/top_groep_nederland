@@ -36,24 +36,24 @@
 
                 <nav class="side-nav" aria-label="Hoofdnavigatie">
                     <span class="side-nav__group">Dashboard</span>
-                    <a class="side-nav__item {% if active_page == 'overview' %}side-nav__item--active{% endif %}" href="/dashboard"><span>Overzicht</span><i class="module-status module-status--green" title="Klaar om te testen"></i></a>
+                    <a class="side-nav__item {% if active_page == 'overview' %}side-nav__item--active{% endif %}" href="/dashboard"><span class="side-nav__label">Overzicht</span><span class="module-status module-status--green" title="Compleet"></span></a>
 
                     <span class="side-nav__group">Relaties</span>
-                    <a class="side-nav__item {% if active_page == 'relations' and relation_tab|default('candidates') == 'candidates' %}side-nav__item--active{% endif %}" href="/dashboard/relations?tab=candidates"><span>Kandidaten</span><i class="module-status module-status--green" title="Klaar om te testen"></i></a>
-                    <a class="side-nav__item {% if active_page == 'relations' and relation_tab|default('candidates') == 'principals' %}side-nav__item--active{% endif %}" href="/dashboard/relations?tab=principals"><span>Opdrachtgevers</span><i class="module-status module-status--green" title="Klaar om te testen"></i></a>
+                    <a class="side-nav__item {% if active_page == 'relations' and relation_tab|default('candidates') == 'candidates' %}side-nav__item--active{% endif %}" href="/dashboard/relations?tab=candidates"><span class="side-nav__label">Kandidaten</span><span class="module-status module-status--green" title="Compleet"></span></a>
+                    <a class="side-nav__item {% if active_page == 'relations' and relation_tab|default('candidates') == 'principals' %}side-nav__item--active{% endif %}" href="/dashboard/relations?tab=principals"><span class="side-nav__label">Opdrachtgevers</span><span class="module-status module-status--green" title="Compleet"></span></a>
 
                     <span class="side-nav__group">Werk</span>
-                    <a class="side-nav__item {% if active_page == 'vacancies' %}side-nav__item--active{% endif %}" href="/dashboard/vacancies"><span>Vacatures</span><i class="module-status module-status--orange" title="Basis staat"></i></a>
-                    <a class="side-nav__item {% if active_page == 'projects' %}side-nav__item--active{% endif %}" href="/dashboard/projects"><span>Projecten</span><i class="module-status module-status--orange" title="Basis staat"></i></a>
+                    <a class="side-nav__item {% if active_page == 'vacancies' %}side-nav__item--active{% endif %}" href="/dashboard/vacancies"><span class="side-nav__label">Vacatures</span><span class="module-status module-status--orange" title="Basis"></span></a>
+                    <a class="side-nav__item {% if active_page == 'projects' %}side-nav__item--active{% endif %}" href="/dashboard/projects"><span class="side-nav__label">Projecten</span><span class="module-status module-status--orange" title="Basis"></span></a>
 
                     <span class="side-nav__group">Uren en lonen</span>
-                    <a class="side-nav__item {% if active_page == 'timesheets' %}side-nav__item--active{% endif %}" href="/dashboard/timesheets"><span>Urenverwerking</span><i class="module-status module-status--green" title="Klaar om te testen"></i></a>
-                    <a class="side-nav__item {% if active_page == 'periods' %}side-nav__item--active{% endif %}" href="/dashboard/periods"><span>Loonperiodes</span><i class="module-status module-status--orange" title="Basis staat"></i></a>
+                    <a class="side-nav__item {% if active_page == 'timesheets' %}side-nav__item--active{% endif %}" href="/dashboard/timesheets"><span class="side-nav__label">Urenverwerking</span><span class="module-status module-status--green" title="Compleet"></span></a>
+                    <a class="side-nav__item {% if active_page == 'periods' %}side-nav__item--active{% endif %}" href="/dashboard/periods"><span class="side-nav__label">Loonperiodes</span><span class="module-status module-status--orange" title="Basis"></span></a>
 
                     <span class="side-nav__group">Beheer</span>
-                    <a class="side-nav__item {% if active_page == 'tickets' %}side-nav__item--active{% endif %}" href="/dashboard/tickets"><span>Tickets</span><i class="module-status module-status--red" title="Nog te ontwikkelen"></i></a>
-                    <a class="side-nav__item {% if active_page == 'server' %}side-nav__item--active{% endif %}" href="/dashboard/server"><span>Server info</span><i class="module-status module-status--green" title="Klaar om te testen"></i></a>
-                    <a class="side-nav__item {% if active_page == 'settings' %}side-nav__item--active{% endif %}" href="/dashboard/settings"><span>Instellingen</span><i class="module-status module-status--orange" title="Basis staat"></i></a>
+                    <a class="side-nav__item {% if active_page == 'tickets' %}side-nav__item--active{% endif %}" href="/dashboard/tickets"><span class="side-nav__label">Tickets</span><span class="module-status module-status--red" title="Open"></span></a>
+                    <a class="side-nav__item {% if active_page == 'server' %}side-nav__item--active{% endif %}" href="/dashboard/server"><span class="side-nav__label">Server info</span><span class="module-status module-status--green" title="Compleet"></span></a>
+                    <a class="side-nav__item {% if active_page == 'settings' %}side-nav__item--active{% endif %}" href="/dashboard/settings"><span class="side-nav__label">Instellingen</span><span class="module-status module-status--orange" title="Basis"></span></a>
                 </nav>
 
                 <div class="sidebar-footer">
@@ -458,7 +458,13 @@
                                             {% set relation_address = (result.street ~ ' ' ~ result.house_number ~ result.house_number_addition)|trim %}
                                             <td>{{ relation_address }}</td>
                                             <td>{{ result.city }}</td>
-                                            <td><span class="relation-completion" title="Relatiekaart {{ result.completion_label }} ingevuld">{{ result.completion_label }}</span></td>
+                                            <td>
+                                                <span class="relation-completion relation-completion--{{ result.completion_tone|default('red') }}" title="Relatiekaart {{ result.completion_label }} ingevuld{% if not result.completion_required_complete %}. Naam, adres, plaats en telefoon zijn verplicht voor groen.{% endif %}">
+                                                    <span class="relation-completion__dot"></span>
+                                                    <span>{{ result.completion_status|default('Onvolledig') }}</span>
+                                                    <strong>{{ result.completion_label }}</strong>
+                                                </span>
+                                            </td>
                                             <td><span class="status-tag">{{ result.status }}</span></td>
                                             <td>{{ result.updated_at }}</td>
                                             <td>
@@ -1553,12 +1559,12 @@
                                                     </div>
                                                     <div class="candidate-suggestions" data-candidate-suggestions aria-label="Kandidaatsuggesties"></div>
                                                     <input type="search" placeholder="Zoek handmatig..." data-candidate-match-search>
-                                                    <select name="matched_relation_id" size="6" data-candidate-match-select>
+                                                    <select name="matched_relation_id" size="6" data-candidate-match-select data-candidate-search-url="/api/candidates/search">
                                                         <option value="">Geen kandidaat gekoppeld</option>
                                                         {% for candidate in timesheet_candidate_options %}
                                                         {% set candidate_name_match = parsed_employee_name and candidate.name and parsed_employee_name|lower == candidate.name|lower %}
                                                         {% set candidate_phone_match = parsed_employee_phone and candidate.phone and (parsed_employee_phone|string|replace(' ', '')|replace('-', '') == candidate.phone|string|replace(' ', '')|replace('-', '')) %}
-                                                        <option value="{{ candidate.id }}" data-name="{{ candidate.name }}" data-phone="{{ candidate.phone if candidate.phone != '-' else '' }}" {% if selected_message.matched_name == candidate.name or candidate_name_match or candidate_phone_match %}selected{% endif %}>
+                                                        <option value="{{ candidate.id }}" data-name="{{ candidate.name }}" data-phone="{{ candidate.phone if candidate.phone != '-' else '' }}" data-city="{{ candidate.city }}" data-source="Dashboard" {% if selected_message.matched_name == candidate.name or candidate_name_match or candidate_phone_match %}selected{% endif %}>
                                                             {% if candidate_phone_match or candidate_name_match %}Beste match - {% endif %}{{ candidate.name }}{% if candidate.phone and candidate.phone != '-' %} | {{ candidate.phone }}{% endif %}{% if candidate.city and candidate.city != '-' %} | {{ candidate.city }}{% endif %}
                                                         </option>
                                                         {% endfor %}
@@ -1832,6 +1838,6 @@
                 </section>
             </main>
         </div>
-        <script src="/dashboard/static/dashboard.js?v=20260602-13"></script>
+        <script src="/dashboard/static/dashboard.js?v=20260602-14"></script>
     </body>
 </html>

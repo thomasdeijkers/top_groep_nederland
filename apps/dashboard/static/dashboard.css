@@ -1765,10 +1765,59 @@ select option {
 
 .relation-completion {
     display: inline-flex;
-    min-width: 48px;
+    min-width: 126px;
     align-items: center;
-    color: #b5f0c8;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 9px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #dce6ee;
+    font-size: 0.72rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.relation-completion__dot {
+    flex: 0 0 auto;
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.05);
+}
+
+.relation-completion strong {
+    color: #ffffff;
+    font-size: 0.74rem;
     font-weight: 900;
+}
+
+.relation-completion--red {
+    border-color: rgba(238, 102, 88, 0.34);
+    background: rgba(238, 102, 88, 0.1);
+}
+
+.relation-completion--red .relation-completion__dot {
+    background: #ee6658;
+}
+
+.relation-completion--orange {
+    border-color: rgba(244, 163, 64, 0.36);
+    background: rgba(244, 163, 64, 0.11);
+}
+
+.relation-completion--orange .relation-completion__dot {
+    background: #f4a340;
+}
+
+.relation-completion--green {
+    border-color: rgba(94, 214, 142, 0.36);
+    background: rgba(94, 214, 142, 0.11);
+}
+
+.relation-completion--green .relation-completion__dot {
+    background: #5ed68e;
 }
 
 .relation-info-field .readonly-info {
@@ -2592,6 +2641,35 @@ body[data-theme="light"] .side-nav__item--active {
 
 body[data-theme="light"] .module-status {
     box-shadow: 0 0 0 3px rgba(23, 32, 39, 0.06);
+}
+
+body[data-theme="light"] .relation-completion {
+    border-color: rgba(28, 42, 50, 0.12);
+    background: rgba(255, 255, 255, 0.72);
+    color: #26343d;
+}
+
+body[data-theme="light"] .relation-completion strong {
+    color: #13241b;
+}
+
+body[data-theme="light"] .relation-completion__dot {
+    box-shadow: 0 0 0 3px rgba(23, 32, 39, 0.06);
+}
+
+body[data-theme="light"] .relation-completion--red {
+    border-color: rgba(196, 70, 58, 0.28);
+    background: rgba(238, 102, 88, 0.12);
+}
+
+body[data-theme="light"] .relation-completion--orange {
+    border-color: rgba(202, 124, 28, 0.3);
+    background: rgba(244, 163, 64, 0.13);
+}
+
+body[data-theme="light"] .relation-completion--green {
+    border-color: rgba(45, 143, 82, 0.28);
+    background: rgba(94, 214, 142, 0.13);
 }
 
 body[data-theme="light"] .stat-card,

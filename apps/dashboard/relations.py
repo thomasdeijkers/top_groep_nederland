@@ -4,6 +4,7 @@ from uuid import uuid4
 
 from psycopg2.extras import RealDictCursor
 
+from apps.dashboard.addressing import split_street_house_number
 from apps.dashboard.data_store import ensure_dashboard_tables
 from shared.db.connection import get_connection
 
@@ -16,7 +17,18 @@ def get_relation(relation_id: int) -> dict | None:
         with conn.cursor(cursor_factory=RealDictCursor) as cursor:
             cursor.execute("SELECT * FROM relations WHERE id = %s;", (relation_id,))
             record = cursor.fetchone()
-            return dict(record) if record else None
+            if not record:
+                return None
+            relation = dict(record)
+            street, house_number, addition = split_street_house_number(
+                relation.get("street") or relation.get("address"),
+                relation.get("house_number"),
+                relation.get("house_number_addition"),
+            )
+            relation["street"] = street
+            relation["house_number"] = house_number
+            relation["house_number_addition"] = addition
+            return relation
 
 
 def get_candidate(candidate_id: int) -> dict | None:
@@ -456,6 +468,12 @@ def _relation_payload(data: dict, relation_type: str) -> dict:
     name = data.get("name") or _full_name(data)
     if relation_type == "candidate":
         name = _full_name(data)
+    street, house_number, addition = split_street_house_number(
+        data.get("street") or data.get("address"),
+        data.get("house_number"),
+        data.get("house_number_addition"),
+    )
+    address_data = {**data, "street": street, "house_number": house_number, "house_number_addition": addition}
     return {
         "relation_type": relation_type,
         "name": name or "Naam onbekend",
@@ -465,10 +483,10 @@ def _relation_payload(data: dict, relation_type: str) -> dict:
         "email": data.get("email"),
         "phone": data.get("phone"),
         "website": data.get("website"),
-        "street": data.get("street"),
-        "house_number": data.get("house_number"),
-        "house_number_addition": data.get("house_number_addition"),
-        "address": _compose_address(data),
+        "street": street,
+        "house_number": house_number,
+        "house_number_addition": addition,
+        "address": _compose_address(address_data),
         "postal_code": data.get("postal_code"),
         "city": data.get("city"),
         "country": data.get("country"),
