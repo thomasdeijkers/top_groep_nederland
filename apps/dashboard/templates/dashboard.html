@@ -18,7 +18,7 @@
         </title>
         <link rel="icon" href="/dashboard/static/favicon.ico" sizes="any">
         <link rel="shortcut icon" href="/dashboard/static/favicon.ico">
-        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260602-13">
+        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260602-14">
     </head>
     <body class="page-{{ active_page }}">
         {% macro confidence_light(field) -%}
@@ -35,13 +35,22 @@
                 </a>
 
                 <nav class="side-nav" aria-label="Hoofdnavigatie">
+                    <span class="side-nav__group">Dashboard</span>
                     <a class="side-nav__item {% if active_page == 'overview' %}side-nav__item--active{% endif %}" href="/dashboard"><span>Overzicht</span><i class="module-status module-status--green" title="Klaar om te testen"></i></a>
-                    <a class="side-nav__item {% if active_page == 'relations' %}side-nav__item--active{% endif %}" href="/dashboard/relations"><span>Relaties</span><i class="module-status module-status--green" title="Klaar om te testen"></i></a>
+
+                    <span class="side-nav__group">Relaties</span>
+                    <a class="side-nav__item {% if active_page == 'relations' and relation_tab|default('candidates') == 'candidates' %}side-nav__item--active{% endif %}" href="/dashboard/relations?tab=candidates"><span>Kandidaten</span><i class="module-status module-status--green" title="Klaar om te testen"></i></a>
+                    <a class="side-nav__item {% if active_page == 'relations' and relation_tab|default('candidates') == 'principals' %}side-nav__item--active{% endif %}" href="/dashboard/relations?tab=principals"><span>Opdrachtgevers</span><i class="module-status module-status--green" title="Klaar om te testen"></i></a>
+
+                    <span class="side-nav__group">Werk</span>
                     <a class="side-nav__item {% if active_page == 'vacancies' %}side-nav__item--active{% endif %}" href="/dashboard/vacancies"><span>Vacatures</span><i class="module-status module-status--orange" title="Basis staat"></i></a>
                     <a class="side-nav__item {% if active_page == 'projects' %}side-nav__item--active{% endif %}" href="/dashboard/projects"><span>Projecten</span><i class="module-status module-status--orange" title="Basis staat"></i></a>
+
                     <span class="side-nav__group">Uren en lonen</span>
                     <a class="side-nav__item {% if active_page == 'timesheets' %}side-nav__item--active{% endif %}" href="/dashboard/timesheets"><span>Urenverwerking</span><i class="module-status module-status--green" title="Klaar om te testen"></i></a>
                     <a class="side-nav__item {% if active_page == 'periods' %}side-nav__item--active{% endif %}" href="/dashboard/periods"><span>Loonperiodes</span><i class="module-status module-status--orange" title="Basis staat"></i></a>
+
+                    <span class="side-nav__group">Beheer</span>
                     <a class="side-nav__item {% if active_page == 'tickets' %}side-nav__item--active{% endif %}" href="/dashboard/tickets"><span>Tickets</span><i class="module-status module-status--red" title="Nog te ontwikkelen"></i></a>
                     <a class="side-nav__item {% if active_page == 'server' %}side-nav__item--active{% endif %}" href="/dashboard/server"><span>Server info</span><i class="module-status module-status--green" title="Klaar om te testen"></i></a>
                     <a class="side-nav__item {% if active_page == 'settings' %}side-nav__item--active{% endif %}" href="/dashboard/settings"><span>Instellingen</span><i class="module-status module-status--orange" title="Basis staat"></i></a>
@@ -594,52 +603,38 @@
                         </div>
                     </div>
 
-                    <article class="panel overview-only todo-panel">
-                        <div class="panel-header">
-                            <div>
-                                <h2>To do</h2>
-                                <p>Aandachtspunten en open opvolging.</p>
-                            </div>
-                        </div>
-
-                        <div class="task-list">
-                            {% for item in review_items %}
-                            <div class="task-item">
-                                <span class="todo-check" aria-hidden="true"></span>
-                                <div>
-                                    <strong>{{ item.title }}</strong>
-                                    <span>{{ item.meta }}</span>
-                                </div>
-                                <small>{{ item.priority }}</small>
-                            </div>
-                            {% endfor %}
-                        </div>
-                    </article>
-
                     <article class="panel overview-only audit-panel">
                         <div class="panel-header">
                             <div>
                                 <h2>Auditspoor</h2>
-                                <p>Laatste dashboardacties met gebruiker, omschrijving en status.</p>
+                                <p>Laatste dashboardacties met tijd, gebruiker, object, omschrijving, status en extra context.</p>
                             </div>
                             <a class="ghost-button" href="/dashboard/audit#auditspoor">Open auditspoor</a>
                         </div>
 
-                        <div class="activity-list">
+                        <div class="audit-overview-list">
                             {% for item in audit_events %}
-                            <div class="activity-item">
-                                <span></span>
-                                <div>
-                                    <strong>{{ item.title }}</strong>
-                                    <small>{{ item.meta }}</small>
-                                    <p>{{ item.detail }}</p>
-                                    <div class="activity-meta-row">
-                                        <em>{{ item.user }}</em>
-                                        <time>{{ item.time }}</time>
-                                        <b>{{ item.status }}</b>
-                                    </div>
+                            <article class="audit-rich-row">
+                                <div class="audit-rich-row__time">
+                                    <time>{{ item.clock }}</time>
+                                    <span>{{ item.date }}</span>
                                 </div>
-                            </div>
+                                <div class="audit-rich-row__main">
+                                    <div class="audit-rich-row__head">
+                                        <strong>{{ item.title }}</strong>
+                                        <span>{{ item.entity_display }}</span>
+                                    </div>
+                                    <p>{{ item.detail or 'Geen omschrijving vastgelegd.' }}</p>
+                                    <div class="audit-rich-row__meta">
+                                        <span>Audit #{{ item.id }}</span>
+                                        <span>{{ item.entity_type }}{% if item.entity_id %} #{{ item.entity_id }}{% endif %}</span>
+                                        {% if item.entity_label %}<span>Label: {{ item.entity_label }}</span>{% endif %}
+                                        <span>{{ item.user }}</span>
+                                        <span>{{ item.status }}</span>
+                                    </div>
+                                    <small>{{ item.metadata_summary }}</small>
+                                </div>
+                            </article>
                             {% else %}
                             <div class="empty-state empty-state--compact">
                                 <strong>Nog geen auditregels</strong>
@@ -662,11 +657,16 @@
                         <div class="audit-sheet">
                             {% for item in audit_events %}
                             <article class="audit-row">
-                                <div>
+                                <div class="audit-row__primary">
                                     <strong>{{ item.title }}</strong>
-                                    <span>{{ item.meta }}</span>
+                                    <span>{{ item.entity_display }}</span>
+                                    {% if item.entity_label %}<span>{{ item.entity_label }}</span>{% endif %}
+                                    <small>Audit #{{ item.id }} · {{ item.entity_type }}{% if item.entity_id %} #{{ item.entity_id }}{% endif %}</small>
                                 </div>
-                                <p>{{ item.detail }}</p>
+                                <div class="audit-row__detail">
+                                    <p>{{ item.detail or 'Geen omschrijving vastgelegd.' }}</p>
+                                    <small>{{ item.metadata_summary }}</small>
+                                </div>
                                 <div class="activity-meta-row">
                                     <em>{{ item.user }}</em>
                                     <time>{{ item.time }}</time>
@@ -1537,7 +1537,7 @@
                                                 {% set parsed_employee_phone = selected_message.parsed_map.employee_phone.value if selected_message.parsed_map.employee_phone is defined else selected_message.sender_phone %}
                                                 <label>
                                                     <span class="field-title">Naam werknemer {{ confidence_light(selected_message.parsed_map.employee_name) }}</span>
-                                                    <input name="field_employee_name" value="{{ parsed_employee_name }}">
+                                                    <input name="field_employee_name" value="{{ parsed_employee_name }}" data-parsed-employee-name>
                                                     {% if selected_message.matched_name and selected_message.matched_name != 'Geen match' %}
                                                     <button class="field-suggestion" type="button" data-fill-field="field_employee_name" data-fill-value="{{ selected_message.matched_name }}">
                                                         Suggestie: {{ selected_message.matched_name }}
@@ -1545,11 +1545,16 @@
                                                     {% endif %}
                                                 </label>
                                                 <label><span class="field-title">Telefoon werknemer {{ confidence_light(selected_message.parsed_map.employee_phone) }}</span><input name="field_employee_phone" value="{{ parsed_employee_phone }}"></label>
-                                                <label class="candidate-match-control">
+                                                <div class="candidate-match-control">
                                                     <span class="field-title">Kandidaat koppelen</span>
-                                                    <input type="search" placeholder="Zoek kandidaat..." data-candidate-match-search>
-                                                    <select name="matched_relation_id" data-candidate-match-select>
-                                                        <option value="">Kies kandidaat</option>
+                                                    <div class="parsed-candidate-name">
+                                                        <span>Geparst</span>
+                                                        <strong>{{ parsed_employee_name or 'Geen naam gevonden' }}</strong>
+                                                    </div>
+                                                    <div class="candidate-suggestions" data-candidate-suggestions aria-label="Kandidaatsuggesties"></div>
+                                                    <input type="search" placeholder="Zoek handmatig..." data-candidate-match-search>
+                                                    <select name="matched_relation_id" size="6" data-candidate-match-select>
+                                                        <option value="">Geen kandidaat gekoppeld</option>
                                                         {% for candidate in timesheet_candidate_options %}
                                                         {% set candidate_name_match = parsed_employee_name and candidate.name and parsed_employee_name|lower == candidate.name|lower %}
                                                         {% set candidate_phone_match = parsed_employee_phone and candidate.phone and (parsed_employee_phone|string|replace(' ', '')|replace('-', '') == candidate.phone|string|replace(' ', '')|replace('-', '')) %}
@@ -1558,7 +1563,7 @@
                                                         </option>
                                                         {% endfor %}
                                                     </select>
-                                                </label>
+                                                </div>
                                                 <label><span class="field-title">Naam ondertekenaar {{ confidence_light(selected_message.parsed_map.signer_name) }}</span><input name="field_signer_name" value="{{ selected_message.parsed_map.signer_name.value if selected_message.parsed_map.signer_name is defined else '' }}"></label>
                                                 <label><span class="field-title">Telefoon ondertekenaar {{ confidence_light(selected_message.parsed_map.signer_phone) }}</span><input name="field_signer_phone" value="{{ selected_message.parsed_map.signer_phone.value if selected_message.parsed_map.signer_phone is defined else '' }}"></label>
                                                 <label><span class="field-title">Project {{ confidence_light(selected_message.parsed_map.work_name) }}</span>
@@ -1596,7 +1601,7 @@
                                                 <label><span class="week-head">Totaal km {{ confidence_light(selected_message.parsed_map.total_km) }}</span><input name="field_total_km" value="{{ selected_message.parsed_map.total_km.value if selected_message.parsed_map.total_km is defined else '' }}"></label>
                                             </div>
 
-                                            <div class="digital-week-table digital-week-table--codes">
+                                            <div class="digital-week-table digital-week-table--codes digital-week-table--codes-with-absence">
                                                 <label><span class="week-head">Code ma {{ confidence_light(selected_message.parsed_map.monday_code) }}</span><input name="field_monday_code" value="{{ selected_message.parsed_map.monday_code.value if selected_message.parsed_map.monday_code is defined else '' }}"></label>
                                                 <label><span class="week-head">Code di {{ confidence_light(selected_message.parsed_map.tuesday_code) }}</span><input name="field_tuesday_code" value="{{ selected_message.parsed_map.tuesday_code.value if selected_message.parsed_map.tuesday_code is defined else '' }}"></label>
                                                 <label><span class="week-head">Code wo {{ confidence_light(selected_message.parsed_map.wednesday_code) }}</span><input name="field_wednesday_code" value="{{ selected_message.parsed_map.wednesday_code.value if selected_message.parsed_map.wednesday_code is defined else '' }}"></label>
@@ -1604,6 +1609,7 @@
                                                 <label><span class="week-head">Code vr {{ confidence_light(selected_message.parsed_map.friday_code) }}</span><input name="field_friday_code" value="{{ selected_message.parsed_map.friday_code.value if selected_message.parsed_map.friday_code is defined else '' }}"></label>
                                                 <label><span class="week-head">Code za {{ confidence_light(selected_message.parsed_map.saturday_code) }}</span><input name="field_saturday_code" value="{{ selected_message.parsed_map.saturday_code.value if selected_message.parsed_map.saturday_code is defined else '' }}"></label>
                                                 <label><span class="week-head">Code zo {{ confidence_light(selected_message.parsed_map.sunday_code) }}</span><input name="field_sunday_code" value="{{ selected_message.parsed_map.sunday_code.value if selected_message.parsed_map.sunday_code is defined else '' }}"></label>
+                                                <label><span class="week-head">Verzuim {{ confidence_light(selected_message.parsed_map.absence_code) }}</span><input name="field_absence_code" value="{{ selected_message.parsed_map.absence_code.value if selected_message.parsed_map.absence_code is defined else '' }}" data-absence-code></label>
                                             </div>
 
                                             <div class="digital-timesheet-grid digital-timesheet-grid--compact">
@@ -1611,7 +1617,6 @@
                                                 <label><span class="field-title">Controle totaal {{ confidence_light(selected_message.parsed_map.total_hours_check) }}</span><input name="field_total_hours_check" value="{{ selected_message.parsed_map.total_hours_check.value if selected_message.parsed_map.total_hours_check is defined else '' }}" readonly></label>
                                                 <label><span class="field-title">Berekend km totaal {{ confidence_light(selected_message.parsed_map.calculated_total_km) }}</span><input name="field_calculated_total_km" value="{{ selected_message.parsed_map.calculated_total_km.value if selected_message.parsed_map.calculated_total_km is defined else '' }}" readonly></label>
                                                 <label><span class="field-title">Controle km totaal {{ confidence_light(selected_message.parsed_map.total_km_check) }}</span><input name="field_total_km_check" value="{{ selected_message.parsed_map.total_km_check.value if selected_message.parsed_map.total_km_check is defined else '' }}" readonly></label>
-                                                <label><span class="field-title">Verzuimcode {{ confidence_light(selected_message.parsed_map.absence_code) }}</span><input name="field_absence_code" value="{{ selected_message.parsed_map.absence_code.value if selected_message.parsed_map.absence_code is defined else '' }}"></label>
                                                 <label><span class="field-title">Opmerking {{ confidence_light(selected_message.parsed_map.remarks) }}</span><input name="field_remarks" value="{{ selected_message.parsed_map.remarks.value if selected_message.parsed_map.remarks is defined else '' }}"></label>
                                                 <label><span class="field-title">Kosten {{ confidence_light(selected_message.parsed_map.expenses) }}</span><input name="field_expenses" value="{{ selected_message.parsed_map.expenses.value if selected_message.parsed_map.expenses is defined else '' }}"></label>
                                                 <label><span class="field-title">Parkeerkosten {{ confidence_light(selected_message.parsed_map.parking_costs) }}</span><input name="field_parking_costs" value="{{ selected_message.parsed_map.parking_costs.value if selected_message.parsed_map.parking_costs is defined else '' }}"></label>
@@ -1827,6 +1832,6 @@
                 </section>
             </main>
         </div>
-        <script src="/dashboard/static/dashboard.js?v=20260602-12"></script>
+        <script src="/dashboard/static/dashboard.js?v=20260602-13"></script>
     </body>
 </html>

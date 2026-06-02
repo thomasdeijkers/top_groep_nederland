@@ -74,6 +74,7 @@ def save_field_corrections(timesheet_id: int, corrections: dict[str, str], match
                             "corrected": True,
                         }
 
+            _apply_absence_code_to_day_codes(parsed_fields)
             _recalculate_total_checks(parsed_fields)
             cursor.execute(
                 """
@@ -81,8 +82,8 @@ def save_field_corrections(timesheet_id: int, corrections: dict[str, str], match
                 SET parsed_fields = %s,
                     matched_relation_id = COALESCE(%s, matched_relation_id),
                     matched_candidate_name = COALESCE(%s, matched_candidate_name),
-                    employee_name = COALESCE(%s, employee_name),
-                    sender_phone = COALESCE(%s, sender_phone),
+                    employee_name = COALESCE(%s, NULLIF(%s, ''), employee_name),
+                    sender_phone = COALESCE(%s, NULLIF(%s, ''), sender_phone),
                     overall_confidence = LEAST(98, GREATEST(COALESCE(overall_confidence, 0), 80)),
                     status = 'goed_te_keuren',
                     updated_at = NOW()
@@ -93,7 +94,9 @@ def save_field_corrections(timesheet_id: int, corrections: dict[str, str], match
                     matched_relation_id,
                     matched_candidate_name,
                     matched_candidate_name,
+                    corrections.get("employee_name", ""),
                     matched_candidate_phone,
+                    corrections.get("employee_phone", ""),
                     timesheet_id,
                 ),
             )
@@ -193,6 +196,30 @@ def _project_cao_setting_id(cursor, project_id: int | None):
     )
     row = cursor.fetchone()
     return row[0] if row else None
+
+
+def _apply_absence_code_to_day_codes(parsed_fields: dict) -> None:
+    absence_code = str((parsed_fields.get("absence_code") or {}).get("value") or "").strip()
+    if not absence_code:
+        return
+    day_pairs = (
+        ("monday_code", "monday_hours"),
+        ("tuesday_code", "tuesday_hours"),
+        ("wednesday_code", "wednesday_hours"),
+        ("thursday_code", "thursday_hours"),
+        ("friday_code", "friday_hours"),
+        ("saturday_code", "saturday_hours"),
+        ("sunday_code", "sunday_hours"),
+    )
+    for code_key, hours_key in day_pairs:
+        code_value = str((parsed_fields.get(code_key) or {}).get("value") or "").strip()
+        hours_value = _decimal_or_none((parsed_fields.get(hours_key) or {}).get("value"))
+        if not code_value and (hours_value is None or hours_value == 0):
+            parsed_fields[code_key] = {
+                "value": absence_code,
+                "confidence": 98,
+                "corrected": True,
+            }
 
 
 def _decimal_or_none(value):

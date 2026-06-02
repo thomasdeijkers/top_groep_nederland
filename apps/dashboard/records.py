@@ -267,6 +267,7 @@ def list_audit_events(limit: int = 25) -> list[dict]:
                            entity_label,
                            description,
                            status,
+                           metadata,
                            created_at
                     FROM audit_events
                     ORDER BY created_at DESC, id DESC
@@ -274,22 +275,180 @@ def list_audit_events(limit: int = 25) -> list[dict]:
                     """,
                     (limit,),
                 )
-                return [
+                rows = [
                     {
                         "id": row[0],
                         "user": row[1] or "Admin",
                         "title": row[2],
                         "entity_type": row[3],
                         "entity_id": row[4],
+                        "entity_label": row[5] or "",
+                        "entity_display": row[5] or f"{row[3] or 'record'} {row[4] or ''}".strip(),
                         "meta": row[5] or row[3],
                         "detail": row[6] or "",
                         "status": row[7] or row[3],
-                        "time": row[8].strftime("%d-%m-%Y %H:%M") if row[8] else "-",
+                        "metadata": row[8] or {},
+                        "metadata_summary": _audit_metadata_summary(row[8] or {}),
+                        "time": row[9].strftime("%d-%m-%Y %H:%M") if row[9] else "-",
+                        "date": row[9].strftime("%d-%m-%Y") if row[9] else "-",
+                        "clock": row[9].strftime("%H:%M") if row[9] else "-",
                     }
                     for row in cursor.fetchall()
                 ]
+                _enrich_audit_events(cursor, rows)
+                return rows
     except Exception:
         return []
+
+
+def _enrich_audit_events(cursor, rows: list[dict]) -> None:
+    if not rows:
+        return
+    timesheet_ids = [row["entity_id"] for row in rows if row.get("entity_type") == "urenbriefje" and row.get("entity_id")]
+    relation_ids = [
+        row["entity_id"]
+        for row in rows
+        if row.get("entity_type") in {"relatie", "candidate", "principal"} and row.get("entity_id")
+    ]
+    timesheets = _audit_timesheet_context(cursor, timesheet_ids)
+    relations = _audit_relation_context(cursor, relation_ids)
+    for row in rows:
+        if row.get("entity_type") == "urenbriefje":
+            context = timesheets.get(row.get("entity_id"))
+            if context:
+                row["entity_display"] = context["display"]
+                row["detail"] = _audit_detail_with_context(row["detail"], context["summary"])
+                row["metadata_summary"] = _combine_audit_summary(row["metadata_summary"], context["metadata"])
+        elif row.get("entity_type") in {"relatie", "candidate", "principal"}:
+            context = relations.get(row.get("entity_id"))
+            if context:
+                row["entity_display"] = context["display"]
+                row["detail"] = _audit_detail_with_context(row["detail"], context["summary"])
+                row["metadata_summary"] = _combine_audit_summary(row["metadata_summary"], context["metadata"])
+
+
+def _audit_timesheet_context(cursor, ids: list[int]) -> dict[int, dict]:
+    if not ids:
+        return {}
+    cursor.execute(
+        """
+        SELECT id,
+               COALESCE(employee_name, matched_candidate_name, sender_name, '') AS employee_name,
+               COALESCE(sender_phone, '') AS sender_phone,
+               COALESCE(project_name, '') AS project_name,
+               COALESCE(principal_name, '') AS principal_name,
+               week_number,
+               work_date,
+               hours,
+               COALESCE(media_filename, '') AS media_filename,
+               COALESCE(status, '') AS status
+        FROM whatsapp_timesheet_inbox
+        WHERE id = ANY(%s);
+        """,
+        (ids,),
+    )
+    contexts = {}
+    for row in cursor.fetchall():
+        bits = [bit for bit in [row[1], row[3], f"week {row[5]}" if row[5] else "", row[8]] if bit]
+        display = f"Urenbriefje #{row[0]}"
+        if bits:
+            display = f"{display} · {' · '.join(bits[:3])}"
+        summary_parts = []
+        if row[1]:
+            summary_parts.append(f"werknemer {row[1]}")
+        if row[3]:
+            summary_parts.append(f"project {row[3]}")
+        if row[4]:
+            summary_parts.append(f"opdrachtgever {row[4]}")
+        if row[7]:
+            summary_parts.append(f"{_format_number(row[7])} uur")
+        metadata_parts = []
+        if row[2]:
+            metadata_parts.append(f"telefoon: {row[2]}")
+        if row[8]:
+            metadata_parts.append(f"bestand: {row[8]}")
+        if row[9]:
+            metadata_parts.append(f"huidige status: {row[9]}")
+        contexts[row[0]] = {
+            "display": display,
+            "summary": ", ".join(summary_parts),
+            "metadata": " | ".join(metadata_parts),
+        }
+    return contexts
+
+
+def _audit_relation_context(cursor, ids: list[int]) -> dict[int, dict]:
+    if not ids:
+        return {}
+    cursor.execute(
+        """
+        SELECT id,
+               relation_type,
+               COALESCE(name, '') AS name,
+               COALESCE(contact_name, '') AS contact_name,
+               COALESCE(email, '') AS email,
+               COALESCE(phone, '') AS phone,
+               COALESCE(city, '') AS city,
+               COALESCE(status, '') AS status
+        FROM relations
+        WHERE id = ANY(%s);
+        """,
+        (ids,),
+    )
+    contexts = {}
+    for row in cursor.fetchall():
+        relation_type = "Opdrachtgever" if row[1] == "principal" else "Kandidaat"
+        display = f"{relation_type} #{row[0]}"
+        if row[2]:
+            display = f"{display} · {row[2]}"
+        summary_parts = []
+        if row[3]:
+            summary_parts.append(f"contact {row[3]}")
+        if row[6]:
+            summary_parts.append(f"plaats {row[6]}")
+        if row[7]:
+            summary_parts.append(f"status {row[7]}")
+        metadata_parts = []
+        if row[4]:
+            metadata_parts.append(f"e-mail: {row[4]}")
+        if row[5]:
+            metadata_parts.append(f"telefoon: {row[5]}")
+        contexts[row[0]] = {
+            "display": display,
+            "summary": ", ".join(summary_parts),
+            "metadata": " | ".join(metadata_parts),
+        }
+    return contexts
+
+
+def _audit_detail_with_context(detail: str, context: str) -> str:
+    if not context:
+        return detail
+    if not detail:
+        return context.capitalize() + "."
+    return f"{detail} Betreft: {context}."
+
+
+def _combine_audit_summary(summary: str, context: str) -> str:
+    if not context:
+        return summary
+    if not summary or summary == "Geen extra metadata":
+        return context
+    return f"{summary} | {context}"
+
+
+def _audit_metadata_summary(metadata) -> str:
+    if not isinstance(metadata, dict) or not metadata:
+        return "Geen extra metadata"
+    parts = []
+    for key, value in metadata.items():
+        if value in (None, "", [], {}):
+            continue
+        label = str(key).replace("_", " ")
+        parts.append(f"{label}: {value}")
+        if len(parts) >= 4:
+            break
+    return " | ".join(parts) if parts else "Geen extra metadata"
 
 
 def _whatsapp_workflow(statuses: dict) -> list[dict]:

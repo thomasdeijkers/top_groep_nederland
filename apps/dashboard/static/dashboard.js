@@ -260,6 +260,63 @@
         const searchInput = form?.querySelector("[data-candidate-match-search]");
         const employeeNameInput = form?.querySelector('[name="field_employee_name"]');
         const employeePhoneInput = form?.querySelector('[name="field_employee_phone"]');
+        const suggestionsTarget = form?.querySelector("[data-candidate-suggestions]");
+
+        const normalize = (value) => (value || "")
+            .toString()
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-z0-9]+/g, " ")
+            .trim();
+
+        const scoreCandidate = (option, parsedName, parsedPhone) => {
+            const name = normalize(option.dataset.name || option.textContent);
+            const phone = (option.dataset.phone || "").replace(/\D/g, "");
+            const query = normalize(parsedName);
+            const queryPhone = (parsedPhone || "").replace(/\D/g, "");
+            if (!option.value || (!query && !queryPhone)) {
+                return 0;
+            }
+            if (queryPhone && phone && phone.endsWith(queryPhone.slice(-8))) {
+                return 120;
+            }
+            if (!query || !name) {
+                return 0;
+            }
+            if (name === query) {
+                return 100;
+            }
+            if (name.includes(query) || query.includes(name)) {
+                return 82;
+            }
+            const nameParts = new Set(name.split(" ").filter(Boolean));
+            const queryParts = query.split(" ").filter(Boolean);
+            const editDistance = (left, right) => {
+                if (Math.abs(left.length - right.length) > 2) {
+                    return 3;
+                }
+                const costs = Array.from({ length: right.length + 1 }, (_, index) => index);
+                for (let i = 1; i <= left.length; i += 1) {
+                    let previous = i;
+                    for (let j = 1; j <= right.length; j += 1) {
+                        const next = left[i - 1] === right[j - 1]
+                            ? costs[j - 1]
+                            : Math.min(costs[j - 1], previous, costs[j]) + 1;
+                        costs[j - 1] = previous;
+                        previous = next;
+                    }
+                    costs[right.length] = previous;
+                }
+                return costs[right.length];
+            };
+            const hits = queryParts.filter((part) => nameParts.has(part) || [...nameParts].some((namePart) => (
+                namePart.startsWith(part)
+                || part.startsWith(namePart)
+                || (part.length >= 5 && namePart.length >= 5 && editDistance(part, namePart) <= 2)
+            ))).length;
+            return queryParts.length ? Math.round((hits / queryParts.length) * 72) : 0;
+        };
 
         const applySelectedCandidate = () => {
             const option = select.selectedOptions[0];
@@ -268,26 +325,73 @@
             }
             if (employeeNameInput && option.dataset.name) {
                 employeeNameInput.value = option.dataset.name;
+                employeeNameInput.dispatchEvent(new Event("input", { bubbles: true }));
             }
             if (employeePhoneInput && option.dataset.phone) {
                 employeePhoneInput.value = option.dataset.phone;
+                employeePhoneInput.dispatchEvent(new Event("input", { bubbles: true }));
             }
         };
 
         const filterCandidates = () => {
             const query = (searchInput?.value || "").trim().toLowerCase();
+            let firstVisible = null;
             [...select.options].forEach((option) => {
                 if (!option.value) {
                     option.hidden = false;
                     return;
                 }
                 const haystack = `${option.textContent || ""} ${option.dataset.name || ""} ${option.dataset.phone || ""}`.toLowerCase();
-                option.hidden = query ? !haystack.includes(query) : false;
+                const visible = query ? haystack.includes(query) : option.selected;
+                option.hidden = !visible;
+                if (visible && !firstVisible) {
+                    firstVisible = option;
+                }
+            });
+            if (query && firstVisible) {
+                select.value = firstVisible.value;
+            }
+        };
+
+        const renderSuggestions = () => {
+            if (!suggestionsTarget) {
+                return;
+            }
+            const parsedName = employeeNameInput?.value || "";
+            const parsedPhone = employeePhoneInput?.value || "";
+            const scored = [...select.options]
+                .filter((option) => option.value)
+                .map((option) => ({ option, score: scoreCandidate(option, parsedName, parsedPhone) }))
+                .filter((item) => item.score >= 35)
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 4);
+            suggestionsTarget.innerHTML = "";
+            if (!scored.length) {
+                const empty = document.createElement("span");
+                empty.className = "candidate-suggestion-empty";
+                empty.textContent = "Geen sterke suggestie. Zoek handmatig hieronder.";
+                suggestionsTarget.append(empty);
+                return;
+            }
+            scored.forEach(({ option, score }) => {
+                const button = document.createElement("button");
+                button.type = "button";
+                button.className = "candidate-suggestion";
+                button.innerHTML = `<strong>${option.dataset.name || option.textContent}</strong><span>${Math.min(score, 100)}% match</span>`;
+                button.addEventListener("click", () => {
+                    select.value = option.value;
+                    select.dispatchEvent(new Event("change", { bubbles: true }));
+                });
+                suggestionsTarget.append(button);
             });
         };
 
         select.addEventListener("change", applySelectedCandidate);
         searchInput?.addEventListener("input", filterCandidates);
+        employeeNameInput?.addEventListener("input", renderSuggestions);
+        employeePhoneInput?.addEventListener("input", renderSuggestions);
+        renderSuggestions();
+        filterCandidates();
         if (select.value) {
             applySelectedCandidate();
         }
@@ -322,6 +426,19 @@
         const totalKmInput = form.elements.field_total_km;
         const calculatedKmInput = form.elements.field_calculated_total_km;
         const checkKmInput = form.elements.field_total_km_check;
+        const absenceInput = form.elements.field_absence_code;
+        const dayCodeInputs = [
+            ["field_monday_code", "field_monday_hours"],
+            ["field_tuesday_code", "field_tuesday_hours"],
+            ["field_wednesday_code", "field_wednesday_hours"],
+            ["field_thursday_code", "field_thursday_hours"],
+            ["field_friday_code", "field_friday_hours"],
+            ["field_saturday_code", "field_saturday_hours"],
+            ["field_sunday_code", "field_sunday_hours"],
+        ].map(([codeName, hoursName]) => ({
+            code: form.elements[codeName],
+            hours: form.elements[hoursName],
+        })).filter((item) => item.code && item.hours);
 
         const syncWorkflowIds = () => {
             if (principalTarget && principalSelect) {
@@ -373,10 +490,26 @@
             syncSumCheck(kmInputs, totalKmInput, calculatedKmInput, checkKmInput, "km", "totaal km ontbreekt");
         };
 
+        const applyAbsenceCode = () => {
+            const absenceCode = (absenceInput?.value || "").trim();
+            if (!absenceCode) {
+                return;
+            }
+            dayCodeInputs.forEach(({ code, hours }) => {
+                const hoursValue = String(hours.value || "").trim().replace(",", ".");
+                const hoursNumber = Number(hoursValue || "0");
+                if (!code.value.trim() && (!hoursValue || hoursNumber === 0)) {
+                    code.value = absenceCode;
+                }
+            });
+        };
+
         dayInputs.forEach((input) => input.addEventListener("input", syncTotalCheck));
         totalInput?.addEventListener("input", syncTotalCheck);
         kmInputs.forEach((input) => input.addEventListener("input", syncTotalCheck));
         totalKmInput?.addEventListener("input", syncTotalCheck);
+        absenceInput?.addEventListener("change", applyAbsenceCode);
+        applyAbsenceCode();
         syncTotalCheck();
     });
 

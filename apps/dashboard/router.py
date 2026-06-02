@@ -99,6 +99,54 @@ def _audit(action: str, entity_type: str, entity_id: int | None = None, label: s
     )
 
 
+def _audit_changed_fields(corrections: dict) -> str:
+    labels = {
+        "employee_name": "naam werknemer",
+        "employee_phone": "telefoon werknemer",
+        "project_number": "projectnummer",
+        "work_name": "project",
+        "principal_name": "opdrachtgever",
+        "week_number": "weeknummer",
+        "total_hours": "totaal uren",
+        "absence_code": "verzuimcode",
+        "remarks": "opmerking",
+    }
+    changed = []
+    for key, value in corrections.items():
+        if str(value or "").strip():
+            changed.append(labels.get(key, key.replace("_", " ")))
+    if not changed:
+        return "Geen ingevulde velden gewijzigd."
+    shown = changed[:6]
+    suffix = f" en {len(changed) - len(shown)} extra velden" if len(changed) > len(shown) else ""
+    return f"Aangepast: {', '.join(shown)}{suffix}."
+
+
+def _audit_relation_fields(data: dict) -> str:
+    labels = {
+        "name": "bedrijfsnaam",
+        "first_name": "voornaam",
+        "last_name": "achternaam",
+        "contact_name": "contactpersoon",
+        "email": "e-mail",
+        "phone": "telefoon",
+        "status": "status",
+        "city": "plaats",
+        "street": "straat",
+        "postal_code": "postcode",
+        "country": "land",
+        "kvk_number": "KvK",
+        "vat_number": "BTW",
+        "notes": "notitie",
+    }
+    changed = [label for key, label in labels.items() if str(data.get(key) or "").strip()]
+    if not changed:
+        return "Relatiekaart opgeslagen zonder extra ingevulde velden."
+    shown = changed[:6]
+    suffix = f" en {len(changed) - len(shown)} extra velden" if len(changed) > len(shown) else ""
+    return f"Relatiekaart bijgewerkt. Aangepast/ingevuld: {', '.join(shown)}{suffix}."
+
+
 def _timesheet_stage(status: str) -> str:
     normalized = (status or "").strip().lower()
     if normalized in {"goed_te_keuren", "approval", "akkoord_nodig"}:
@@ -269,7 +317,7 @@ def _dashboard_context(
     )
     whatsapp_timesheets = list_whatsapp_timesheets()
     overview_data = get_overview_data()
-    audit_events = list_audit_events(120 if data_page == "audit" else 8)
+    audit_events = list_audit_events(120 if data_page == "audit" else 14)
     openai_usage = get_openai_usage_summary()
     project_options = list_project_options()
     projects = list_projects(query=query if data_page == "projects" else "")
@@ -500,7 +548,10 @@ async def correct_whatsapp_timesheet(timesheet_id: int, request: Request):
     }
     matched_relation_id = int(form["matched_relation_id"]) if str(form.get("matched_relation_id") or "").isdigit() else None
     save_field_corrections(timesheet_id, corrections, matched_relation_id=matched_relation_id)
-    _audit("Urenbriefje gecorrigeerd", "urenbriefje", timesheet_id, f"Urenbriefje {timesheet_id}", "Velden op het urenbriefje zijn handmatig aangepast.", "Controle")
+    description = _audit_changed_fields(corrections)
+    if matched_relation_id:
+        description += f" Kandidaatkaart #{matched_relation_id} gekoppeld."
+    _audit("Urenbriefje gecorrigeerd", "urenbriefje", timesheet_id, f"Urenbriefje {timesheet_id}", description, "Controle")
     return RedirectResponse(f"/dashboard/timesheets?stage=valideren&timesheet={timesheet_id}", status_code=303)
 
 
@@ -752,7 +803,7 @@ async def edit_relation(
     update_relation(relation_id, locals(), photo_data)
     tab = "principals" if relation_type == "principal" else "candidates"
     label = name if relation_type == "principal" else " ".join(part for part in (first_name, last_name) if part).strip()
-    _audit("Relatie bijgewerkt", relation_type, relation_id, label or "Relatie", "Relatiegegevens bijgewerkt.", "Relaties")
+    _audit("Relatie bijgewerkt", relation_type, relation_id, label or f"Relatie {relation_id}", _audit_relation_fields(locals()), "Relaties")
     return RedirectResponse(_relations_url(tab, edit=relation_id, anchor="#relatie-formulier"), status_code=303)
 
 
