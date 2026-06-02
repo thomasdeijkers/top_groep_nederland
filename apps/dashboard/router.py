@@ -297,38 +297,57 @@ def _dashboard_context(
             ],
         }
 
-    stats = get_dashboard_stats()
-    server_overview = get_server_overview()
-    organizations = list_organizations()
+    stats = get_dashboard_stats() if data_page == "overview" else get_empty_dashboard_stats()
+    server_overview = {
+        "server_metrics": [],
+        "server_system_tiles": [],
+        "server_scheduler_tiles": [],
+        "server_otys_tiles": [],
+        "scheduled_jobs": [],
+    }
+    organizations = list_organizations() if data_page == "overview" else []
     active_status = status_filter if data_page in {"relations", "vacancies"} else ""
-    relations = list_relations(query=query if data_page == "relations" else "", status=active_status if data_page == "relations" else "")
-    candidate_relations = list_relations(query=query if data_page == "relations" else "", relation_type="candidate", status=active_status if data_page == "relations" else "")
-    timesheet_candidate_options = list_relations(limit=10000, relation_type="candidate")
-    principal_relations = list_relations(query=query if data_page == "relations" else "", relation_type="principal", status=active_status if data_page == "relations" else "")
-    principals = list_principals(query=query if data_page == "relations" else "")
-    imported_candidates = list_candidates(query=query if data_page == "relations" else "")
-    imported_tickets = list_tickets()
-    imported_vacancies = list_vacancies(query=query if data_page == "vacancies" else "", status=active_status if data_page == "vacancies" else "")
-    relation_status_options = list_relation_statuses("candidate" if relation_tab == "candidates" else "principal")
-    vacancy_status_options = list_vacancy_statuses()
-    relation_tab_counts = list_relation_tab_counts()
+    relations = list_relations(query=query, status=active_status) if data_page == "relations" else []
+    candidate_relations = list_relations(query=query, relation_type="candidate", status=active_status) if data_page == "relations" else []
+    timesheet_candidate_options = list_relations(limit=200, relation_type="candidate") if data_page == "timesheets" else []
+    principal_relations = list_relations(query=query, relation_type="principal", status=active_status) if data_page == "relations" else []
+    principals = list_principals(query=query if data_page == "relations" else "") if data_page in {"relations", "vacancies", "projects"} else []
+    imported_candidates = list_candidates(query=query) if data_page == "relations" else []
+    imported_tickets = list_tickets() if data_page == "tickets" else []
+    imported_vacancies = list_vacancies(query=query, status=active_status) if data_page == "vacancies" else []
+    relation_status_options = list_relation_statuses("candidate" if relation_tab == "candidates" else "principal") if data_page == "relations" else []
+    vacancy_status_options = list_vacancy_statuses() if data_page == "vacancies" else []
+    relation_tab_counts = list_relation_tab_counts() if data_page == "relations" else {"candidates": 0, "principals": 0}
     status_tiles = (
         list_vacancy_status_counts(query if data_page == "vacancies" else "")
         if data_page == "vacancies"
         else list_relation_status_counts("candidate" if relation_tab == "candidates" else "principal", query if data_page == "relations" else "")
+        if data_page == "relations"
+        else []
     )
-    whatsapp_timesheets = list_whatsapp_timesheets()
-    overview_data = get_overview_data()
-    audit_events = list_audit_events(120 if data_page == "audit" else 14)
+    whatsapp_timesheets = list_whatsapp_timesheets() if data_page == "timesheets" else []
+    overview_data = get_overview_data() if data_page == "overview" else {
+        "counts": {
+            "candidates": 0,
+            "principals": 0,
+            "vacancies": 0,
+            "tickets": 0,
+            "whatsapp_timesheet_inbox": 0,
+        },
+        "recent": [],
+        "whatsapp_workflow": [],
+        "weekly_hours_yoy": [],
+    }
+    audit_events = list_audit_events(120 if data_page == "audit" else 14) if data_page in {"audit", "settings"} else []
     openai_usage = get_openai_usage_summary()
-    project_options = list_project_options()
-    projects = list_projects(query=query if data_page == "projects" else "")
+    project_options = list_project_options() if data_page in {"timesheets", "projects", "periods"} else []
+    projects = list_projects(query=query) if data_page == "projects" else []
     selected_project = get_project(project_id) if data_page == "projects" and project_id else None
-    payroll_periods = list_payroll_periods()
-    archived_payroll_periods = list_payroll_periods(archived=True)
-    payroll_period_defaults = get_payroll_period_defaults()
+    payroll_periods = list_payroll_periods() if data_page == "periods" else []
+    archived_payroll_periods = list_payroll_periods(archived=True) if data_page == "periods" else []
+    payroll_period_defaults = get_payroll_period_defaults() if data_page == "periods" else {}
     selected_payroll_period = get_payroll_period(period_id) if data_page == "periods" and period_id else None
-    cao_settings = list_cao_settings()
+    cao_settings = list_cao_settings() if data_page in {"settings", "periods"} else []
     selected_cao_setting = get_cao_setting(cao_id) if data_page == "settings" and cao_id else None
     selected_relation = get_relation(edit_id) if data_page == "relations" and edit_id else None
     selected_vacancy = get_vacancy(edit_id) if data_page == "vacancies" and edit_id else None
@@ -405,7 +424,7 @@ def _dashboard_context(
         "cao_settings": cao_settings,
         "selected_cao_setting": selected_cao_setting,
         "show_cao_form": show_cao_form or bool(selected_cao_setting),
-        "timesheet_channel_tiles": get_timesheet_channel_tiles(),
+        "timesheet_channel_tiles": get_timesheet_channel_tiles() if data_page == "timesheets" else [],
         "country_options": [
             "Nederland",
             "Belgie",
