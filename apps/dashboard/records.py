@@ -434,7 +434,7 @@ def list_candidates(limit: int = 25, query: str = "") -> list[dict]:
         return []
 
 
-def list_relations(limit: int = 50, query: str = "", relation_type: str = "", status: str = "") -> list[dict]:
+def list_relations(limit: int = 15, query: str = "", relation_type: str = "", status: str = "") -> list[dict]:
     try:
         ensure_dashboard_tables()
         with get_connection() as conn:
@@ -472,7 +472,8 @@ def list_relations(limit: int = 50, query: str = "", relation_type: str = "", st
                     f"""
                     SELECT id, relation_type, name, contact_name, email, phone,
                            city, status, COALESCE(source, ''), photo_path,
-                           street, house_number, house_number_addition, postal_code, country
+                           street, house_number, house_number_addition, postal_code, country,
+                           external_id, updated_at
                     FROM relations
                     {where_clause}
                     ORDER BY updated_at DESC, id DESC
@@ -480,28 +481,48 @@ def list_relations(limit: int = 50, query: str = "", relation_type: str = "", st
                     """,
                     tuple(params),
                 )
-                return [
-                    {
+                rows = []
+                for row in cursor.fetchall():
+                    completion_fields = [
+                        row[2],
+                        row[4],
+                        row[5],
+                        row[6],
+                        row[7],
+                        row[10],
+                        row[13],
+                        row[14],
+                        row[15],
+                    ]
+                    if row[1] == "principal":
+                        completion_fields.extend([row[3]])
+                    filled_count = sum(1 for value in completion_fields if str(value or "").strip())
+                    completion_total = len(completion_fields)
+                    completion_percent = round((filled_count / completion_total) * 100) if completion_total else 0
+                    rows.append({
                         "id": row[0],
                         "relation_type": row[1],
                         "type": "Opdrachtgever" if row[1] == "principal" else "Kandidaat",
-                        "name": row[2],
-                        "contact": row[5] or "-",
-                        "email": row[4] or "-",
-                        "phone": row[5] or "-",
-                        "city": row[6] or "-",
-                        "status": row[7] or "Nieuw",
-                        "source": row[8] or "-",
+                        "name": row[2] or "",
+                        "contact": row[5] or "",
+                        "email": row[4] or "",
+                        "phone": row[5] or "",
+                        "city": row[6] or "",
+                        "status": row[7] or "",
+                        "source": row[8] or "",
                         "has_photo": bool(row[9]),
                         "initials": _initials(row[2]),
-                        "street": row[10] or "-",
+                        "street": row[10] or "",
                         "house_number": row[11] or "",
                         "house_number_addition": row[12] or "",
-                        "postal_code": row[13] or "-",
-                        "country": row[14] or "-",
-                    }
-                    for row in cursor.fetchall()
-                ]
+                        "postal_code": row[13] or "",
+                        "country": row[14] or "",
+                        "external_id": row[15] or "",
+                        "updated_at": row[16].strftime("%d-%m-%Y %H:%M") if row[16] else "",
+                        "completion_percent": completion_percent,
+                        "completion_label": f"{completion_percent}%",
+                    })
+                return rows
     except Exception:
         return []
 
@@ -862,7 +883,7 @@ def _format_money(value) -> str:
     return f"€ {text}"
 
 
-def list_payroll_periods(limit: int = 25) -> list[dict]:
+def list_payroll_periods(limit: int = 25, archived: bool = False) -> list[dict]:
     try:
         ensure_dashboard_tables()
         with get_connection() as conn:
@@ -897,17 +918,21 @@ def list_payroll_periods(limit: int = 25) -> list[dict]:
                             OR (b.payroll_period_id IS NULL AND b.work_date BETWEEN p2.start_date AND p2.end_date)
                         GROUP BY p2.id
                     ) b ON b.payroll_period_id = p.id
-                    ORDER BY p.year DESC, p.period_number DESC
+                    WHERE (
+                        (%s = TRUE AND LOWER(COALESCE(p.status, '')) = 'archief')
+                        OR (%s = FALSE AND LOWER(COALESCE(p.status, '')) <> 'archief')
+                    )
+                    ORDER BY p.start_date DESC NULLS LAST, p.end_date DESC NULLS LAST, p.year DESC, p.period_number DESC
                     LIMIT %s;
                     """,
-                    (limit,),
+                    (archived, archived, limit),
                 )
                 periods = [
                     {
                         "id": row[0],
                         "year": row[1],
                         "period_number": row[2],
-                        "name": row[3],
+                        "name": _payroll_period_name(row[2], row[4], row[5]) if row[4] and row[5] else row[3],
                         "start_date": row[4].strftime("%d-%m-%Y") if row[4] else "-",
                         "end_date": row[5].strftime("%d-%m-%Y") if row[5] else "-",
                         "status": row[6] or "concept",
@@ -920,16 +945,78 @@ def list_payroll_periods(limit: int = 25) -> list[dict]:
                     }
                     for row in cursor.fetchall()
                 ]
+                _apply_period_display_numbers(periods)
                 _attach_period_weeks(cursor, periods)
                 return periods
     except Exception:
         return []
 
 
+def get_payroll_period_defaults() -> dict:
+    today = date.today()
+    fallback_start = today - timedelta(days=today.weekday())
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT year, period_number, end_date
+                    FROM payroll_periods
+                    WHERE LOWER(COALESCE(status, '')) <> 'archief'
+                    ORDER BY end_date DESC NULLS LAST, year DESC, period_number DESC
+                    LIMIT 1;
+                    """
+                )
+                row = cursor.fetchone()
+                if row and row[2]:
+                    next_start = row[2] + timedelta(days=1)
+                    next_year = next_start.year
+                else:
+                    next_start = fallback_start
+                    next_year = next_start.year
+                next_end = next_start + timedelta(days=27)
+                cursor.execute(
+                    """
+                    SELECT period_number
+                    FROM payroll_periods
+                    WHERE year = %s
+                      AND LOWER(COALESCE(status, '')) <> 'archief'
+                    ORDER BY period_number;
+                    """,
+                    (next_year,),
+                )
+                used_numbers = {int(number or 0) for (number,) in cursor.fetchall()}
+                next_number = 1
+                while next_number in used_numbers:
+                    next_number += 1
+                display_number = len(used_numbers) + 1
+                return {
+                    "year": next_year,
+                    "period_number": next_number,
+                    "display_period_number": display_number,
+                    "start_date": next_start.isoformat(),
+                    "end_date": next_end.isoformat(),
+                    "name": _payroll_period_name(display_number, next_start, next_end),
+                }
+    except Exception:
+        fallback_end = fallback_start + timedelta(days=27)
+        return {
+            "year": fallback_start.year,
+            "period_number": 1,
+            "display_period_number": 1,
+            "start_date": fallback_start.isoformat(),
+            "end_date": fallback_end.isoformat(),
+            "name": _payroll_period_name(1, fallback_start, fallback_end),
+        }
+
+
 def get_payroll_period(period_id: int | None) -> dict | None:
     if not period_id:
         return None
     period = next((item for item in list_payroll_periods(limit=200) if item["id"] == period_id), None)
+    if not period:
+        period = next((item for item in list_payroll_periods(limit=200, archived=True) if item["id"] == period_id), None)
     if period:
         period["payroll_rows"] = list_payroll_period_payroll(period_id)
         period["payroll_totals"] = _payroll_period_totals(period["payroll_rows"])
@@ -1132,6 +1219,101 @@ def create_payroll_period(data: dict) -> int:
     return period_id
 
 
+def create_payroll_period_batch(data: dict) -> list[int]:
+    defaults = get_payroll_period_defaults()
+    period_number = _int_or_none(data.get("period_number")) or defaults["period_number"]
+    period_count = min(max(_int_or_none(data.get("period_count")) or 1, 1), 2)
+    start_date = _date_or_none(data.get("start_date")) or _date_or_none(defaults["start_date"]) or date.today()
+    display_period_number = _int_or_none(data.get("display_period_number")) or defaults.get("display_period_number") or period_number
+    year = start_date.year
+    notes = (data.get("notes") or "").strip()
+    status = (data.get("status") or "Open").strip() or "Open"
+
+    available_numbers = _available_payroll_period_numbers(year, period_count)
+    created_ids: list[int] = []
+    for offset in range(period_count):
+        current_number = available_numbers[offset] if offset < len(available_numbers) else period_number + offset
+        current_display_number = display_period_number + offset
+        current_start = start_date + timedelta(days=28 * offset)
+        current_end = current_start + timedelta(days=27)
+        current_data = {
+            "year": year,
+            "period_number": current_number,
+            "name": _payroll_period_name(current_display_number, current_start, current_end),
+            "start_date": current_start.isoformat(),
+            "end_date": current_end.isoformat(),
+            "status": status,
+            "notes": notes,
+        }
+        created_ids.append(create_payroll_period(current_data))
+    return created_ids
+
+
+def _available_payroll_period_numbers(year: int, count: int) -> list[int]:
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT period_number
+                    FROM payroll_periods
+                    WHERE year = %s
+                    ORDER BY period_number;
+                    """,
+                    (year,),
+                )
+                used_numbers = {int(number or 0) for (number,) in cursor.fetchall()}
+    except Exception:
+        used_numbers = set()
+    numbers: list[int] = []
+    candidate = 1
+    while len(numbers) < count:
+        if candidate not in used_numbers:
+            numbers.append(candidate)
+        candidate += 1
+    return numbers
+
+
+def archive_payroll_period(period_id: int, archived: bool = True) -> None:
+    if not period_id:
+        return
+    ensure_dashboard_tables()
+    new_status = "Archief" if archived else "Open"
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE payroll_periods
+                SET status = %s, updated_at = NOW()
+                WHERE id = %s;
+                """,
+                (new_status, period_id),
+            )
+        conn.commit()
+
+
+def _payroll_period_name(period_number: int, start_date: date, end_date: date) -> str:
+    return f"Periode {period_number:02d} {start_date:%d/%m} - {end_date:%d/%m}"
+
+
+def _apply_period_display_numbers(periods: list[dict]) -> None:
+    grouped: dict[int, list[dict]] = {}
+    for period in periods:
+        grouped.setdefault(period["year"], []).append(period)
+    for year_periods in grouped.values():
+        ordered = sorted(
+            year_periods,
+            key=lambda item: datetime.strptime(item["start_date"], "%d-%m-%Y") if item["start_date"] != "-" else datetime.min,
+        )
+        for display_number, period in enumerate(ordered, start=1):
+            period["display_period_number"] = display_number
+            start_date = datetime.strptime(period["start_date"], "%d-%m-%Y").date() if period["start_date"] != "-" else None
+            end_date = datetime.strptime(period["end_date"], "%d-%m-%Y").date() if period["end_date"] != "-" else None
+            if start_date and end_date:
+                period["name"] = _payroll_period_name(display_number, start_date, end_date)
+
+
 def _attach_period_weeks(cursor, periods: list[dict]) -> None:
     period_ids = [period["id"] for period in periods]
     if not period_ids:
@@ -1156,8 +1338,38 @@ def _attach_period_weeks(cursor, periods: list[dict]) -> None:
                 "week_number": row[2],
                 "start_date": row[3].strftime("%d-%m-%Y") if row[3] else "-",
                 "end_date": row[4].strftime("%d-%m-%Y") if row[4] else "-",
+                "booking_count": 0,
+                "project_count": 0,
+                "total_hours": "0",
             }
         )
+    cursor.execute(
+        """
+        SELECT w.payroll_period_id,
+               w.week_index,
+               COUNT(b.id) AS booking_count,
+               COUNT(DISTINCT b.project_id) AS project_count,
+               COALESCE(SUM(b.hours), 0) AS total_hours
+        FROM payroll_period_weeks w
+        LEFT JOIN project_time_bookings b
+            ON b.work_date BETWEEN w.start_date AND w.end_date
+           AND (b.payroll_period_id = w.payroll_period_id OR b.payroll_period_id IS NULL)
+        WHERE w.payroll_period_id = ANY(%s)
+        GROUP BY w.payroll_period_id, w.week_index
+        ORDER BY w.payroll_period_id, w.week_index;
+        """,
+        (period_ids,),
+    )
+    for period_id, week_index, booking_count, project_count, total_hours in cursor.fetchall():
+        period = period_map.get(period_id)
+        if not period:
+            continue
+        week = next((item for item in period["weeks"] if item["week_index"] == week_index), None)
+        if not week:
+            continue
+        week["booking_count"] = booking_count or 0
+        week["project_count"] = project_count or 0
+        week["total_hours"] = _format_number(total_hours)
 
 
 def _attach_project_bookings(cursor, projects: list[dict], per_project: int = 5) -> None:

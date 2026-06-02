@@ -18,7 +18,7 @@
         </title>
         <link rel="icon" href="/dashboard/static/favicon.ico" sizes="any">
         <link rel="shortcut icon" href="/dashboard/static/favicon.ico">
-        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260602-3">
+        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260602-13">
     </head>
     <body class="page-{{ active_page }}">
         {% macro confidence_light(field) -%}
@@ -39,9 +39,10 @@
                     <a class="side-nav__item {% if active_page == 'relations' %}side-nav__item--active{% endif %}" href="/dashboard/relations"><span>Relaties</span><i class="module-status module-status--green" title="Klaar om te testen"></i></a>
                     <a class="side-nav__item {% if active_page == 'vacancies' %}side-nav__item--active{% endif %}" href="/dashboard/vacancies"><span>Vacatures</span><i class="module-status module-status--orange" title="Basis staat"></i></a>
                     <a class="side-nav__item {% if active_page == 'projects' %}side-nav__item--active{% endif %}" href="/dashboard/projects"><span>Projecten</span><i class="module-status module-status--orange" title="Basis staat"></i></a>
-                    <a class="side-nav__item {% if active_page == 'periods' %}side-nav__item--active{% endif %}" href="/dashboard/periods"><span>Periodes</span><i class="module-status module-status--orange" title="Basis staat"></i></a>
-                    <a class="side-nav__item {% if active_page == 'tickets' %}side-nav__item--active{% endif %}" href="/dashboard/tickets"><span>Tickets</span><i class="module-status module-status--red" title="Nog te ontwikkelen"></i></a>
+                    <span class="side-nav__group">Uren en lonen</span>
                     <a class="side-nav__item {% if active_page == 'timesheets' %}side-nav__item--active{% endif %}" href="/dashboard/timesheets"><span>Urenverwerking</span><i class="module-status module-status--green" title="Klaar om te testen"></i></a>
+                    <a class="side-nav__item {% if active_page == 'periods' %}side-nav__item--active{% endif %}" href="/dashboard/periods"><span>Loonperiodes</span><i class="module-status module-status--orange" title="Basis staat"></i></a>
+                    <a class="side-nav__item {% if active_page == 'tickets' %}side-nav__item--active{% endif %}" href="/dashboard/tickets"><span>Tickets</span><i class="module-status module-status--red" title="Nog te ontwikkelen"></i></a>
                     <a class="side-nav__item {% if active_page == 'server' %}side-nav__item--active{% endif %}" href="/dashboard/server"><span>Server info</span><i class="module-status module-status--green" title="Klaar om te testen"></i></a>
                     <a class="side-nav__item {% if active_page == 'settings' %}side-nav__item--active{% endif %}" href="/dashboard/settings"><span>Instellingen</span><i class="module-status module-status--orange" title="Basis staat"></i></a>
                 </nav>
@@ -63,7 +64,7 @@
                         </span>
                         <div>
                             <span>ChatGPT deze maand</span>
-                            <strong>${{ "%.4f"|format(openai_usage.month_cost_usd|float) }}</strong>
+                            <strong>${{ "%.2f"|format(openai_usage.month_cost_usd|float) }}</strong>
                             <small>{{ openai_usage.month_requests }} parsing{% if openai_usage.month_requests != 1 %}s{% endif %}</small>
                         </div>
                     </div>
@@ -373,6 +374,7 @@
                     {% set candidate_rows = candidate_relations if candidate_relations is defined else all_relation_rows|selectattr('relation_type', 'equalto', 'candidate')|list %}
                     {% set principal_rows = principal_relations if principal_relations is defined else all_relation_rows|selectattr('relation_type', 'equalto', 'principal')|list %}
                     <article class="panel panel--full relations-only" id="relaties">
+                        <div class="sticky-work-header">
                         <div class="panel-header">
                             <div>
                                 <p class="section-label">Relaties</p>
@@ -395,21 +397,14 @@
 
                         {% set visible_relations = candidate_rows if active_relation_tab == 'candidates' else principal_rows %}
                         {% set relation_label = 'kandidaten' if active_relation_tab == 'candidates' else 'opdrachtgevers' %}
-                        <div class="status-tile-row">
-                            {% for tile in status_tiles %}
-                            <a class="status-count-tile {% if status_filter == tile.label %}status-count-tile--active{% endif %}" href="/dashboard/relations?tab={{ active_relation_tab }}&status={{ tile.label|urlencode }}{% if query %}&q={{ query|urlencode }}{% endif %}#relaties">
-                                <span>{{ tile.label }}</span>
-                                <strong>{{ tile.count }}</strong>
-                            </a>
-                            {% endfor %}
-                        </div>
+                        {% set active_relation_count = relation_tab_counts.candidates|default(0) if active_relation_tab == 'candidates' else relation_tab_counts.principals|default(0) %}
                         <form class="single-search" action="/dashboard/relations" method="get">
                             <input type="hidden" name="tab" value="{{ active_relation_tab }}">
                             <input type="search" name="q" value="{{ query }}" placeholder="Zoek in {{ relation_label }} op naam, telefoon, e-mail, plaats, status of OTYS ID">
                             <select name="status" aria-label="Filter op status" class="{% if status_filter %}select-has-value{% endif %}" data-persist-select="dashboard-relations-status-{{ active_relation_tab }}" data-persist-param="status">
-                                <option value="">Alle statussen</option>
-                                {% for status_option in relation_status_options %}
-                                <option value="{{ status_option }}" {% if status_filter == status_option %}selected{% endif %}>{{ status_option }}</option>
+                                <option value="">Alle statussen ({{ active_relation_count }})</option>
+                                {% for tile in status_tiles %}
+                                <option value="{{ tile.label }}" {% if status_filter == tile.label %}selected{% endif %}>{{ tile.label }} ({{ tile.count }})</option>
                                 {% endfor %}
                             </select>
                             <button class="ghost-button" type="submit">Zoeken</button>
@@ -417,6 +412,7 @@
                             <a class="ghost-button" href="/dashboard/relations?tab={{ active_relation_tab }}#relaties" data-clear-persist="dashboard-relations-status-{{ active_relation_tab }}">Wissen</a>
                             {% endif %}
                         </form>
+                        </div>
 
                         <div class="relation-layout relation-layout--wide">
                             <div class="table-wrap">
@@ -429,7 +425,9 @@
                                             <th>Telefoonnummer</th>
                                             <th>Adres</th>
                                             <th>Plaats</th>
+                                            <th>Kaart</th>
                                             <th>Status</th>
+                                            <th>Laatste mutatie</th>
                                             <th>Actie</th>
                                         </tr>
                                     </thead>
@@ -448,9 +446,12 @@
                                             </td>
                                             <td>{{ result.name }}</td>
                                             <td>{{ result.contact }}</td>
-                                            <td>{{ result.street }} {{ result.house_number }}{{ result.house_number_addition }}</td>
+                                            {% set relation_address = (result.street ~ ' ' ~ result.house_number ~ result.house_number_addition)|trim %}
+                                            <td>{{ relation_address }}</td>
                                             <td>{{ result.city }}</td>
+                                            <td><span class="relation-completion" title="Relatiekaart {{ result.completion_label }} ingevuld">{{ result.completion_label }}</span></td>
                                             <td><span class="status-tag">{{ result.status }}</span></td>
+                                            <td>{{ result.updated_at }}</td>
                                             <td>
                                                 {% if result.id %}
                                                 <a class="table-link" href="/dashboard/relations?tab={{ active_relation_tab }}{% if query %}&q={{ query|urlencode }}{% endif %}{% if status_filter %}&status={{ status_filter|urlencode }}{% endif %}&edit={{ result.id }}#relatie-formulier">Open</a>
@@ -461,7 +462,7 @@
                                         </tr>
                                         {% else %}
                                         <tr>
-                                            <td colspan="8">Nog geen {{ relation_label }} gevonden.</td>
+                                            <td colspan="10">Nog geen {{ relation_label }} gevonden.</td>
                                         </tr>
                                         {% endfor %}
                                     </tbody>
@@ -473,7 +474,14 @@
 
                     {% set show_relation_editor = show_relation_form|default(false) or selected_relation or (request is defined and request.query_params.get('new')) %}
                     {% if show_relation_editor %}
-                    {% set relation_editor_close_url = '/dashboard/relations?tab=' ~ active_relation_tab ~ ('&q=' ~ query|urlencode if query else '') ~ ('&status=' ~ status_filter|urlencode if status_filter else '') ~ '#relaties' %}
+                    {% set relation_editor_close_url = '/dashboard/relations?tab=' ~ active_relation_tab %}
+                    {% if query %}
+                    {% set relation_editor_close_url = relation_editor_close_url ~ '&q=' ~ (query|urlencode) %}
+                    {% endif %}
+                    {% if status_filter %}
+                    {% set relation_editor_close_url = relation_editor_close_url ~ '&status=' ~ (status_filter|urlencode) %}
+                    {% endif %}
+                    {% set relation_editor_close_url = relation_editor_close_url ~ '#relaties' %}
                     <div class="relation-editor-backdrop relations-only" data-relation-editor-modal data-close-url="{{ relation_editor_close_url }}">
                         <article class="relation-editor-modal" id="relatie-formulier" role="dialog" aria-modal="true" aria-labelledby="relation-editor-title">
                             <div class="panel-header relation-editor-modal__header">
@@ -510,17 +518,21 @@
                                         <option value="principal" {% if (selected_relation and selected_relation.relation_type == 'principal') or (not selected_relation and active_relation_tab == 'principals') %}selected{% endif %}>Opdrachtgever</option>
                                     </select>
                                 </label>
-                                <label data-principal-field>Bedrijfsnaam <input type="text" name="name" value="{{ selected_relation.name if selected_relation and selected_relation.relation_type == 'principal' else '' }}" placeholder="Bedrijfsnaam"></label>
-                                <label data-candidate-field>Voornaam <input type="text" name="first_name" value="{{ selected_relation.first_name if selected_relation else '' }}"></label>
-                                <label data-candidate-field>Achternaam <input type="text" name="last_name" value="{{ selected_relation.last_name if selected_relation else '' }}"></label>
-                                <label data-principal-field>Naam contactpersoon <input type="text" name="contact_name" value="{{ selected_relation.contact_name if selected_relation else '' }}"></label>
-                                <label>E-mail <input type="email" name="email" value="{{ selected_relation.email if selected_relation else '' }}"></label>
-                                <label>Telefoon <input type="text" name="phone" value="{{ selected_relation.phone if selected_relation else '' }}"></label>
-                                <label data-principal-field>Website <input type="url" name="website" value="{{ selected_relation.website if selected_relation else '' }}"></label>
-                                <label>Plaats <input type="text" name="city" value="{{ selected_relation.city if selected_relation else '' }}"></label>
+                                <label class="relation-info-field">OTYS ID
+                                    <span class="readonly-info">{{ selected_relation.external_id|default('', true) if selected_relation else '' }}</span>
+                                </label>
+                                <label data-principal-field>Bedrijfsnaam <input type="text" name="name" value="{{ selected_relation.name|default('', true) if selected_relation and selected_relation.relation_type == 'principal' else '' }}" placeholder="Bedrijfsnaam"></label>
+                                <label data-candidate-field>Voornaam <input type="text" name="first_name" value="{{ selected_relation.first_name|default('', true) if selected_relation else '' }}"></label>
+                                <label data-candidate-field>Achternaam <input type="text" name="last_name" value="{{ selected_relation.last_name|default('', true) if selected_relation else '' }}"></label>
+                                <label data-principal-field>Naam contactpersoon <input type="text" name="contact_name" value="{{ selected_relation.contact_name|default('', true) if selected_relation else '' }}"></label>
+                                <label>E-mail <input type="email" name="email" value="{{ selected_relation.email|default('', true) if selected_relation else '' }}"></label>
+                                <label>Telefoon <input type="text" name="phone" value="{{ selected_relation.phone|default('', true) if selected_relation else '' }}"></label>
+                                <label data-principal-field>Website <input type="url" name="website" value="{{ selected_relation.website|default('', true) if selected_relation else '' }}"></label>
+                                <label>Plaats <input type="text" name="city" value="{{ selected_relation.city|default('', true) if selected_relation else '' }}"></label>
                                 <label>Status
-                                    {% set selected_status = selected_relation.status if selected_relation and selected_relation.status else ('Archief' if selected_relation and selected_relation.archived_at else 'Actief') %}
+                                    {% set selected_status = selected_relation.status|default('', true) if selected_relation else 'Actief' %}
                                     <select name="status">
+                                        <option value="" {% if not selected_status %}selected{% endif %}>Geen status</option>
                                         {% for status_option in relation_status_options %}
                                         <option value="{{ status_option }}" {% if selected_status == status_option %}selected{% endif %}>{{ status_option }}</option>
                                         {% endfor %}
@@ -530,29 +542,30 @@
                                     </select>
                                 </label>
                                 <input type="hidden" name="source" value="{{ selected_relation.source if selected_relation and selected_relation.source else 'handmatig' }}">
-                                <label>Straat <input type="text" name="street" value="{{ (selected_relation.street or selected_relation.address) if selected_relation else '' }}"></label>
-                                <label>Huisnummer <input type="text" name="house_number" value="{{ selected_relation.house_number if selected_relation else '' }}"></label>
-                                <label>Toevoeging <input type="text" name="house_number_addition" value="{{ selected_relation.house_number_addition if selected_relation else '' }}" placeholder="A / bis / rood"></label>
-                                <label>Postcode <input type="text" name="postal_code" value="{{ selected_relation.postal_code if selected_relation else '' }}"></label>
+                                <label>Straat <input type="text" name="street" value="{{ (selected_relation.street or selected_relation.address)|default('', true) if selected_relation else '' }}"></label>
+                                <label>Huisnummer <input type="text" name="house_number" value="{{ selected_relation.house_number|default('', true) if selected_relation else '' }}"></label>
+                                <label>Toevoeging <input type="text" name="house_number_addition" value="{{ selected_relation.house_number_addition|default('', true) if selected_relation else '' }}" placeholder="A / bis / rood"></label>
+                                <label>Postcode <input type="text" name="postal_code" value="{{ selected_relation.postal_code|default('', true) if selected_relation else '' }}"></label>
                                 <label>Land
                                     <select name="country">
-                                        {% set selected_country = selected_relation.country if selected_relation and selected_relation.country else 'Nederland' %}
+                                        {% set selected_country = selected_relation.country|default('', true) if selected_relation else 'Nederland' %}
+                                        <option value="" {% if not selected_country %}selected{% endif %}>Geen land</option>
                                         {% for country in country_options %}
                                         <option value="{{ country }}" {% if selected_country == country %}selected{% endif %}>{{ country }}</option>
                                         {% endfor %}
                                     </select>
                                 </label>
-                                <label data-candidate-field>Eigenaar <input type="text" name="owner" value="{{ selected_relation.owner if selected_relation else '' }}" placeholder="Top Groep Nederland"></label>
-                                <label data-candidate-field>Beschikbaarheid <input type="text" name="availability" value="{{ selected_relation.availability if selected_relation else '' }}"></label>
+                                <label data-candidate-field>Eigenaar <input type="text" name="owner" value="{{ selected_relation.owner|default('', true) if selected_relation else '' }}" placeholder="Top Groep Nederland"></label>
+                                <label data-candidate-field>Beschikbaarheid <input type="text" name="availability" value="{{ selected_relation.availability|default('', true) if selected_relation else '' }}"></label>
                                 <label class="currency-field" data-candidate-field>Uurtarief
                                     <span class="currency-input">
                                         <span>&euro;</span>
-                                        <input type="number" step="0.01" name="hourly_rate" value="{{ selected_relation.hourly_rate if selected_relation else '' }}" placeholder="0,00">
+                                        <input type="number" step="0.01" name="hourly_rate" value="{{ selected_relation.hourly_rate|default('', true) if selected_relation else '' }}" placeholder="0,00">
                                     </span>
                                 </label>
-                                <label data-principal-field>KvK <input type="text" name="kvk_number" value="{{ selected_relation.kvk_number if selected_relation else '' }}"></label>
-                                <label data-principal-field>BTW <input type="text" name="vat_number" value="{{ selected_relation.vat_number if selected_relation else '' }}"></label>
-                                <label class="form-span-2">Notities <textarea name="notes">{{ selected_relation.notes if selected_relation else '' }}</textarea></label>
+                                <label data-principal-field>KvK <input type="text" name="kvk_number" value="{{ selected_relation.kvk_number|default('', true) if selected_relation else '' }}"></label>
+                                <label data-principal-field>BTW <input type="text" name="vat_number" value="{{ selected_relation.vat_number|default('', true) if selected_relation else '' }}"></label>
+                                <label class="form-span-2">Notities <textarea name="notes">{{ selected_relation.notes|default('', true) if selected_relation else '' }}</textarea></label>
                                 <button class="ghost-button create-form__submit" type="submit">Relatie opslaan</button>
                             </form>
                         </article>
@@ -670,6 +683,7 @@
                     </article>
 
                     <article class="panel panel--full vacancies-only" id="vacatures">
+                        <div class="sticky-work-header">
                         <div class="panel-header">
                             <div>
                                 <p class="section-label section-label--vacancy">Vacatures</p>
@@ -679,21 +693,12 @@
                             <a class="ghost-button vacancy-button" href="/dashboard/vacancies#vacature-formulier">Nieuwe vacature</a>
                         </div>
 
-                        <div class="status-tile-row">
-                            {% for tile in status_tiles %}
-                            <a class="status-count-tile {% if status_filter == tile.label %}status-count-tile--active{% endif %}" href="/dashboard/vacancies?status={{ tile.label|urlencode }}{% if query %}&q={{ query|urlencode }}{% endif %}#vacatures">
-                                <span>{{ tile.label }}</span>
-                                <strong>{{ tile.count }}</strong>
-                            </a>
-                            {% endfor %}
-                        </div>
-
                         <form class="single-search vacancy-top-search" action="/dashboard/vacancies" method="get">
                             <input type="search" name="q" value="{{ query }}" placeholder="Zoek op titel, referentie, opdrachtgever, plaats of status">
                             <select name="status" aria-label="Filter op status" class="{% if status_filter %}select-has-value{% endif %}" data-persist-select="dashboard-vacancies-status" data-persist-param="status">
-                                <option value="">Alle statussen</option>
-                                {% for status_option in vacancy_status_options %}
-                                <option value="{{ status_option }}" {% if status_filter == status_option %}selected{% endif %}>{{ status_option }}</option>
+                                <option value="">Alle statussen ({{ status_tiles|sum(attribute='count') }})</option>
+                                {% for tile in status_tiles %}
+                                <option value="{{ tile.label }}" {% if status_filter == tile.label %}selected{% endif %}>{{ tile.label }} ({{ tile.count }})</option>
                                 {% endfor %}
                             </select>
                             <button class="ghost-button" type="submit">Zoeken</button>
@@ -701,6 +706,7 @@
                             <a class="ghost-button" href="/dashboard/vacancies#vacatures" data-clear-persist="dashboard-vacancies-status">Wissen</a>
                             {% endif %}
                         </form>
+                        </div>
 
                         <div class="vacancy-database-layout">
                             <div class="table-wrap vacancy-table">
@@ -830,41 +836,54 @@
                     <article class="panel panel--full periods-only" id="periodes">
                         <div class="panel-header">
                             <div>
-                                <p class="section-label">Vier weken loon</p>
-                                <h2>Periodes beheren</h2>
-                                <p>Maak loonperiodes aan met vier vaste weken. Deze periodes vormen straks de basis voor loonstrookvoorbereiding.</p>
+                                <p class="section-label">Urenverwerking / lonen</p>
+                                <h2>Loonperiodes</h2>
+                                <p>Het systeem kiest automatisch de volgende vierweekse periode. Pas alleen de startdatum of het aantal blokken aan als de kalender afwijkt.</p>
                             </div>
                         </div>
 
+                        <div class="period-create-shell">
+                            <div class="period-create-proposal">
+                                <span>Volgende voorstel</span>
+                                <strong>{{ payroll_period_defaults.name }}</strong>
+                                <small>{{ payroll_period_defaults.start_date }} t/m {{ payroll_period_defaults.end_date }} · volgende periode {{ payroll_period_defaults.period_number }} {{ payroll_period_defaults.year }}</small>
+                            </div>
                         <form class="period-create-form" action="/api/periods" method="post">
-                            <label>Jaar <input type="number" name="year" value="2026" min="2020" max="2100" required></label>
-                            <label>Periode <input type="number" name="period_number" min="1" max="14" placeholder="5" required></label>
-                            <label>Naam <input type="text" name="name" placeholder="Periode 5 - 2026"></label>
-                            <label>Startdatum <input type="date" name="start_date" required></label>
-                            <label>Einddatum <input type="date" name="end_date"></label>
+                            <input type="hidden" name="year" value="{{ payroll_period_defaults.year }}">
+                            <input type="hidden" name="period_number" value="{{ payroll_period_defaults.period_number }}">
+                            <input type="hidden" name="display_period_number" value="{{ payroll_period_defaults.display_period_number }}">
+                            <label>Aantal periodes
+                                <select name="period_count">
+                                    <option value="1">1 x 4 weken</option>
+                                    <option value="2">2 x 4 weken</option>
+                                </select>
+                            </label>
+                            <label>Startdatum <input type="date" name="start_date" value="{{ payroll_period_defaults.start_date }}" required></label>
                             <label>Status
                                 <select name="status">
-                                    <option value="concept">Concept</option>
                                     <option value="open">Open</option>
+                                    <option value="concept">Concept</option>
                                     <option value="controle">Controle</option>
                                     <option value="afgesloten">Afgesloten</option>
                                 </select>
                             </label>
-                            <label class="period-create-form__notes">Notitie <input type="text" name="notes" placeholder="Bijvoorbeeld: aansluitend op bouw periodekalender"></label>
-                            <button class="ghost-button" type="submit">Periode aanmaken</button>
+                            <label class="period-create-form__notes">Notitie <input type="text" name="notes" placeholder="Bijvoorbeeld: afwijkende bouwkalender"></label>
+                            <button class="ghost-button" type="submit">Periodes aanmaken</button>
                         </form>
+                        </div>
+
+                        <div class="period-tabs" aria-label="Periode overzicht">
+                            <a class="period-tab period-tab--active" href="#periodes">Actief</a>
+                            <a class="period-tab" href="#periode-archief">Archief</a>
+                        </div>
 
                         <div class="table-wrap period-table">
                             <table>
                                 <thead>
                                     <tr>
                                         <th>Periode</th>
-                                        <th>Datum</th>
-                                        <th>Weken</th>
-                                        <th>Boekingen</th>
-                                        <th>Uren</th>
+                                        <th>Samenvatting</th>
                                         <th>Status</th>
-                                        <th>Gewijzigd</th>
                                         <th>Actie</th>
                                     </tr>
                                 </thead>
@@ -873,24 +892,40 @@
                                     <tr>
                                         <td>
                                             <strong>{{ period.name }}</strong>
-                                            <span>{{ period.year }} / periode {{ period.period_number }}</span>
+                                            <span>{{ period.year }} / periode {{ period.display_period_number or period.period_number }}</span>
                                         </td>
-                                        <td>{{ period.start_date }} t/m {{ period.end_date }}</td>
-                                        <td>{{ period.week_count }} weken</td>
-                                        <td>{{ period.booking_count }}</td>
-                                        <td>{{ period.total_hours }}</td>
+                                        <td>
+                                            <div class="period-summary-strip">
+                                                <span>{{ period.start_date }} t/m {{ period.end_date }}</span>
+                                                <strong>{{ period.week_count }} weken</strong>
+                                                <strong>{{ period.total_hours }} uur</strong>
+                                                <strong>{{ period.booking_count }} boekingen</strong>
+                                            </div>
+                                        </td>
                                         <td><span class="status-tag">{{ period.status }}</span></td>
-                                        <td>{{ period.updated_at }}</td>
-                                        <td><a class="table-link" href="/dashboard/periods?period={{ period.id }}#periode-verloning">Open verloning</a></td>
+                                        <td>
+                                            <div class="period-actions">
+                                                <a class="table-link" href="/dashboard/periods?period={{ period.id }}#periode-verloning">Open verloning</a>
+                                                <form action="/api/periods/{{ period.id }}/archive" method="post">
+                                                    <button class="table-link table-link--button" type="submit">Archiveer</button>
+                                                </form>
+                                            </div>
+                                        </td>
                                     </tr>
                                     <tr class="period-weeks-row">
-                                        <td colspan="8">
+                                        <td colspan="4">
                                             <div class="period-week-grid">
                                                 {% for week in period.weeks %}
                                                 <div>
                                                     <span>Week {{ week.week_index }}</span>
                                                     <strong>WK{{ week.week_number }}</strong>
                                                     <small>{{ week.start_date }} t/m {{ week.end_date }}</small>
+                                                    <div class="period-week-counts">
+                                                        <span>Geboekt</span>
+                                                        <b>{{ week.total_hours }} uur</b>
+                                                        <b>{{ week.project_count }} projecten</b>
+                                                        <b>{{ week.booking_count }} boekingen</b>
+                                                    </div>
                                                 </div>
                                                 {% else %}
                                                 <div>
@@ -904,10 +939,64 @@
                                     </tr>
                                     {% else %}
                                     <tr>
-                                        <td colspan="8">
+                                        <td colspan="4">
                                             <div class="empty-state">
                                                 <strong>Nog geen loonperiodes</strong>
                                                 <span>Maak hierboven de eerste vierwekelijkse periode aan.</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="table-wrap period-table period-archive" id="periode-archief">
+                            <div class="panel-header panel-header--compact">
+                                <div>
+                                    <p class="section-label">Archief</p>
+                                    <h3>Gearchiveerde periodes</h3>
+                                </div>
+                            </div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Periode</th>
+                                        <th>Samenvatting</th>
+                                        <th>Status</th>
+                                        <th>Actie</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for period in archived_payroll_periods %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ period.name }}</strong>
+                                            <span>{{ period.year }} / periode {{ period.display_period_number or period.period_number }}</span>
+                                        </td>
+                                        <td>
+                                            <div class="period-summary-strip">
+                                                <span>{{ period.start_date }} t/m {{ period.end_date }}</span>
+                                                <strong>{{ period.total_hours }} uur</strong>
+                                                <strong>{{ period.booking_count }} boekingen</strong>
+                                            </div>
+                                        </td>
+                                        <td><span class="status-tag">{{ period.status }}</span></td>
+                                        <td>
+                                            <div class="period-actions">
+                                                <a class="table-link" href="/dashboard/periods?period={{ period.id }}#periode-verloning">Open verloning</a>
+                                                <form action="/api/periods/{{ period.id }}/restore" method="post">
+                                                    <button class="table-link table-link--button" type="submit">Terugzetten</button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="5">
+                                            <div class="empty-state">
+                                                <strong>Nog geen archief</strong>
+                                                <span>Gearchiveerde loonperiodes blijven hier oproepbaar.</span>
                                             </div>
                                         </td>
                                     </tr>
@@ -954,6 +1043,12 @@
                                 <span>Week {{ week.week_index }}</span>
                                 <strong>WK{{ week.week_number }}</strong>
                                 <small>{{ week.start_date }} t/m {{ week.end_date }}</small>
+                                <div class="period-week-counts">
+                                    <span>Geboekt</span>
+                                    <b>{{ week.total_hours }} uur</b>
+                                    <b>{{ week.project_count }} projecten</b>
+                                    <b>{{ week.booking_count }} boekingen</b>
+                                </div>
                             </div>
                             {% endfor %}
                         </div>
@@ -1438,16 +1533,32 @@
                                                     </select>
                                                 </label>
                                                 <label><span class="field-title">Projectnummer {{ confidence_light(selected_message.parsed_map.project_number) }}</span><input name="field_project_number" value="{{ selected_message.parsed_map.project_number.value if selected_message.parsed_map.project_number is defined else '' }}"></label>
+                                                {% set parsed_employee_name = selected_message.parsed_map.employee_name.value if selected_message.parsed_map.employee_name is defined else selected_message.employee_name %}
+                                                {% set parsed_employee_phone = selected_message.parsed_map.employee_phone.value if selected_message.parsed_map.employee_phone is defined else selected_message.sender_phone %}
                                                 <label>
                                                     <span class="field-title">Naam werknemer {{ confidence_light(selected_message.parsed_map.employee_name) }}</span>
-                                                    <input name="field_employee_name" value="{{ selected_message.parsed_map.employee_name.value if selected_message.parsed_map.employee_name is defined else selected_message.employee_name }}">
+                                                    <input name="field_employee_name" value="{{ parsed_employee_name }}">
                                                     {% if selected_message.matched_name and selected_message.matched_name != 'Geen match' %}
                                                     <button class="field-suggestion" type="button" data-fill-field="field_employee_name" data-fill-value="{{ selected_message.matched_name }}">
                                                         Suggestie: {{ selected_message.matched_name }}
                                                     </button>
                                                     {% endif %}
                                                 </label>
-                                                <label><span class="field-title">Telefoon werknemer {{ confidence_light(selected_message.parsed_map.employee_phone) }}</span><input name="field_employee_phone" value="{{ selected_message.parsed_map.employee_phone.value if selected_message.parsed_map.employee_phone is defined else selected_message.sender_phone }}"></label>
+                                                <label><span class="field-title">Telefoon werknemer {{ confidence_light(selected_message.parsed_map.employee_phone) }}</span><input name="field_employee_phone" value="{{ parsed_employee_phone }}"></label>
+                                                <label class="candidate-match-control">
+                                                    <span class="field-title">Kandidaat koppelen</span>
+                                                    <input type="search" placeholder="Zoek kandidaat..." data-candidate-match-search>
+                                                    <select name="matched_relation_id" data-candidate-match-select>
+                                                        <option value="">Kies kandidaat</option>
+                                                        {% for candidate in timesheet_candidate_options %}
+                                                        {% set candidate_name_match = parsed_employee_name and candidate.name and parsed_employee_name|lower == candidate.name|lower %}
+                                                        {% set candidate_phone_match = parsed_employee_phone and candidate.phone and (parsed_employee_phone|string|replace(' ', '')|replace('-', '') == candidate.phone|string|replace(' ', '')|replace('-', '')) %}
+                                                        <option value="{{ candidate.id }}" data-name="{{ candidate.name }}" data-phone="{{ candidate.phone if candidate.phone != '-' else '' }}" {% if selected_message.matched_name == candidate.name or candidate_name_match or candidate_phone_match %}selected{% endif %}>
+                                                            {% if candidate_phone_match or candidate_name_match %}Beste match - {% endif %}{{ candidate.name }}{% if candidate.phone and candidate.phone != '-' %} | {{ candidate.phone }}{% endif %}{% if candidate.city and candidate.city != '-' %} | {{ candidate.city }}{% endif %}
+                                                        </option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </label>
                                                 <label><span class="field-title">Naam ondertekenaar {{ confidence_light(selected_message.parsed_map.signer_name) }}</span><input name="field_signer_name" value="{{ selected_message.parsed_map.signer_name.value if selected_message.parsed_map.signer_name is defined else '' }}"></label>
                                                 <label><span class="field-title">Telefoon ondertekenaar {{ confidence_light(selected_message.parsed_map.signer_phone) }}</span><input name="field_signer_phone" value="{{ selected_message.parsed_map.signer_phone.value if selected_message.parsed_map.signer_phone is defined else '' }}"></label>
                                                 <label><span class="field-title">Project {{ confidence_light(selected_message.parsed_map.work_name) }}</span>
@@ -1495,7 +1606,7 @@
                                                 <label><span class="week-head">Code zo {{ confidence_light(selected_message.parsed_map.sunday_code) }}</span><input name="field_sunday_code" value="{{ selected_message.parsed_map.sunday_code.value if selected_message.parsed_map.sunday_code is defined else '' }}"></label>
                                             </div>
 
-                                            <div class="digital-timesheet-grid">
+                                            <div class="digital-timesheet-grid digital-timesheet-grid--compact">
                                                 <label><span class="field-title">Berekend totaal {{ confidence_light(selected_message.parsed_map.calculated_total_hours) }}</span><input name="field_calculated_total_hours" value="{{ selected_message.parsed_map.calculated_total_hours.value if selected_message.parsed_map.calculated_total_hours is defined else '' }}" readonly></label>
                                                 <label><span class="field-title">Controle totaal {{ confidence_light(selected_message.parsed_map.total_hours_check) }}</span><input name="field_total_hours_check" value="{{ selected_message.parsed_map.total_hours_check.value if selected_message.parsed_map.total_hours_check is defined else '' }}" readonly></label>
                                                 <label><span class="field-title">Berekend km totaal {{ confidence_light(selected_message.parsed_map.calculated_total_km) }}</span><input name="field_calculated_total_km" value="{{ selected_message.parsed_map.calculated_total_km.value if selected_message.parsed_map.calculated_total_km is defined else '' }}" readonly></label>
@@ -1518,7 +1629,7 @@
                                             </div>
 
                                             <div class="preview-actions">
-                                                <button class="ghost-button" type="button">Koppel kandidaat</button>
+                                                <button class="ghost-button" type="submit">Koppel kandidaat</button>
                                                 <button class="ghost-button" type="submit">Correcties opslaan</button>
                                             </div>
                                 </form>
@@ -1716,6 +1827,6 @@
                 </section>
             </main>
         </div>
-        <script src="/dashboard/static/dashboard.js?v=20260602-3"></script>
+        <script src="/dashboard/static/dashboard.js?v=20260602-12"></script>
     </body>
 </html>

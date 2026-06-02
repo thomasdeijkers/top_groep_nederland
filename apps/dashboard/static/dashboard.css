@@ -115,6 +115,17 @@ a {
     white-space: nowrap;
 }
 
+.side-nav__group {
+    display: block;
+    margin: 12px 0 2px;
+    padding: 0 12px;
+    color: #7fd1a0;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
 .module-status {
     display: inline-flex;
     flex: 0 0 auto;
@@ -157,11 +168,21 @@ a {
 }
 
 .dashboard-header {
+    position: sticky;
+    top: 0;
+    z-index: 70;
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
     gap: 24px;
-    margin-bottom: 24px;
+    margin: -34px -20px 16px;
+    padding: 26px 20px 12px;
+    background: linear-gradient(180deg, rgba(14, 19, 20, 0.96), rgba(14, 19, 20, 0.86));
+    backdrop-filter: blur(14px);
+}
+
+.dashboard-header h1 {
+    margin-bottom: 8px;
 }
 
 .eyebrow {
@@ -268,10 +289,46 @@ h2 {
 
 .period-create-form {
     display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr)) auto;
+    grid-template-columns: minmax(150px, 0.85fr) minmax(150px, 0.85fr) minmax(130px, 0.75fr) minmax(220px, 1.2fr) auto;
     gap: 10px;
     align-items: end;
-    margin: 16px 0;
+    margin: 0;
+}
+
+.period-create-shell {
+    display: grid;
+    grid-template-columns: minmax(250px, 0.7fr) minmax(0, 1.3fr);
+    gap: 12px;
+    align-items: stretch;
+    margin: 16px 0 14px;
+    padding: 12px;
+    border: 1px solid rgba(127, 209, 160, 0.18);
+    border-radius: 8px;
+    background:
+        repeating-linear-gradient(135deg, rgba(127, 209, 160, 0.06) 0 8px, rgba(127, 209, 160, 0.025) 8px 16px),
+        rgba(10, 22, 19, 0.3);
+}
+
+.period-create-proposal {
+    display: grid;
+    align-content: center;
+    gap: 5px;
+    min-height: 74px;
+    padding: 12px;
+    border: 1px solid rgba(127, 209, 160, 0.18);
+    border-radius: 8px;
+    background: rgba(7, 17, 18, 0.55);
+}
+
+.period-create-proposal span,
+.period-create-proposal small {
+    color: #aebbc8;
+    font-size: 0.78rem;
+}
+
+.period-create-proposal strong {
+    color: #ffffff;
+    font-size: 1.05rem;
 }
 
 .project-create-form label,
@@ -343,11 +400,88 @@ h2 {
     min-height: 40px;
 }
 
+.period-tabs {
+    display: flex;
+    gap: 8px;
+    margin: 4px 0 14px;
+    padding: 4px;
+    width: fit-content;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: rgba(7, 14, 18, 0.38);
+}
+
+.period-tab {
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    padding: 0 12px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    color: #bdd0dc;
+    font-weight: 700;
+}
+
+.period-tab--active {
+    border-color: rgba(127, 209, 160, 0.35);
+    color: #9fe5b9;
+    background: rgba(127, 209, 160, 0.08);
+}
+
+.period-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+}
+
+.period-actions form {
+    margin: 0;
+}
+
+.table-link--button {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    font: inherit;
+}
+
 .period-table td > span {
     display: block;
     margin-top: 3px;
     color: #9fb0bd;
     font-size: 0.78rem;
+}
+
+.period-summary-strip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background:
+        repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.045) 0 7px, rgba(255, 255, 255, 0.018) 7px 14px),
+        rgba(7, 14, 18, 0.3);
+}
+
+.period-summary-strip span {
+    flex-basis: 100%;
+    color: #d8e1e7;
+    font-size: 0.86rem;
+}
+
+.period-summary-strip strong {
+    display: inline-flex;
+    min-height: 22px;
+    align-items: center;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #f5fff8;
+    font-size: 0.76rem;
 }
 
 .period-weeks-row td {
@@ -364,7 +498,7 @@ h2 {
 .period-week-grid div {
     display: grid;
     gap: 3px;
-    min-height: 72px;
+    min-height: 118px;
     padding: 10px;
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 8px;
@@ -382,13 +516,52 @@ h2 {
     font-size: 1rem;
 }
 
+.period-week-counts {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+    margin-top: 8px;
+    padding: 7px;
+    border: 1px solid rgba(127, 209, 160, 0.1);
+    border-radius: 8px;
+    background:
+        repeating-linear-gradient(135deg, rgba(127, 209, 160, 0.13) 0 7px, rgba(127, 209, 160, 0.055) 7px 14px),
+        rgba(6, 17, 18, 0.55);
+}
+
+.period-week-counts span {
+    grid-column: 1 / -1;
+    color: #b9c7d1;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.period-week-counts b {
+    display: grid;
+    align-items: center;
+    min-height: 24px;
+    padding: 0 6px;
+    border-radius: 6px;
+    background: rgba(7, 19, 20, 0.55);
+    color: #d9ffe8;
+    font-size: 0.72rem;
+    line-height: 1.1;
+    white-space: nowrap;
+}
+
 .period-week-grid--compact {
     margin: 10px 0 12px;
 }
 
 .period-week-grid--compact div {
-    min-height: 58px;
+    min-height: 118px;
     padding: 8px 10px;
+}
+
+.period-archive {
+    margin-top: 18px;
 }
 
 .period-payroll-summary {
@@ -748,6 +921,36 @@ h2 {
     margin-bottom: 0;
     color: #9ca7b1;
     font-size: 0.9rem;
+}
+
+.sticky-work-header {
+    position: sticky;
+    top: 118px;
+    z-index: 60;
+    margin: -20px -20px 14px;
+    padding: 10px 20px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(180deg, rgba(27, 32, 34, 0.94), rgba(27, 32, 34, 0.82));
+    backdrop-filter: blur(14px);
+}
+
+.sticky-work-header .panel-header > div {
+    display: none;
+}
+
+.sticky-work-header .panel-header,
+.sticky-work-header .single-search,
+.sticky-work-header .relation-tabs {
+    margin-bottom: 8px;
+}
+
+.sticky-work-header .panel-header {
+    justify-content: flex-end;
+    min-height: 38px;
+}
+
+.sticky-work-header > :last-child {
+    margin-bottom: 0;
 }
 
 .section-label {
@@ -1291,6 +1494,19 @@ select.select-has-value {
     color: #f5fff8;
 }
 
+.candidate-match-control {
+    border-color: rgba(127, 209, 160, 0.28);
+    background: rgba(127, 209, 160, 0.06);
+}
+
+.candidate-match-control input[type="search"] {
+    margin-bottom: 8px;
+}
+
+.candidate-match-control select {
+    border-color: rgba(127, 209, 160, 0.35);
+}
+
 select option {
     background: #12171c;
 }
@@ -1353,6 +1569,63 @@ select option {
 .relation-tab--active strong {
     background: rgba(127, 209, 160, 0.22);
     color: #a9ecc0;
+}
+
+.relation-progress {
+    position: relative;
+    display: inline-flex;
+    width: 78px;
+    min-height: 24px;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border: 1px solid rgba(127, 209, 160, 0.28);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.relation-progress__bar {
+    position: absolute;
+    inset: 0 auto 0 0;
+    display: block;
+    width: var(--relation-progress, 0%);
+    min-width: 4px;
+    border-radius: inherit;
+    background: linear-gradient(90deg, rgba(255, 177, 64, 0.45), rgba(127, 209, 160, 0.55));
+}
+
+.relation-progress strong {
+    position: relative;
+    z-index: 1;
+    color: #f7fff9;
+    font-size: 0.74rem;
+    font-weight: 900;
+    line-height: 1;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.relation-completion {
+    display: inline-flex;
+    min-width: 48px;
+    align-items: center;
+    color: #b5f0c8;
+    font-weight: 900;
+}
+
+.relation-info-field .readonly-info {
+    display: flex;
+    min-height: 44px;
+    align-items: center;
+    width: 100%;
+    margin-top: 8px;
+    padding: 0 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #9aa8b4;
+    box-shadow: none;
+    cursor: default;
+    user-select: text;
 }
 
 .import-box {
@@ -1548,7 +1821,8 @@ select option {
 .preview-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 10px;
+    gap: 8px;
+    margin-top: 4px;
 }
 
 .workflow-actions {
@@ -2147,6 +2421,10 @@ body[data-theme="light"] .side-nav__item {
     color: #43515b;
 }
 
+body[data-theme="light"] .side-nav__group {
+    color: #2f8554;
+}
+
 body[data-theme="light"] .side-nav__item:hover,
 body[data-theme="light"] .side-nav__item--active {
     color: #173521;
@@ -2284,6 +2562,27 @@ body[data-theme="light"] .period-create-form input::placeholder {
 body[data-theme="light"] .payroll-settings-form--compact {
     border-color: rgba(66, 138, 87, 0.18);
     background: rgba(247, 251, 248, 0.82);
+}
+
+body[data-theme="light"] .period-create-shell,
+body[data-theme="light"] .period-create-proposal,
+body[data-theme="light"] .period-summary-strip,
+body[data-theme="light"] .period-week-counts {
+    border-color: rgba(28, 42, 50, 0.12);
+    background-color: rgba(247, 251, 248, 0.88);
+}
+
+body[data-theme="light"] .period-create-proposal strong,
+body[data-theme="light"] .period-summary-strip span,
+body[data-theme="light"] .period-summary-strip strong,
+body[data-theme="light"] .period-week-counts b {
+    color: #172027;
+}
+
+body[data-theme="light"] .period-create-proposal span,
+body[data-theme="light"] .period-create-proposal small,
+body[data-theme="light"] .period-week-counts span {
+    color: #60717d;
 }
 
 body[data-theme="light"] .period-payroll-summary div,
@@ -3773,8 +4072,8 @@ body[data-theme="light"] .theme-toggle strong {
 
 .digital-timesheet-form {
     display: grid;
-    gap: 14px;
-    padding: 18px;
+    gap: 8px;
+    padding: 12px;
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 8px;
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.035));
@@ -3784,7 +4083,7 @@ body[data-theme="light"] .theme-toggle strong {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 14px;
+    gap: 10px;
 }
 
 .digital-timesheet-header h3 {
@@ -3793,23 +4092,60 @@ body[data-theme="light"] .theme-toggle strong {
 
 .digital-timesheet-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 7px;
+}
+
+.digital-timesheet-grid--compact {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
 }
 
 .digital-timesheet-grid label {
     display: grid;
-    gap: 6px;
+    gap: 4px;
     color: #aebbc8;
-    font-size: 0.8rem;
+    font-size: 0.76rem;
     font-weight: 800;
+}
+
+.digital-timesheet-grid input,
+.digital-timesheet-grid select {
+    min-height: 36px;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.digital-timesheet-grid--compact label {
+    gap: 4px;
+    font-size: 0.74rem;
+}
+
+.digital-timesheet-grid--compact input {
+    min-height: 32px;
+    padding: 0 10px;
+}
+
+.digital-timesheet-grid--compact .field-title {
+    gap: 5px;
+}
+
+.digital-timesheet-grid--compact .field-light {
+    transform: scale(0.86);
+    transform-origin: right center;
+}
+
+.digital-timesheet-grid--compact .field-suggestion {
+    min-height: 24px;
+    padding: 0 7px;
+    font-size: 0.7rem;
 }
 
 .digital-week-table {
     display: grid;
     grid-template-columns: repeat(8, minmax(54px, 1fr));
-    gap: 6px;
-    padding: 12px;
+    gap: 5px;
+    padding: 8px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
     background: rgba(255, 255, 255, 0.045);
@@ -3826,20 +4162,20 @@ body[data-theme="light"] .theme-toggle strong {
 .week-head {
     display: grid;
     justify-items: center;
-    gap: 5px;
+    gap: 3px;
     color: #aebbc8;
-    font-size: 0.78rem;
+    font-size: 0.72rem;
     font-weight: 800;
     text-align: center;
 }
 
 .digital-week-table label {
     display: grid;
-    gap: 7px;
+    gap: 4px;
 }
 
 .digital-week-table input {
-    min-height: 38px;
+    min-height: 32px;
     padding: 0 8px;
     text-align: center;
 }
@@ -4010,6 +4346,7 @@ body[data-theme="light"] .theme-toggle strong {
     .settings-grid,
     .project-create-form,
     .payroll-settings-form,
+    .period-create-shell,
     .period-create-form,
     .period-week-grid,
     .period-payroll-summary,
@@ -4055,6 +4392,10 @@ body[data-theme="light"] .theme-toggle strong {
         grid-column: auto;
     }
 
+    .period-create-form .ghost-button {
+        width: 100%;
+    }
+
     .settings-card-heading,
     .form-actions-inline {
         align-items: flex-start;
@@ -4072,6 +4413,19 @@ body[data-theme="light"] .theme-toggle strong {
     .header-actions {
         align-items: flex-start;
         flex-direction: column;
+    }
+
+    .dashboard-header {
+        margin: -28px -12px 18px;
+        padding: 28px 12px 12px;
+    }
+
+    .sticky-work-header {
+        top: 178px;
+        margin-right: -12px;
+        margin-left: -12px;
+        padding-right: 12px;
+        padding-left: 12px;
     }
 
     .side-nav,
@@ -4093,6 +4447,7 @@ body[data-theme="light"] .theme-toggle strong {
     .processing-status,
     .project-create-form,
     .payroll-settings-form,
+    .period-create-shell,
     .period-create-form,
     .period-week-grid,
     .period-payroll-summary,
@@ -4129,5 +4484,244 @@ body[data-theme="light"] .theme-toggle strong {
 @media (max-width: 760px) {
     .digital-week-table {
         grid-template-columns: repeat(4, minmax(54px, 1fr));
+    }
+}
+
+@media (max-width: 900px) {
+    .table-wrap {
+        overflow-x: auto;
+        overflow-y: visible;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-gutter: stable;
+    }
+
+    .table-wrap table {
+        min-width: 920px;
+    }
+
+    .vacancy-table table,
+    .timesheet-message-table table,
+    .period-table table,
+    .period-payroll-table table,
+    .project-detail-table table,
+    .ticket-table table {
+        min-width: 980px;
+    }
+
+    .relation-tabs,
+    .timesheet-tabs,
+    .timesheet-status-grid {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scroll-snap-type: x proximity;
+    }
+
+    .relation-tab,
+    .timesheet-tab,
+    .timesheet-status-tile {
+        scroll-snap-align: start;
+    }
+
+    .single-search,
+    .vacancy-top-search,
+    .timesheet-search,
+    .project-search {
+        grid-template-columns: minmax(220px, 1fr) minmax(170px, 230px) auto;
+    }
+
+    .single-search .ghost-button:last-child,
+    .vacancy-top-search .ghost-button:last-child {
+        grid-column: auto;
+    }
+}
+
+@media (orientation: portrait) and (max-width: 760px) {
+    .dashboard-shell {
+        width: min(100% - 16px, 1180px);
+    }
+
+    .dashboard-header h1 {
+        font-size: clamp(2rem, 12vw, 3.2rem);
+        line-height: 0.95;
+    }
+
+    .page-intro {
+        max-width: 100%;
+        font-size: 0.9rem;
+    }
+
+    .panel {
+        padding: 12px;
+    }
+
+    .sticky-work-header {
+        top: 116px;
+        margin: -12px -12px 10px;
+        padding: 8px 12px;
+    }
+
+    .sticky-work-header .panel-header {
+        gap: 8px;
+        min-height: 34px;
+        margin-bottom: 6px;
+    }
+
+    .sticky-work-header .panel-header .ghost-button {
+        min-height: 34px;
+        padding: 0 10px;
+        font-size: 0.78rem;
+    }
+
+    .relation-tabs {
+        display: grid;
+        grid-auto-flow: column;
+        grid-auto-columns: minmax(145px, max-content);
+        gap: 6px;
+        padding-bottom: 4px;
+    }
+
+    .relation-tab {
+        min-height: 32px;
+        padding: 0 10px;
+        white-space: nowrap;
+    }
+
+    .relation-tab strong {
+        min-width: 24px;
+        min-height: 20px;
+        padding: 0 6px;
+    }
+
+    .single-search,
+    .vacancy-top-search,
+    .timesheet-search,
+    .project-search {
+        grid-template-columns: 1fr;
+        gap: 7px;
+    }
+
+    .single-search input,
+    .single-search select,
+    .single-search button,
+    .single-search .ghost-button,
+    .timesheet-search input,
+    .timesheet-search button,
+    .project-search input,
+    .project-search button {
+        width: 100%;
+        min-height: 38px;
+    }
+
+    .stats-grid,
+    .server-grid,
+    .ticket-grid,
+    .module-grid,
+    .timesheet-status-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .stat-card,
+    .timesheet-status-tile {
+        min-height: 76px;
+        padding: 10px;
+        border-radius: 8px;
+    }
+
+    .stat-card strong,
+    .timesheet-status-tile strong {
+        font-size: 1.4rem;
+    }
+
+    .timesheet-status-grid {
+        grid-auto-flow: column;
+        grid-auto-columns: minmax(150px, 44vw);
+        grid-template-columns: none;
+        overflow-x: auto;
+        padding-bottom: 4px;
+    }
+
+    .table-wrap {
+        margin-right: -12px;
+        margin-left: -12px;
+        padding-inline: 12px;
+    }
+
+    .relation-progress {
+        width: 70px;
+        min-height: 22px;
+    }
+
+    .status-tag {
+        max-width: 150px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .digital-timesheet-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .digital-week-table,
+    .digital-week-table--with-total,
+    .digital-week-table--codes {
+        grid-template-columns: repeat(4, minmax(74px, 1fr));
+        overflow-x: auto;
+    }
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+    .dashboard-shell {
+        width: min(100% - 18px, 1840px);
+        padding-top: 18px;
+    }
+
+    .dashboard-header {
+        margin: -18px -9px 12px;
+        padding: 18px 9px 10px;
+    }
+
+    .dashboard-header h1 {
+        font-size: clamp(2rem, 5vw, 3.4rem);
+    }
+
+    .page-intro {
+        max-width: 900px;
+        font-size: 0.86rem;
+    }
+
+    .sticky-work-header {
+        top: 74px;
+        padding-top: 8px;
+    }
+
+    .single-search,
+    .vacancy-top-search {
+        grid-template-columns: minmax(360px, 1fr) minmax(190px, 260px) auto auto;
+    }
+
+    .stats-grid,
+    .server-grid,
+    .ticket-grid,
+    .module-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .timesheet-status-grid {
+        grid-template-columns: repeat(5, minmax(130px, 1fr));
+    }
+
+    .digital-timesheet-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .digital-week-table {
+        grid-template-columns: repeat(8, minmax(62px, 1fr));
+    }
+
+    .table-wrap table {
+        min-width: 1100px;
     }
 }

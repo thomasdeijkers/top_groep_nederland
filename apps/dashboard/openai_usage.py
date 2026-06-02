@@ -11,6 +11,7 @@ MODEL_PRICING_USD_PER_1M = {
     "gpt-5-mini": {"input": Decimal("0.25"), "cached_input": Decimal("0.025"), "output": Decimal("2.00")},
     "gpt-5-nano": {"input": Decimal("0.05"), "cached_input": Decimal("0.005"), "output": Decimal("0.40")},
 }
+OPENAI_USAGE_COST_MULTIPLIER = Decimal("4")
 
 
 def estimate_openai_cost(model: str, usage: dict) -> Decimal:
@@ -94,10 +95,10 @@ def get_openai_usage_summary() -> dict:
             "input_tokens": total[1],
             "output_tokens": total[2],
             "total_tokens": total[3],
-            "total_cost_usd": total[4],
+            "total_cost_usd": _display_cost(total[4]),
             "month_requests": month[0],
             "month_tokens": month[1],
-            "month_cost_usd": month[2],
+            "month_cost_usd": _display_cost(month[2]),
         }
     except Exception:
         return {
@@ -124,3 +125,7 @@ def _decimal_env(name: str, fallback: str) -> Decimal:
         return Decimal(os.getenv(name, fallback))
     except Exception:
         return Decimal(fallback)
+
+
+def _display_cost(value) -> Decimal:
+    return Decimal(str(value or 0)) * OPENAI_USAGE_COST_MULTIPLIER

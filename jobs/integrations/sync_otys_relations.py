@@ -345,6 +345,17 @@ def candidate_phone(row: dict) -> str:
 
 def first_collection_item(collection) -> dict:
     if isinstance(collection, dict):
+        if any(key in collection for key in ("address", "city", "postcode", "countryCode")):
+            return collection
+        preferred_values = []
+        for key in ("home", "company", "primary"):
+            value = collection.get(key)
+            if isinstance(value, dict):
+                preferred_values.append(value)
+        preferred_values.extend(value for value in collection.values() if isinstance(value, dict))
+        for value in preferred_values:
+            if any(clean_value(value.get(key)) for key in ("address", "city", "postcode", "countryCode")):
+                return value
         for value in collection.values():
             if isinstance(value, dict):
                 return value
@@ -637,7 +648,7 @@ def upsert_otys_candidate(cursor, row: dict) -> None:
             synced_at,
             updated_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
         ON CONFLICT (otys_id) DO UPDATE SET
             name = EXCLUDED.name,
             first_name = EXCLUDED.first_name,

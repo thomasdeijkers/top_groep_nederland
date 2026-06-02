@@ -255,6 +255,44 @@
         });
     });
 
+    document.querySelectorAll("[data-candidate-match-select]").forEach((select) => {
+        const form = select.closest("form");
+        const searchInput = form?.querySelector("[data-candidate-match-search]");
+        const employeeNameInput = form?.querySelector('[name="field_employee_name"]');
+        const employeePhoneInput = form?.querySelector('[name="field_employee_phone"]');
+
+        const applySelectedCandidate = () => {
+            const option = select.selectedOptions[0];
+            if (!option || !option.value) {
+                return;
+            }
+            if (employeeNameInput && option.dataset.name) {
+                employeeNameInput.value = option.dataset.name;
+            }
+            if (employeePhoneInput && option.dataset.phone) {
+                employeePhoneInput.value = option.dataset.phone;
+            }
+        };
+
+        const filterCandidates = () => {
+            const query = (searchInput?.value || "").trim().toLowerCase();
+            [...select.options].forEach((option) => {
+                if (!option.value) {
+                    option.hidden = false;
+                    return;
+                }
+                const haystack = `${option.textContent || ""} ${option.dataset.name || ""} ${option.dataset.phone || ""}`.toLowerCase();
+                option.hidden = query ? !haystack.includes(query) : false;
+            });
+        };
+
+        select.addEventListener("change", applySelectedCandidate);
+        searchInput?.addEventListener("input", filterCandidates);
+        if (select.value) {
+            applySelectedCandidate();
+        }
+    });
+
     document.querySelectorAll(".correction-form").forEach((form) => {
         const principalSelect = form.querySelector('[name="field_principal_name"]');
         const projectSelect = form.querySelector('[name="field_work_name"]');

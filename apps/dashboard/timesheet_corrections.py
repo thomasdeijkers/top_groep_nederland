@@ -5,7 +5,7 @@ from apps.dashboard.data_store import ensure_dashboard_tables
 from shared.db.connection import get_connection
 
 
-def save_field_corrections(timesheet_id: int, corrections: dict[str, str]) -> None:
+def save_field_corrections(timesheet_id: int, corrections: dict[str, str], matched_relation_id: int | None = None) -> None:
     ensure_dashboard_tables()
     with get_connection() as conn:
         with conn.cursor() as cursor:
@@ -45,17 +45,57 @@ def save_field_corrections(timesheet_id: int, corrections: dict[str, str]) -> No
                     (timesheet_id, field_key, original_value, corrected_value, original_confidence),
                 )
 
+            matched_candidate_name = None
+            matched_candidate_phone = None
+            if matched_relation_id:
+                cursor.execute(
+                    """
+                    SELECT name, phone
+                    FROM relations
+                    WHERE id = %s
+                      AND relation_type = 'candidate'
+                      AND archived_at IS NULL;
+                    """,
+                    (matched_relation_id,),
+                )
+                candidate_row = cursor.fetchone()
+                if candidate_row:
+                    matched_candidate_name = candidate_row[0]
+                    matched_candidate_phone = candidate_row[1]
+                    parsed_fields["employee_name"] = {
+                        "value": matched_candidate_name or corrections.get("employee_name", ""),
+                        "confidence": 98,
+                        "corrected": True,
+                    }
+                    if matched_candidate_phone:
+                        parsed_fields["employee_phone"] = {
+                            "value": matched_candidate_phone,
+                            "confidence": 98,
+                            "corrected": True,
+                        }
+
             _recalculate_total_checks(parsed_fields)
             cursor.execute(
                 """
                 UPDATE whatsapp_timesheet_inbox
                 SET parsed_fields = %s,
+                    matched_relation_id = COALESCE(%s, matched_relation_id),
+                    matched_candidate_name = COALESCE(%s, matched_candidate_name),
+                    employee_name = COALESCE(%s, employee_name),
+                    sender_phone = COALESCE(%s, sender_phone),
                     overall_confidence = LEAST(98, GREATEST(COALESCE(overall_confidence, 0), 80)),
                     status = 'goed_te_keuren',
                     updated_at = NOW()
                 WHERE id = %s;
                 """,
-                (Json(parsed_fields), timesheet_id),
+                (
+                    Json(parsed_fields),
+                    matched_relation_id,
+                    matched_candidate_name,
+                    matched_candidate_name,
+                    matched_candidate_phone,
+                    timesheet_id,
+                ),
             )
         conn.commit()
 

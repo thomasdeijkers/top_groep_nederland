@@ -16,13 +16,16 @@ from apps.dashboard.placeholders import (
 from apps.dashboard.organizations import create_organization, list_organizations
 from apps.dashboard.openai_usage import get_openai_usage_summary
 from apps.dashboard.records import (
+    archive_payroll_period,
     create_cao_setting,
     create_project,
     create_payroll_period,
+    create_payroll_period_batch,
     get_cao_setting,
     get_payroll_period,
     get_project,
     get_overview_data,
+    get_payroll_period_defaults,
     get_timesheet_channel_tiles,
     list_audit_events,
     list_cao_settings,
@@ -196,6 +199,7 @@ def _dashboard_context(
             "relation_tab": "candidates",
             "show_relation_form": False,
             "candidate_relations": [],
+            "timesheet_candidate_options": [],
             "principal_relations": [],
             "status_tiles": [],
             "relation_tab_counts": {"candidates": 0, "principals": 0},
@@ -222,6 +226,8 @@ def _dashboard_context(
             "selected_project": None,
             "selected_payroll_period": None,
             "payroll_periods": [],
+            "archived_payroll_periods": [],
+            "payroll_period_defaults": {},
             "cao_settings": [],
             "selected_cao_setting": None,
             "show_cao_form": False,
@@ -247,6 +253,7 @@ def _dashboard_context(
     active_status = status_filter if data_page in {"relations", "vacancies"} else ""
     relations = list_relations(query=query if data_page == "relations" else "", status=active_status if data_page == "relations" else "")
     candidate_relations = list_relations(query=query if data_page == "relations" else "", relation_type="candidate", status=active_status if data_page == "relations" else "")
+    timesheet_candidate_options = list_relations(limit=10000, relation_type="candidate")
     principal_relations = list_relations(query=query if data_page == "relations" else "", relation_type="principal", status=active_status if data_page == "relations" else "")
     principals = list_principals(query=query if data_page == "relations" else "")
     imported_candidates = list_candidates(query=query if data_page == "relations" else "")
@@ -268,6 +275,8 @@ def _dashboard_context(
     projects = list_projects(query=query if data_page == "projects" else "")
     selected_project = get_project(project_id) if data_page == "projects" and project_id else None
     payroll_periods = list_payroll_periods()
+    archived_payroll_periods = list_payroll_periods(archived=True)
+    payroll_period_defaults = get_payroll_period_defaults()
     selected_payroll_period = get_payroll_period(period_id) if data_page == "periods" and period_id else None
     cao_settings = list_cao_settings()
     selected_cao_setting = get_cao_setting(cao_id) if data_page == "settings" and cao_id else None
@@ -325,6 +334,7 @@ def _dashboard_context(
         "relation_tab": relation_tab,
         "show_relation_form": show_relation_form,
         "candidate_relations": candidate_relations,
+        "timesheet_candidate_options": timesheet_candidate_options,
         "principal_relations": principal_relations,
         "candidates": imported_candidates,
         "tickets": imported_tickets,
@@ -340,6 +350,8 @@ def _dashboard_context(
         "selected_project": selected_project,
         "selected_payroll_period": selected_payroll_period,
         "payroll_periods": payroll_periods,
+        "archived_payroll_periods": archived_payroll_periods,
+        "payroll_period_defaults": payroll_period_defaults,
         "cao_settings": cao_settings,
         "selected_cao_setting": selected_cao_setting,
         "show_cao_form": show_cao_form or bool(selected_cao_setting),
@@ -486,7 +498,8 @@ async def correct_whatsapp_timesheet(timesheet_id: int, request: Request):
         for key, value in form.items()
         if key.startswith("field_")
     }
-    save_field_corrections(timesheet_id, corrections)
+    matched_relation_id = int(form["matched_relation_id"]) if str(form.get("matched_relation_id") or "").isdigit() else None
+    save_field_corrections(timesheet_id, corrections, matched_relation_id=matched_relation_id)
     _audit("Urenbriefje gecorrigeerd", "urenbriefje", timesheet_id, f"Urenbriefje {timesheet_id}", "Velden op het urenbriefje zijn handmatig aangepast.", "Controle")
     return RedirectResponse(f"/dashboard/timesheets?stage=valideren&timesheet={timesheet_id}", status_code=303)
 
@@ -640,10 +653,31 @@ def save_payroll_period(
     end_date: str = Form(""),
     status: str = Form("concept"),
     notes: str = Form(""),
+    period_count: str = Form("1"),
+    display_period_number: str = Form(""),
 ):
-    period_id = create_payroll_period(locals())
-    _audit("Periode aangemaakt", "periode", period_id, name or f"Periode {period_number}", "Vierwekelijkse loonperiode aangemaakt of bijgewerkt.", "Periodes")
+    if name or end_date:
+        period_id = create_payroll_period(locals())
+        created_ids = [period_id]
+    else:
+        created_ids = create_payroll_period_batch(locals())
+        period_id = created_ids[-1] if created_ids else 0
+    _audit("Periode aangemaakt", "periode", period_id, name or f"Periode {period_number}", f"{len(created_ids)} vierwekelijkse loonperiode(s) aangemaakt of bijgewerkt.", "Periodes")
     return RedirectResponse(f"/dashboard/periods?created={period_id}#periodes", status_code=303)
+
+
+@router.post("/api/periods/{period_id}/archive")
+def archive_period(period_id: int):
+    archive_payroll_period(period_id, archived=True)
+    _audit("Periode gearchiveerd", "periode", period_id, f"Periode {period_id}", "Loonperiode verplaatst naar het archief.", "Periodes")
+    return RedirectResponse("/dashboard/periods#periode-archief", status_code=303)
+
+
+@router.post("/api/periods/{period_id}/restore")
+def restore_period(period_id: int):
+    archive_payroll_period(period_id, archived=False)
+    _audit("Periode teruggezet", "periode", period_id, f"Periode {period_id}", "Loonperiode teruggezet uit het archief.", "Periodes")
+    return RedirectResponse("/dashboard/periods#periodes", status_code=303)
 
 
 async def _relation_photo_from_upload(photo: UploadFile | None):
