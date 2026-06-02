@@ -17,7 +17,8 @@ def main():
     client = OtysClient()
 
     try:
-        response = client.authenticate()
+        session_id = client.login_by_uid()
+        relations_response = client.get_relations(session_id, limit=25)
     except Exception as exc:
         print("OTYS_AUTH_ERROR")
         print(type(exc).__name__)
@@ -25,30 +26,72 @@ def main():
         return
 
     print("OTYS_AUTH_RESULT")
-    print("path=/api/auth")
-    print(f"status_code={response.status_code}")
-    print(f"content_type={response.headers.get('content-type', '')}")
+    print("path=https://ows.otys.nl/jservice.php")
+    print(f"session_id_received={bool(session_id)}")
+    print("method=Otys.Services.RelationService.getListEx")
 
-    if response.ok:
-        payload = response.json()
-        access_token = payload.get("accessToken") or payload.get("token")
-        token_type = payload.get("tokenType")
-        expires_in = payload.get("expiresIn")
-        expires_at = payload.get("expires_at") or payload.get("expiresAt")
-        print(f"access_token_received={bool(access_token)}")
-        print(f"token_type={token_type or ''}")
-        print(f"expires_in_set={expires_in is not None}")
-        print(f"expires_at_set={bool(expires_at)}")
+    result = relations_response.get("result")
+    rows = _extract_rows(result)
+    total_count = _extract_total_count(result)
+
+    print(f"relations_received={len(rows)}")
+    if total_count is not None:
+        print(f"total_count={total_count}")
+    if rows:
+        first = rows[0]
+        print(f"first_relation_uid={first.get('uid', '')}")
+        print(f"first_relation_name={first.get('relation', '')}")
+        print(f"first_relation_status={first.get('status', '')}")
     else:
-        try:
-            payload = response.json()
-        except ValueError:
-            payload = {}
-        if payload:
-            print(f"response_keys={','.join(payload.keys())}")
-            for key in ("title", "detail", "status", "type", "message"):
-                if key in payload:
-                    print(f"{key}={payload[key]}")
+        print(f"result_shape={_describe_result_shape(result)}")
+
+
+def _extract_rows(result):
+    if isinstance(result, list):
+        return result
+    if not isinstance(result, dict):
+        return []
+
+    for key in ("listOutput", "list", "rows", "items", "data", "output", "records", "result"):
+        value = result.get(key)
+        if isinstance(value, list):
+            return value
+        if isinstance(value, dict):
+            nested = _extract_rows(value)
+            if nested:
+                return nested
+
+    return []
+
+
+def _extract_total_count(result):
+    if not isinstance(result, dict):
+        return None
+
+    for key in ("totalCount", "total_count", "count"):
+        if key in result:
+            return result[key]
+
+    return None
+
+
+def _describe_result_shape(result):
+    if isinstance(result, list):
+        return f"list:{len(result)}"
+    if not isinstance(result, dict):
+        return type(result).__name__
+
+    parts = []
+    for key, value in result.items():
+        if isinstance(value, list):
+            parts.append(f"{key}=list:{len(value)}")
+        elif isinstance(value, dict):
+            nested_keys = ",".join(list(value.keys())[:8])
+            parts.append(f"{key}=dict:{nested_keys}")
+        else:
+            parts.append(f"{key}={type(value).__name__}")
+
+    return "; ".join(parts[:12])
 
 
 if __name__ == "__main__":

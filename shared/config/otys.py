@@ -9,6 +9,7 @@ load_dotenv()
 @dataclass(frozen=True)
 class OtysSettings:
     base_url: str
+    ows_url: str
     api_key: str
     username: str
     password: str
@@ -18,6 +19,7 @@ class OtysSettings:
 def get_otys_settings() -> OtysSettings:
     return OtysSettings(
         base_url=os.getenv("OTYS_BASE_URL", "").strip().rstrip("/"),
+        ows_url=os.getenv("OTYS_OWS_URL", "https://ows.otys.nl/jservice.php").strip(),
         api_key=os.getenv("OTYS_API_KEY", "").strip(),
         username=os.getenv("OTYS_USERNAME", "").strip(),
         password=os.getenv("OTYS_PASSWORD", "").strip(),

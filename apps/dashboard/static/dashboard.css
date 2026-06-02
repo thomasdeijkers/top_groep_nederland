@@ -1616,7 +1616,7 @@ select option {
 
 .single-search {
     display: grid;
-    grid-template-columns: minmax(320px, 1fr) auto;
+    grid-template-columns: minmax(320px, 1fr) minmax(180px, 240px) auto auto;
     gap: 10px;
     margin-bottom: 14px;
 }

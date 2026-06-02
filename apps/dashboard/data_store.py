@@ -26,6 +26,8 @@ def ensure_dashboard_tables():
         Path("migrations/019_demo_seed_data.sql"),
         Path("migrations/020_demo_payroll_period.sql"),
         Path("migrations/021_audit_events.sql"),
+        Path("migrations/022_otys_staging_tables.sql"),
+        Path("migrations/023_otys_api_usage.sql"),
     ]
 
     with get_connection() as conn:

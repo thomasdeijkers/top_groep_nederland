@@ -32,8 +32,10 @@ from apps.dashboard.records import (
     list_project_options,
     list_principals,
     list_relations,
+    list_relation_statuses,
     list_tickets,
     list_vacancies,
+    list_vacancy_statuses,
     list_whatsapp_timesheets,
     log_audit_event,
     update_cao_setting,
@@ -68,12 +70,14 @@ router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).resolve().parent / "templates")
 
 
-def _relations_url(tab: str = "candidates", edit: int | None = None, q: str = "", anchor: str = "") -> str:
+def _relations_url(tab: str = "candidates", edit: int | None = None, q: str = "", status: str = "", anchor: str = "") -> str:
     params = {"tab": tab}
     if edit is not None:
         params["edit"] = edit
     if q:
         params["q"] = q
+    if status:
+        params["status"] = status
     return f"/dashboard/relations?{urlencode(params)}{anchor}"
 
 
@@ -152,6 +156,7 @@ def _dashboard_context(
     workflow_stage: str = "all",
     timesheet_tab: str = "overview",
     relation_tab: str = "candidates",
+    status_filter: str = "",
     show_relation_form: bool = False,
     project_id: int | None = None,
     period_id: int | None = None,
@@ -173,6 +178,7 @@ def _dashboard_context(
             "server_metrics": server_overview["server_metrics"],
             "server_system_tiles": server_overview["server_system_tiles"],
             "server_scheduler_tiles": server_overview["server_scheduler_tiles"],
+            "server_otys_tiles": server_overview["server_otys_tiles"],
             "scheduled_jobs": server_overview["scheduled_jobs"],
             "ticket_queues": TICKET_QUEUES,
             "directory_results": [],
@@ -233,13 +239,16 @@ def _dashboard_context(
     stats = get_dashboard_stats()
     server_overview = get_server_overview()
     organizations = list_organizations()
-    relations = list_relations(query=query if data_page == "relations" else "")
-    candidate_relations = list_relations(query=query if data_page == "relations" else "", relation_type="candidate")
-    principal_relations = list_relations(query=query if data_page == "relations" else "", relation_type="principal")
+    active_status = status_filter if data_page in {"relations", "vacancies"} else ""
+    relations = list_relations(query=query if data_page == "relations" else "", status=active_status if data_page == "relations" else "")
+    candidate_relations = list_relations(query=query if data_page == "relations" else "", relation_type="candidate", status=active_status if data_page == "relations" else "")
+    principal_relations = list_relations(query=query if data_page == "relations" else "", relation_type="principal", status=active_status if data_page == "relations" else "")
     principals = list_principals(query=query if data_page == "relations" else "")
     imported_candidates = list_candidates(query=query if data_page == "relations" else "")
     imported_tickets = list_tickets()
-    imported_vacancies = list_vacancies(query=query if data_page == "vacancies" else "")
+    imported_vacancies = list_vacancies(query=query if data_page == "vacancies" else "", status=active_status if data_page == "vacancies" else "")
+    relation_status_options = list_relation_statuses("candidate" if relation_tab == "candidates" else "principal")
+    vacancy_status_options = list_vacancy_statuses()
     whatsapp_timesheets = list_whatsapp_timesheets()
     overview_data = get_overview_data()
     audit_events = list_audit_events(120 if data_page == "audit" else 8)
@@ -285,10 +294,14 @@ def _dashboard_context(
         "server_metrics": server_overview["server_metrics"],
         "server_system_tiles": server_overview["server_system_tiles"],
         "server_scheduler_tiles": server_overview["server_scheduler_tiles"],
+        "server_otys_tiles": server_overview["server_otys_tiles"],
         "scheduled_jobs": server_overview["scheduled_jobs"],
         "ticket_queues": TICKET_QUEUES,
         "directory_results": relations or principals or organizations,
         "relations": relations,
+        "status_filter": status_filter,
+        "relation_status_options": relation_status_options,
+        "vacancy_status_options": vacancy_status_options,
         "import_steps": IMPORT_STEPS,
         "whatsapp_inbox": whatsapp_inbox,
         "selected_timesheet": selected_timesheet,
@@ -343,6 +356,7 @@ def _render_dashboard(
     workflow_stage: str = "all",
     timesheet_tab: str = "overview",
     relation_tab: str = "candidates",
+    status_filter: str = "",
     show_relation_form: bool = False,
     project_id: int | None = None,
     period_id: int | None = None,
@@ -352,7 +366,7 @@ def _render_dashboard(
     return templates.TemplateResponse(
         request,
         "dashboard.html",
-        _dashboard_context(active_page, edit_id, query, timesheet_id, workflow_stage, timesheet_tab, relation_tab, show_relation_form, project_id, period_id, cao_id, show_cao_form),
+        _dashboard_context(active_page, edit_id, query, timesheet_id, workflow_stage, timesheet_tab, relation_tab, status_filter, show_relation_form, project_id, period_id, cao_id, show_cao_form),
     )
 
 
@@ -362,18 +376,18 @@ def dashboard(request: Request):
 
 
 @router.get("/dashboard/candidates", response_class=HTMLResponse)
-def candidates_page(request: Request, edit: int | None = None, q: str = ""):
-    return RedirectResponse(_relations_url("candidates", edit, q), status_code=303)
+def candidates_page(request: Request, edit: int | None = None, q: str = "", status: str = ""):
+    return RedirectResponse(_relations_url("candidates", edit, q, status), status_code=303)
 
 
 @router.get("/dashboard/principals", response_class=HTMLResponse)
-def principals_page(request: Request, edit: int | None = None, q: str = ""):
-    return RedirectResponse(_relations_url("principals", edit, q), status_code=303)
+def principals_page(request: Request, edit: int | None = None, q: str = "", status: str = ""):
+    return RedirectResponse(_relations_url("principals", edit, q, status), status_code=303)
 
 
 @router.get("/dashboard/relations", response_class=HTMLResponse)
-def relations_page(request: Request, edit: int | None = None, q: str = "", tab: str = "candidates", new: bool = Query(False)):
-    return _render_dashboard(request, "relations", edit, q, relation_tab=tab, show_relation_form=new)
+def relations_page(request: Request, edit: int | None = None, q: str = "", tab: str = "candidates", status: str = "", new: bool = Query(False)):
+    return _render_dashboard(request, "relations", edit, q, relation_tab=tab, status_filter=status, show_relation_form=new)
 
 
 @router.get("/dashboard/relations/photo/{relation_id}")
@@ -385,8 +399,8 @@ def relation_photo(relation_id: int):
 
 
 @router.get("/dashboard/vacancies", response_class=HTMLResponse)
-def vacancies_page(request: Request, edit: int | None = None, q: str = ""):
-    return _render_dashboard(request, "vacancies", edit, q)
+def vacancies_page(request: Request, edit: int | None = None, q: str = "", status: str = ""):
+    return _render_dashboard(request, "vacancies", edit, q, status_filter=status)
 
 
 @router.get("/dashboard/projects", response_class=HTMLResponse)

@@ -17,6 +17,7 @@ def main():
 
     print("OTYS_CONFIG_OK")
     print(f"base_url_set={bool(settings.base_url)}")
+    print(f"ows_url_set={bool(settings.ows_url)}")
     print(f"api_key_set={bool(settings.api_key)}")
     print(f"username_set={bool(settings.username)}")
     print(f"password_set={bool(settings.password)}")

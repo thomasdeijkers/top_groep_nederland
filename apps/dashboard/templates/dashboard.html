@@ -383,8 +383,8 @@
                         </div>
 
                         <nav class="relation-tabs" aria-label="Relatie tabs">
-                            <a class="relation-tab {% if active_relation_tab == 'candidates' %}relation-tab--active{% endif %}" href="/dashboard/relations?tab=candidates#relaties">Kandidaten</a>
-                            <a class="relation-tab {% if active_relation_tab == 'principals' %}relation-tab--active{% endif %}" href="/dashboard/relations?tab=principals#relaties">Opdrachtgevers</a>
+                            <a class="relation-tab {% if active_relation_tab == 'candidates' %}relation-tab--active{% endif %}" href="/dashboard/relations?tab=candidates{% if status_filter %}&status={{ status_filter|urlencode }}{% endif %}#relaties">Kandidaten</a>
+                            <a class="relation-tab {% if active_relation_tab == 'principals' %}relation-tab--active{% endif %}" href="/dashboard/relations?tab=principals{% if status_filter %}&status={{ status_filter|urlencode }}{% endif %}#relaties">Opdrachtgevers</a>
                         </nav>
 
                         {% set visible_relations = candidate_rows if active_relation_tab == 'candidates' else principal_rows %}
@@ -392,6 +392,12 @@
                         <form class="single-search" action="/dashboard/relations" method="get">
                             <input type="hidden" name="tab" value="{{ active_relation_tab }}">
                             <input type="search" name="q" value="{{ query }}" placeholder="Zoek in {{ relation_label }} op naam, telefoon, e-mail, plaats, status of OTYS ID">
+                            <select name="status" aria-label="Filter op status">
+                                <option value="">Alle statussen</option>
+                                {% for status_option in relation_status_options %}
+                                <option value="{{ status_option }}" {% if status_filter == status_option %}selected{% endif %}>{{ status_option }}</option>
+                                {% endfor %}
+                            </select>
                             <button class="ghost-button" type="submit">Zoeken</button>
                         </form>
 
@@ -491,11 +497,13 @@
                             <label data-principal-field>Website <input type="url" name="website" value="{{ selected_relation.website if selected_relation else '' }}"></label>
                             <label>Plaats <input type="text" name="city" value="{{ selected_relation.city if selected_relation else '' }}"></label>
                             <label>Status
-                                {% set selected_status = 'Archief' if selected_relation and (selected_relation.archived_at or (selected_relation.status|lower) in ['archief', 'gearchiveerd']) else 'Actief' %}
-                                <select name="status">
-                                    <option value="Actief" {% if selected_status == 'Actief' %}selected{% endif %}>Actief</option>
-                                    <option value="Archief" {% if selected_status == 'Archief' %}selected{% endif %}>Archief</option>
-                                </select>
+                                {% set selected_status = selected_relation.status if selected_relation and selected_relation.status else ('Archief' if selected_relation and selected_relation.archived_at else 'Actief') %}
+                                <input type="text" name="status" value="{{ selected_status }}" list="relation-status-options">
+                                <datalist id="relation-status-options">
+                                    {% for status_option in relation_status_options %}
+                                    <option value="{{ status_option }}"></option>
+                                    {% endfor %}
+                                </datalist>
                             </label>
                             <input type="hidden" name="source" value="{{ selected_relation.source if selected_relation and selected_relation.source else 'handmatig' }}">
                             <label>Straat <input type="text" name="street" value="{{ (selected_relation.street or selected_relation.address) if selected_relation else '' }}"></label>
@@ -648,8 +656,14 @@
 
                         <form class="single-search vacancy-top-search" action="/dashboard/vacancies" method="get">
                             <input type="search" name="q" value="{{ query }}" placeholder="Zoek op titel, referentie, opdrachtgever, plaats of status">
+                            <select name="status" aria-label="Filter op status">
+                                <option value="">Alle statussen</option>
+                                {% for status_option in vacancy_status_options %}
+                                <option value="{{ status_option }}" {% if status_filter == status_option %}selected{% endif %}>{{ status_option }}</option>
+                                {% endfor %}
+                            </select>
                             <button class="ghost-button" type="submit">Zoeken</button>
-                            {% if query %}
+                            {% if query or status_filter %}
                             <a class="ghost-button" href="/dashboard/vacancies#vacatures">Wissen</a>
                             {% endif %}
                         </form>
@@ -723,7 +737,15 @@
                                 <div class="create-form">
                                     <label class="form-span-2">Functietitel <input type="text" name="title" value="{{ selected_vacancy.title if selected_vacancy else '' }}" required></label>
                                     <label>Referentie <input type="text" name="reference_number" value="{{ selected_vacancy.reference_number if selected_vacancy else '' }}"></label>
-                                    <label>Status <input type="text" name="status" value="{{ selected_vacancy.status if selected_vacancy else '' }}" placeholder="Lopend"></label>
+                                    <label>Status
+                                        {% set selected_vacancy_status = selected_vacancy.status if selected_vacancy and selected_vacancy.status else 'Concept' %}
+                                        <input type="text" name="status" value="{{ selected_vacancy_status }}" list="vacancy-status-options">
+                                        <datalist id="vacancy-status-options">
+                                            {% for status_option in vacancy_status_options %}
+                                            <option value="{{ status_option }}"></option>
+                                            {% endfor %}
+                                        </datalist>
+                                    </label>
                                     <label>Eigenaar <input type="text" name="owner" value="{{ selected_vacancy.owner if selected_vacancy else '' }}"></label>
                                     <label>Opdrachtgever <input type="text" name="relation_name" value="{{ selected_vacancy.relation_name if selected_vacancy else '' }}"></label>
                                     <label>Locatie <input type="text" name="location" value="{{ selected_vacancy.location if selected_vacancy else '' }}"></label>
@@ -1552,6 +1574,31 @@
                         {% endif %}
                         <div class="server-grid server-grid--single-row">
                             {% for metric in scheduler_tiles %}
+                            <div class="server-card server-card--{{ metric.tone|default('neutral') }}">
+                                <span>{{ metric.label }}</span>
+                                <strong>{{ metric.value }}</strong>
+                                <small>{{ metric.meta }}</small>
+                                <div class="meter" aria-hidden="true">
+                                    <span style="width: {{ metric.level }}%"></span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="server-section-heading">
+                            <h3>OTYS API</h3>
+                            <p>OWS-verbruik, rate-limit headers en blokkades vanuit de laatste synchronisaties.</p>
+                        </div>
+                        {% set otys_tiles = server_otys_tiles|default([], true) %}
+                        {% if not otys_tiles %}
+                            {% set otys_tiles = [
+                                {'label': 'OTYS calls minuut', 'value': '0', 'meta': 'nog geen OTYS-call gelogd', 'level': 0, 'tone': 'neutral'},
+                                {'label': 'OTYS resterend', 'value': '-', 'meta': 'wacht op eerste OTYS-header', 'level': 0, 'tone': 'neutral'},
+                                {'label': 'OTYS blokkades', 'value': '0', 'meta': 'laatste 24 uur', 'level': 0, 'tone': 'good'}
+                            ] %}
+                        {% endif %}
+                        <div class="server-grid server-grid--single-row">
+                            {% for metric in otys_tiles %}
                             <div class="server-card server-card--{{ metric.tone|default('neutral') }}">
                                 <span>{{ metric.label }}</span>
                                 <strong>{{ metric.value }}</strong>

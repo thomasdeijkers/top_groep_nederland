@@ -8,6 +8,7 @@ from datetime import datetime
 from psycopg2 import sql
 
 from shared.db.connection import get_connection
+from apps.dashboard.otys_usage import get_otys_usage_summary
 
 
 STAT_DEFINITIONS = [
@@ -77,6 +78,7 @@ def get_server_overview():
     memory = _memory_usage()
     database_size = _database_size_usage(database)
     scheduled_jobs = _placeholder_scheduled_jobs()
+    otys_tiles = _otys_usage_tiles()
 
     system_tiles = [
         {
@@ -144,6 +146,7 @@ def get_server_overview():
         "database": database,
         "server_system_tiles": system_tiles,
         "server_scheduler_tiles": scheduler_tiles,
+        "server_otys_tiles": otys_tiles,
         "server_metrics": system_tiles,
         "scheduled_jobs": scheduled_jobs,
     }
@@ -182,6 +185,69 @@ def _placeholder_scheduled_jobs():
             "status": "Nog niet actief",
             "last_run": "-",
             "next_run": "-",
+        },
+    ]
+
+
+def _otys_usage_tiles():
+    usage = get_otys_usage_summary()
+    latest_remaining = usage.get("latest_remaining")
+    min_remaining = usage.get("min_remaining_hour")
+    blocked = usage.get("day_blocked", 0)
+    last_error = usage.get("latest_error") or usage.get("last_error") or "geen fout bekend"
+    latest_status = usage.get("latest_status")
+    timeframe = usage.get("latest_timeframe")
+
+    remaining_label = "-" if latest_remaining is None else str(latest_remaining)
+    remaining_meta = "nog geen OTYS-call gelogd"
+    if latest_remaining is not None:
+        remaining_meta = f"laatste venster, reset over {timeframe}s" if timeframe is not None else "laatst bekende OTYS-header"
+
+    if latest_remaining is None:
+        remaining_tone = "neutral"
+        remaining_level = 0
+    elif latest_remaining <= 25:
+        remaining_tone = "warning"
+        remaining_level = 15
+    else:
+        remaining_tone = "good"
+        remaining_level = min((latest_remaining / 350) * 100, 100)
+
+    return [
+        {
+            "label": "OTYS calls minuut",
+            "value": str(usage.get("minute_calls", 0)),
+            "meta": f"{usage.get('hour_calls', 0)} in 1 uur, {usage.get('day_calls', 0)} in 24 uur",
+            "level": min((usage.get("minute_calls", 0) / 350) * 100, 100),
+            "tone": "warning" if usage.get("minute_calls", 0) >= 300 else "good",
+        },
+        {
+            "label": "OTYS resterend",
+            "value": remaining_label,
+            "meta": remaining_meta,
+            "level": remaining_level,
+            "tone": remaining_tone,
+        },
+        {
+            "label": "OTYS blokkades",
+            "value": str(blocked),
+            "meta": "laatste 24 uur",
+            "level": 100 if blocked else 0,
+            "tone": "danger" if blocked else "good",
+        },
+        {
+            "label": "OTYS laatste status",
+            "value": str(latest_status or "-"),
+            "meta": last_error[:90],
+            "level": 100 if latest_status and int(latest_status) < 400 else 0,
+            "tone": "good" if latest_status and int(latest_status) < 400 else "neutral",
+        },
+        {
+            "label": "OTYS laagste rest",
+            "value": "-" if min_remaining is None else str(min_remaining),
+            "meta": "laagste gemeten restant dit uur",
+            "level": 0 if min_remaining is None else min((min_remaining / 350) * 100, 100),
+            "tone": "warning" if min_remaining is not None and min_remaining <= 25 else "good",
         },
     ]
 

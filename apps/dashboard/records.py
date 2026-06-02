@@ -434,7 +434,7 @@ def list_candidates(limit: int = 25, query: str = "") -> list[dict]:
         return []
 
 
-def list_relations(limit: int = 50, query: str = "", relation_type: str = "") -> list[dict]:
+def list_relations(limit: int = 50, query: str = "", relation_type: str = "", status: str = "") -> list[dict]:
     try:
         ensure_dashboard_tables()
         with get_connection() as conn:
@@ -447,6 +447,9 @@ def list_relations(limit: int = 50, query: str = "", relation_type: str = "") ->
                 if relation_type in {"candidate", "principal"}:
                     filters.append("relation_type = %s")
                     params.append(relation_type)
+                if status:
+                    filters.append("status = %s")
+                    params.append(status)
                 if query:
                     filters.append(
                         """
@@ -592,6 +595,33 @@ def list_project_options(limit: int = 100) -> list[dict]:
                 ]
     except Exception:
         return []
+
+
+def list_relation_statuses(relation_type: str = "") -> list[str]:
+    defaults = ["Actief", "Nieuw", "Nog beoordelen", "Via Website", "Werknemer ACTIEF", "In Reserve Houden", "Archief"]
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                params = []
+                filters = ["COALESCE(status, '') <> ''"]
+                if relation_type in {"candidate", "principal"}:
+                    filters.append("relation_type = %s")
+                    params.append(relation_type)
+                cursor.execute(
+                    f"""
+                    SELECT DISTINCT status
+                    FROM relations
+                    WHERE {' AND '.join(filters)}
+                    ORDER BY status;
+                    """,
+                    tuple(params),
+                )
+                values = [row[0] for row in cursor.fetchall() if row[0]]
+    except Exception:
+        values = []
+
+    return _unique_options([*defaults, *values])
 
 
 def list_projects(limit: int = 100, query: str = "") -> list[dict]:
@@ -1379,24 +1409,32 @@ def list_tickets(limit: int = 25) -> list[dict]:
         return []
 
 
-def list_vacancies(limit: int = 30, query: str = "") -> list[dict]:
+def list_vacancies(limit: int = 30, query: str = "", status: str = "") -> list[dict]:
     try:
         ensure_dashboard_tables()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 params = []
-                where_clause = ""
+                filters = []
                 if query:
-                    where_clause = """
-                    WHERE title ILIKE %s
-                       OR reference_number ILIKE %s
-                       OR status ILIKE %s
-                       OR owner ILIKE %s
-                       OR relation_name ILIKE %s
-                       OR location ILIKE %s
-                    """
+                    filters.append(
+                        """
+                        (
+                           title ILIKE %s
+                           OR reference_number ILIKE %s
+                           OR status ILIKE %s
+                           OR owner ILIKE %s
+                           OR relation_name ILIKE %s
+                           OR location ILIKE %s
+                        )
+                        """
+                    )
                     like_query = f"%{query}%"
                     params.extend([like_query] * 6)
+                if status:
+                    filters.append("status = %s")
+                    params.append(status)
+                where_clause = f"WHERE {' AND '.join(filters)}" if filters else ""
                 params.append(limit)
                 cursor.execute(
                     f"""
@@ -1428,6 +1466,39 @@ def list_vacancies(limit: int = 30, query: str = "") -> list[dict]:
                 ]
     except Exception:
         return []
+
+
+def list_vacancy_statuses() -> list[str]:
+    defaults = ["Concept", "Lopend", "Open", "Controle", "Afgesloten", "OTYS"]
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT DISTINCT status
+                    FROM vacancies
+                    WHERE COALESCE(status, '') <> ''
+                    ORDER BY status;
+                    """
+                )
+                values = [row[0] for row in cursor.fetchall() if row[0]]
+    except Exception:
+        values = []
+
+    return _unique_options([*defaults, *values])
+
+
+def _unique_options(values: list[str]) -> list[str]:
+    seen = set()
+    options = []
+    for value in values:
+        clean = str(value or "").strip()
+        key = clean.lower()
+        if clean and key not in seen:
+            seen.add(key)
+            options.append(clean)
+    return options
 
 
 def list_whatsapp_timesheets(limit: int = 25) -> list[dict]:
