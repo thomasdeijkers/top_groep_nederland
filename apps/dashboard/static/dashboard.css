@@ -1191,6 +1191,47 @@ tr:last-child td {
     font-weight: 700;
 }
 
+.status-tile-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    margin: 0 0 14px;
+}
+
+.status-count-tile {
+    display: flex;
+    min-height: 58px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid rgba(127, 209, 160, 0.18);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.045);
+    color: #dfe9ee;
+}
+
+.status-count-tile span {
+    overflow: hidden;
+    color: #aebbc8;
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.status-count-tile strong {
+    color: #a9ecc0;
+    font-size: 1.35rem;
+    line-height: 1;
+}
+
+.status-count-tile--active,
+.status-count-tile:hover {
+    border-color: rgba(127, 209, 160, 0.42);
+    background: rgba(127, 209, 160, 0.1);
+}
+
 .ticket-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1244,6 +1285,12 @@ input::placeholder {
     color: #8996a1;
 }
 
+select.select-has-value {
+    border-color: rgba(127, 209, 160, 0.52);
+    background: rgba(127, 209, 160, 0.1);
+    color: #f5fff8;
+}
+
 select option {
     background: #12171c;
 }
@@ -1273,6 +1320,7 @@ select option {
 .relation-tab {
     display: inline-flex;
     align-items: center;
+    gap: 8px;
     min-height: 34px;
     padding: 0 12px;
     border: 1px solid transparent;
@@ -1282,10 +1330,29 @@ select option {
     font-weight: 850;
 }
 
+.relation-tab strong {
+    display: inline-flex;
+    min-width: 28px;
+    min-height: 22px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 7px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #d9e6ee;
+    font-size: 0.72rem;
+    line-height: 1;
+}
+
 .relation-tab--active {
     border-color: rgba(127, 209, 160, 0.34);
     background: rgba(127, 209, 160, 0.13);
     color: #e7fff0;
+}
+
+.relation-tab--active strong {
+    background: rgba(127, 209, 160, 0.22);
+    color: #a9ecc0;
 }
 
 .import-box {
@@ -1711,6 +1778,70 @@ select option {
 
 .relation-modal__header h2 {
     margin: 0;
+}
+
+.relation-editor-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 28px;
+    background: rgba(8, 12, 14, 0.72);
+    backdrop-filter: blur(10px);
+}
+
+.relation-editor-modal {
+    width: min(1180px, 100%);
+    max-height: min(860px, calc(100vh - 56px));
+    overflow: auto;
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius);
+    background: rgba(24, 29, 31, 0.9);
+    box-shadow: var(--shadow);
+    padding: 22px;
+}
+
+.relation-editor-modal__header {
+    align-items: flex-start;
+    gap: 18px;
+    margin-bottom: 18px;
+}
+
+.relation-editor-modal__actions {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-left: auto;
+}
+
+.relation-editor-modal__actions form {
+    margin: 0;
+}
+
+.relation-editor-modal__close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+}
+
+@media (max-width: 760px) {
+    .relation-editor-backdrop {
+        align-items: stretch;
+        padding: 12px;
+    }
+
+    .relation-editor-modal {
+        max-height: calc(100vh - 24px);
+        padding: 16px;
+    }
+
+    .relation-editor-modal__header,
+    .relation-editor-modal__actions {
+        flex-wrap: wrap;
+    }
 }
 
 .modal-close {

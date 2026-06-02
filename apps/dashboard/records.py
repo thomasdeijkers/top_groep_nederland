@@ -1489,6 +1489,90 @@ def list_vacancy_statuses() -> list[str]:
     return _unique_options([*defaults, *values])
 
 
+def list_relation_status_counts(relation_type: str = "", query: str = "") -> list[dict]:
+    relation_type = relation_type if relation_type in {"candidate", "principal"} else "candidate"
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                filters = ["relation_type = %s"]
+                params = [relation_type]
+                if query:
+                    filters.append(
+                        """(
+                           name ILIKE %s OR contact_name ILIKE %s OR email ILIKE %s
+                        OR phone ILIKE %s OR city ILIKE %s OR status ILIKE %s OR external_id ILIKE %s
+                        )"""
+                    )
+                    search = f"%{query}%"
+                    params.extend([search] * 7)
+                cursor.execute(
+                    f"""
+                    SELECT COALESCE(NULLIF(status, ''), 'Geen status'), COUNT(*)
+                    FROM relations
+                    WHERE {' AND '.join(filters)}
+                    GROUP BY 1
+                    ORDER BY COUNT(*) DESC, 1;
+                    """,
+                    tuple(params),
+                )
+                return [{"label": row[0], "count": row[1]} for row in cursor.fetchall()]
+    except Exception:
+        return []
+
+
+def list_relation_tab_counts() -> dict:
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT LOWER(relation_type), COUNT(*)
+                    FROM relations
+                    WHERE archived_at IS NULL
+                      AND LOWER(COALESCE(status, '')) NOT IN ('archief', 'gearchiveerd', 'archived')
+                    GROUP BY LOWER(relation_type);
+                    """
+                )
+                counts = {row[0]: row[1] for row in cursor.fetchall()}
+        return {
+            "candidates": counts.get("candidate", 0),
+            "principals": counts.get("principal", 0),
+        }
+    except Exception:
+        return {"candidates": 0, "principals": 0}
+
+
+def list_vacancy_status_counts(query: str = "") -> list[dict]:
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                params = []
+                where_clause = ""
+                if query:
+                    where_clause = """
+                    WHERE title ILIKE %s OR reference_number ILIKE %s OR owner ILIKE %s
+                       OR relation_name ILIKE %s OR location ILIKE %s OR status ILIKE %s
+                    """
+                    search = f"%{query}%"
+                    params.extend([search] * 6)
+                cursor.execute(
+                    f"""
+                    SELECT COALESCE(NULLIF(status, ''), 'Geen status'), COUNT(*)
+                    FROM vacancies
+                    {where_clause}
+                    GROUP BY 1
+                    ORDER BY COUNT(*) DESC, 1;
+                    """,
+                    tuple(params),
+                )
+                return [{"label": row[0], "count": row[1]} for row in cursor.fetchall()]
+    except Exception:
+        return []
+
+
 def _unique_options(values: list[str]) -> list[str]:
     seen = set()
     options = []

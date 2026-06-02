@@ -18,7 +18,7 @@
         </title>
         <link rel="icon" href="/dashboard/static/favicon.ico" sizes="any">
         <link rel="shortcut icon" href="/dashboard/static/favicon.ico">
-        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260601-3">
+        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260602-3">
     </head>
     <body class="page-{{ active_page }}">
         {% macro confidence_light(field) -%}
@@ -379,26 +379,43 @@
                                 <h2>Relaties beheren</h2>
                                 <p>Zoek en beheer kandidaten en opdrachtgevers vanuit hun eigen lijst.</p>
                             </div>
-                            <a class="ghost-button" href="/dashboard/relations?tab={{ active_relation_tab }}&new=1#relatie-formulier">Nieuwe relatie aanmaken</a>
+                            <a class="ghost-button" href="/dashboard/relations?tab={{ active_relation_tab }}{% if query %}&q={{ query|urlencode }}{% endif %}{% if status_filter %}&status={{ status_filter|urlencode }}{% endif %}&new=1#relatie-formulier">Nieuwe relatie aanmaken</a>
                         </div>
 
                         <nav class="relation-tabs" aria-label="Relatie tabs">
-                            <a class="relation-tab {% if active_relation_tab == 'candidates' %}relation-tab--active{% endif %}" href="/dashboard/relations?tab=candidates{% if status_filter %}&status={{ status_filter|urlencode }}{% endif %}#relaties">Kandidaten</a>
-                            <a class="relation-tab {% if active_relation_tab == 'principals' %}relation-tab--active{% endif %}" href="/dashboard/relations?tab=principals{% if status_filter %}&status={{ status_filter|urlencode }}{% endif %}#relaties">Opdrachtgevers</a>
+                            <a class="relation-tab {% if active_relation_tab == 'candidates' %}relation-tab--active{% endif %}" href="/dashboard/relations?tab=candidates{% if status_filter %}&status={{ status_filter|urlencode }}{% endif %}#relaties" data-relation-tab="candidates">
+                                <span>Kandidaten</span>
+                                <strong>{{ relation_tab_counts.candidates|default(0) }}</strong>
+                            </a>
+                            <a class="relation-tab {% if active_relation_tab == 'principals' %}relation-tab--active{% endif %}" href="/dashboard/relations?tab=principals{% if status_filter %}&status={{ status_filter|urlencode }}{% endif %}#relaties" data-relation-tab="principals">
+                                <span>Opdrachtgevers</span>
+                                <strong>{{ relation_tab_counts.principals|default(0) }}</strong>
+                            </a>
                         </nav>
 
                         {% set visible_relations = candidate_rows if active_relation_tab == 'candidates' else principal_rows %}
                         {% set relation_label = 'kandidaten' if active_relation_tab == 'candidates' else 'opdrachtgevers' %}
+                        <div class="status-tile-row">
+                            {% for tile in status_tiles %}
+                            <a class="status-count-tile {% if status_filter == tile.label %}status-count-tile--active{% endif %}" href="/dashboard/relations?tab={{ active_relation_tab }}&status={{ tile.label|urlencode }}{% if query %}&q={{ query|urlencode }}{% endif %}#relaties">
+                                <span>{{ tile.label }}</span>
+                                <strong>{{ tile.count }}</strong>
+                            </a>
+                            {% endfor %}
+                        </div>
                         <form class="single-search" action="/dashboard/relations" method="get">
                             <input type="hidden" name="tab" value="{{ active_relation_tab }}">
                             <input type="search" name="q" value="{{ query }}" placeholder="Zoek in {{ relation_label }} op naam, telefoon, e-mail, plaats, status of OTYS ID">
-                            <select name="status" aria-label="Filter op status">
+                            <select name="status" aria-label="Filter op status" class="{% if status_filter %}select-has-value{% endif %}" data-persist-select="dashboard-relations-status-{{ active_relation_tab }}" data-persist-param="status">
                                 <option value="">Alle statussen</option>
                                 {% for status_option in relation_status_options %}
                                 <option value="{{ status_option }}" {% if status_filter == status_option %}selected{% endif %}>{{ status_option }}</option>
                                 {% endfor %}
                             </select>
                             <button class="ghost-button" type="submit">Zoeken</button>
+                            {% if query or status_filter %}
+                            <a class="ghost-button" href="/dashboard/relations?tab={{ active_relation_tab }}#relaties" data-clear-persist="dashboard-relations-status-{{ active_relation_tab }}">Wissen</a>
+                            {% endif %}
                         </form>
 
                         <div class="relation-layout relation-layout--wide">
@@ -436,7 +453,7 @@
                                             <td><span class="status-tag">{{ result.status }}</span></td>
                                             <td>
                                                 {% if result.id %}
-                                                <a class="table-link" href="/dashboard/relations?tab={{ active_relation_tab }}&edit={{ result.id }}#relatie-formulier">Open</a>
+                                                <a class="table-link" href="/dashboard/relations?tab={{ active_relation_tab }}{% if query %}&q={{ query|urlencode }}{% endif %}{% if status_filter %}&status={{ status_filter|urlencode }}{% endif %}&edit={{ result.id }}#relatie-formulier">Open</a>
                                                 {% else %}
                                                 <span>-</span>
                                                 {% endif %}
@@ -456,82 +473,90 @@
 
                     {% set show_relation_editor = show_relation_form|default(false) or selected_relation or (request is defined and request.query_params.get('new')) %}
                     {% if show_relation_editor %}
-                    <article class="panel panel--full relations-only" id="relatie-formulier">
-                        <div class="panel-header">
-                            <div>
-                                <p class="section-label">Database</p>
-                                <h2>{% if selected_relation %}Relatie bewerken{% else %}Relatie aanmaken{% endif %}</h2>
-                                <p>Kies het type relatie en vul alleen de velden in die nodig zijn. Foto's en logo's worden bij de relatie opgeslagen.</p>
-                            </div>
-                            {% if selected_relation %}
-                            <form action="/api/relations/{{ selected_relation.id }}/archive" method="post">
-                                <button class="ghost-button danger-button" type="submit">Archiveren</button>
-                            </form>
-                            {% endif %}
-                        </div>
-
-                        <form class="create-form relation-form" data-relation-form action="{% if selected_relation %}/api/relations/{{ selected_relation.id }}{% else %}/api/relations{% endif %}" method="post" enctype="multipart/form-data">
-                            <div class="relation-photo-panel">
-                                <div class="relation-photo-preview">
-                                    {% if selected_relation and selected_relation.photo_path %}
-                                    <img src="/dashboard/relations/photo/{{ selected_relation.id }}" alt="Relatie foto">
-                                    {% else %}
-                                    <span>{{ (selected_relation.name[:2] if selected_relation else 'OB')|upper }}</span>
-                                    {% endif %}
+                    {% set relation_editor_close_url = '/dashboard/relations?tab=' ~ active_relation_tab ~ ('&q=' ~ query|urlencode if query else '') ~ ('&status=' ~ status_filter|urlencode if status_filter else '') ~ '#relaties' %}
+                    <div class="relation-editor-backdrop relations-only" data-relation-editor-modal data-close-url="{{ relation_editor_close_url }}">
+                        <article class="relation-editor-modal" id="relatie-formulier" role="dialog" aria-modal="true" aria-labelledby="relation-editor-title">
+                            <div class="panel-header relation-editor-modal__header">
+                                <div>
+                                    <p class="section-label">Database</p>
+                                    <h2 id="relation-editor-title">{% if selected_relation %}Relatie bewerken{% else %}Relatie aanmaken{% endif %}</h2>
+                                    <p>Kies het type relatie en vul alleen de velden in die nodig zijn. Foto's en logo's worden bij de relatie opgeslagen.</p>
                                 </div>
-                                <label class="form-span-2">Foto of logo <input type="file" name="photo" accept="image/*"></label>
+                                <div class="relation-editor-modal__actions">
+                                    {% if selected_relation %}
+                                    <form action="/api/relations/{{ selected_relation.id }}/archive" method="post">
+                                        <button class="ghost-button danger-button" type="submit">Archiveren</button>
+                                    </form>
+                                    {% endif %}
+                                    <a class="modal-close relation-editor-modal__close" href="{{ relation_editor_close_url }}" data-relation-editor-close aria-label="Sluiten">x</a>
+                                </div>
                             </div>
 
-                            <label class="relation-type-field">Type
-                                <select name="relation_type" data-relation-type>
-                                    <option value="candidate" {% if (selected_relation and selected_relation.relation_type == 'candidate') or (not selected_relation and active_relation_tab == 'candidates') %}selected{% endif %}>Kandidaat</option>
-                                    <option value="principal" {% if (selected_relation and selected_relation.relation_type == 'principal') or (not selected_relation and active_relation_tab == 'principals') %}selected{% endif %}>Opdrachtgever</option>
-                                </select>
-                            </label>
-                            <label data-principal-field>Bedrijfsnaam <input type="text" name="name" value="{{ selected_relation.name if selected_relation and selected_relation.relation_type == 'principal' else '' }}" placeholder="Bedrijfsnaam"></label>
-                            <label data-candidate-field>Voornaam <input type="text" name="first_name" value="{{ selected_relation.first_name if selected_relation else '' }}"></label>
-                            <label data-candidate-field>Achternaam <input type="text" name="last_name" value="{{ selected_relation.last_name if selected_relation else '' }}"></label>
-                            <label data-principal-field>Naam contactpersoon <input type="text" name="contact_name" value="{{ selected_relation.contact_name if selected_relation else '' }}"></label>
-                            <label>E-mail <input type="email" name="email" value="{{ selected_relation.email if selected_relation else '' }}"></label>
-                            <label>Telefoon <input type="text" name="phone" value="{{ selected_relation.phone if selected_relation else '' }}"></label>
-                            <label data-principal-field>Website <input type="url" name="website" value="{{ selected_relation.website if selected_relation else '' }}"></label>
-                            <label>Plaats <input type="text" name="city" value="{{ selected_relation.city if selected_relation else '' }}"></label>
-                            <label>Status
-                                {% set selected_status = selected_relation.status if selected_relation and selected_relation.status else ('Archief' if selected_relation and selected_relation.archived_at else 'Actief') %}
-                                <input type="text" name="status" value="{{ selected_status }}" list="relation-status-options">
-                                <datalist id="relation-status-options">
-                                    {% for status_option in relation_status_options %}
-                                    <option value="{{ status_option }}"></option>
-                                    {% endfor %}
-                                </datalist>
-                            </label>
-                            <input type="hidden" name="source" value="{{ selected_relation.source if selected_relation and selected_relation.source else 'handmatig' }}">
-                            <label>Straat <input type="text" name="street" value="{{ (selected_relation.street or selected_relation.address) if selected_relation else '' }}"></label>
-                            <label>Huisnummer <input type="text" name="house_number" value="{{ selected_relation.house_number if selected_relation else '' }}"></label>
-                            <label>Toevoeging <input type="text" name="house_number_addition" value="{{ selected_relation.house_number_addition if selected_relation else '' }}" placeholder="A / bis / rood"></label>
-                            <label>Postcode <input type="text" name="postal_code" value="{{ selected_relation.postal_code if selected_relation else '' }}"></label>
-                            <label>Land
-                                <select name="country">
-                                    {% set selected_country = selected_relation.country if selected_relation and selected_relation.country else 'Nederland' %}
-                                    {% for country in country_options %}
-                                    <option value="{{ country }}" {% if selected_country == country %}selected{% endif %}>{{ country }}</option>
-                                    {% endfor %}
-                                </select>
-                            </label>
-                            <label data-candidate-field>Eigenaar <input type="text" name="owner" value="{{ selected_relation.owner if selected_relation else '' }}" placeholder="Top Groep Nederland"></label>
-                            <label data-candidate-field>Beschikbaarheid <input type="text" name="availability" value="{{ selected_relation.availability if selected_relation else '' }}"></label>
-                            <label class="currency-field" data-candidate-field>Uurtarief
-                                <span class="currency-input">
-                                    <span>&euro;</span>
-                                    <input type="number" step="0.01" name="hourly_rate" value="{{ selected_relation.hourly_rate if selected_relation else '' }}" placeholder="0,00">
-                                </span>
-                            </label>
-                            <label data-principal-field>KvK <input type="text" name="kvk_number" value="{{ selected_relation.kvk_number if selected_relation else '' }}"></label>
-                            <label data-principal-field>BTW <input type="text" name="vat_number" value="{{ selected_relation.vat_number if selected_relation else '' }}"></label>
-                            <label class="form-span-2">Notities <textarea name="notes">{{ selected_relation.notes if selected_relation else '' }}</textarea></label>
-                            <button class="ghost-button create-form__submit" type="submit">Relatie opslaan</button>
-                        </form>
-                    </article>
+                            <form class="create-form relation-form" data-relation-form action="{% if selected_relation %}/api/relations/{{ selected_relation.id }}{% else %}/api/relations{% endif %}" method="post" enctype="multipart/form-data">
+                                <div class="relation-photo-panel">
+                                    <div class="relation-photo-preview">
+                                        {% if selected_relation and selected_relation.photo_path %}
+                                        <img src="/dashboard/relations/photo/{{ selected_relation.id }}" alt="Relatie foto">
+                                        {% else %}
+                                        <span>{{ (selected_relation.name[:2] if selected_relation else 'OB')|upper }}</span>
+                                        {% endif %}
+                                    </div>
+                                    <label class="form-span-2">Foto of logo <input type="file" name="photo" accept="image/*"></label>
+                                </div>
+
+                                <label class="relation-type-field">Type
+                                    <select name="relation_type" data-relation-type>
+                                        <option value="candidate" {% if (selected_relation and selected_relation.relation_type == 'candidate') or (not selected_relation and active_relation_tab == 'candidates') %}selected{% endif %}>Kandidaat</option>
+                                        <option value="principal" {% if (selected_relation and selected_relation.relation_type == 'principal') or (not selected_relation and active_relation_tab == 'principals') %}selected{% endif %}>Opdrachtgever</option>
+                                    </select>
+                                </label>
+                                <label data-principal-field>Bedrijfsnaam <input type="text" name="name" value="{{ selected_relation.name if selected_relation and selected_relation.relation_type == 'principal' else '' }}" placeholder="Bedrijfsnaam"></label>
+                                <label data-candidate-field>Voornaam <input type="text" name="first_name" value="{{ selected_relation.first_name if selected_relation else '' }}"></label>
+                                <label data-candidate-field>Achternaam <input type="text" name="last_name" value="{{ selected_relation.last_name if selected_relation else '' }}"></label>
+                                <label data-principal-field>Naam contactpersoon <input type="text" name="contact_name" value="{{ selected_relation.contact_name if selected_relation else '' }}"></label>
+                                <label>E-mail <input type="email" name="email" value="{{ selected_relation.email if selected_relation else '' }}"></label>
+                                <label>Telefoon <input type="text" name="phone" value="{{ selected_relation.phone if selected_relation else '' }}"></label>
+                                <label data-principal-field>Website <input type="url" name="website" value="{{ selected_relation.website if selected_relation else '' }}"></label>
+                                <label>Plaats <input type="text" name="city" value="{{ selected_relation.city if selected_relation else '' }}"></label>
+                                <label>Status
+                                    {% set selected_status = selected_relation.status if selected_relation and selected_relation.status else ('Archief' if selected_relation and selected_relation.archived_at else 'Actief') %}
+                                    <select name="status">
+                                        {% for status_option in relation_status_options %}
+                                        <option value="{{ status_option }}" {% if selected_status == status_option %}selected{% endif %}>{{ status_option }}</option>
+                                        {% endfor %}
+                                        {% if selected_status and selected_status not in relation_status_options %}
+                                        <option value="{{ selected_status }}" selected>{{ selected_status }}</option>
+                                        {% endif %}
+                                    </select>
+                                </label>
+                                <input type="hidden" name="source" value="{{ selected_relation.source if selected_relation and selected_relation.source else 'handmatig' }}">
+                                <label>Straat <input type="text" name="street" value="{{ (selected_relation.street or selected_relation.address) if selected_relation else '' }}"></label>
+                                <label>Huisnummer <input type="text" name="house_number" value="{{ selected_relation.house_number if selected_relation else '' }}"></label>
+                                <label>Toevoeging <input type="text" name="house_number_addition" value="{{ selected_relation.house_number_addition if selected_relation else '' }}" placeholder="A / bis / rood"></label>
+                                <label>Postcode <input type="text" name="postal_code" value="{{ selected_relation.postal_code if selected_relation else '' }}"></label>
+                                <label>Land
+                                    <select name="country">
+                                        {% set selected_country = selected_relation.country if selected_relation and selected_relation.country else 'Nederland' %}
+                                        {% for country in country_options %}
+                                        <option value="{{ country }}" {% if selected_country == country %}selected{% endif %}>{{ country }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                                <label data-candidate-field>Eigenaar <input type="text" name="owner" value="{{ selected_relation.owner if selected_relation else '' }}" placeholder="Top Groep Nederland"></label>
+                                <label data-candidate-field>Beschikbaarheid <input type="text" name="availability" value="{{ selected_relation.availability if selected_relation else '' }}"></label>
+                                <label class="currency-field" data-candidate-field>Uurtarief
+                                    <span class="currency-input">
+                                        <span>&euro;</span>
+                                        <input type="number" step="0.01" name="hourly_rate" value="{{ selected_relation.hourly_rate if selected_relation else '' }}" placeholder="0,00">
+                                    </span>
+                                </label>
+                                <label data-principal-field>KvK <input type="text" name="kvk_number" value="{{ selected_relation.kvk_number if selected_relation else '' }}"></label>
+                                <label data-principal-field>BTW <input type="text" name="vat_number" value="{{ selected_relation.vat_number if selected_relation else '' }}"></label>
+                                <label class="form-span-2">Notities <textarea name="notes">{{ selected_relation.notes if selected_relation else '' }}</textarea></label>
+                                <button class="ghost-button create-form__submit" type="submit">Relatie opslaan</button>
+                            </form>
+                        </article>
+                    </div>
                     {% endif %}
 
                     <div class="modal-backdrop" data-relation-modal hidden>
@@ -654,9 +679,18 @@
                             <a class="ghost-button vacancy-button" href="/dashboard/vacancies#vacature-formulier">Nieuwe vacature</a>
                         </div>
 
+                        <div class="status-tile-row">
+                            {% for tile in status_tiles %}
+                            <a class="status-count-tile {% if status_filter == tile.label %}status-count-tile--active{% endif %}" href="/dashboard/vacancies?status={{ tile.label|urlencode }}{% if query %}&q={{ query|urlencode }}{% endif %}#vacatures">
+                                <span>{{ tile.label }}</span>
+                                <strong>{{ tile.count }}</strong>
+                            </a>
+                            {% endfor %}
+                        </div>
+
                         <form class="single-search vacancy-top-search" action="/dashboard/vacancies" method="get">
                             <input type="search" name="q" value="{{ query }}" placeholder="Zoek op titel, referentie, opdrachtgever, plaats of status">
-                            <select name="status" aria-label="Filter op status">
+                            <select name="status" aria-label="Filter op status" class="{% if status_filter %}select-has-value{% endif %}" data-persist-select="dashboard-vacancies-status" data-persist-param="status">
                                 <option value="">Alle statussen</option>
                                 {% for status_option in vacancy_status_options %}
                                 <option value="{{ status_option }}" {% if status_filter == status_option %}selected{% endif %}>{{ status_option }}</option>
@@ -664,7 +698,7 @@
                             </select>
                             <button class="ghost-button" type="submit">Zoeken</button>
                             {% if query or status_filter %}
-                            <a class="ghost-button" href="/dashboard/vacancies#vacatures">Wissen</a>
+                            <a class="ghost-button" href="/dashboard/vacancies#vacatures" data-clear-persist="dashboard-vacancies-status">Wissen</a>
                             {% endif %}
                         </form>
 
@@ -739,12 +773,14 @@
                                     <label>Referentie <input type="text" name="reference_number" value="{{ selected_vacancy.reference_number if selected_vacancy else '' }}"></label>
                                     <label>Status
                                         {% set selected_vacancy_status = selected_vacancy.status if selected_vacancy and selected_vacancy.status else 'Concept' %}
-                                        <input type="text" name="status" value="{{ selected_vacancy_status }}" list="vacancy-status-options">
-                                        <datalist id="vacancy-status-options">
+                                        <select name="status">
                                             {% for status_option in vacancy_status_options %}
-                                            <option value="{{ status_option }}"></option>
+                                            <option value="{{ status_option }}" {% if selected_vacancy_status == status_option %}selected{% endif %}>{{ status_option }}</option>
                                             {% endfor %}
-                                        </datalist>
+                                            {% if selected_vacancy_status and selected_vacancy_status not in vacancy_status_options %}
+                                            <option value="{{ selected_vacancy_status }}" selected>{{ selected_vacancy_status }}</option>
+                                            {% endif %}
+                                        </select>
                                     </label>
                                     <label>Eigenaar <input type="text" name="owner" value="{{ selected_vacancy.owner if selected_vacancy else '' }}"></label>
                                     <label>Opdrachtgever <input type="text" name="relation_name" value="{{ selected_vacancy.relation_name if selected_vacancy else '' }}"></label>
@@ -1680,6 +1716,6 @@
                 </section>
             </main>
         </div>
-        <script src="/dashboard/static/dashboard.js?v=20260601-3"></script>
+        <script src="/dashboard/static/dashboard.js?v=20260602-3"></script>
     </body>
 </html>

@@ -7,7 +7,10 @@ CREATE TABLE IF NOT EXISTS otys_candidates (
     email TEXT,
     phone TEXT,
     mobile_phone TEXT,
+    address TEXT,
+    postal_code TEXT,
     city TEXT,
+    country TEXT,
     status TEXT,
     raw_data JSONB NOT NULL DEFAULT '{}'::jsonb,
     synced_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
@@ -17,6 +20,11 @@ CREATE TABLE IF NOT EXISTS otys_candidates (
 
 ALTER TABLE otys_candidates
     ADD COLUMN IF NOT EXISTS entry_date_time TEXT;
+
+ALTER TABLE otys_candidates
+    ADD COLUMN IF NOT EXISTS address TEXT,
+    ADD COLUMN IF NOT EXISTS postal_code TEXT,
+    ADD COLUMN IF NOT EXISTS country TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_otys_candidates_name
     ON otys_candidates (name);

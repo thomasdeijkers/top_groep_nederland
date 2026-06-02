@@ -33,8 +33,11 @@ from apps.dashboard.records import (
     list_principals,
     list_relations,
     list_relation_statuses,
+    list_relation_status_counts,
+    list_relation_tab_counts,
     list_tickets,
     list_vacancies,
+    list_vacancy_status_counts,
     list_vacancy_statuses,
     list_whatsapp_timesheets,
     log_audit_event,
@@ -194,6 +197,8 @@ def _dashboard_context(
             "show_relation_form": False,
             "candidate_relations": [],
             "principal_relations": [],
+            "status_tiles": [],
+            "relation_tab_counts": {"candidates": 0, "principals": 0},
             "candidates": [],
             "tickets": [],
             "vacancies": [],
@@ -249,6 +254,12 @@ def _dashboard_context(
     imported_vacancies = list_vacancies(query=query if data_page == "vacancies" else "", status=active_status if data_page == "vacancies" else "")
     relation_status_options = list_relation_statuses("candidate" if relation_tab == "candidates" else "principal")
     vacancy_status_options = list_vacancy_statuses()
+    relation_tab_counts = list_relation_tab_counts()
+    status_tiles = (
+        list_vacancy_status_counts(query if data_page == "vacancies" else "")
+        if data_page == "vacancies"
+        else list_relation_status_counts("candidate" if relation_tab == "candidates" else "principal", query if data_page == "relations" else "")
+    )
     whatsapp_timesheets = list_whatsapp_timesheets()
     overview_data = get_overview_data()
     audit_events = list_audit_events(120 if data_page == "audit" else 8)
@@ -302,6 +313,8 @@ def _dashboard_context(
         "status_filter": status_filter,
         "relation_status_options": relation_status_options,
         "vacancy_status_options": vacancy_status_options,
+        "status_tiles": status_tiles,
+        "relation_tab_counts": relation_tab_counts,
         "import_steps": IMPORT_STEPS,
         "whatsapp_inbox": whatsapp_inbox,
         "selected_timesheet": selected_timesheet,

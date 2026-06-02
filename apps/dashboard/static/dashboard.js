@@ -20,6 +20,84 @@
         setTheme(themeToggle.checked ? "light" : "dark");
     });
 
+    const relationTabs = document.querySelectorAll("[data-relation-tab]");
+    if (relationTabs.length) {
+        const tabStorageKey = "dashboard-relations-tab";
+        const validTabs = new Set(["candidates", "principals"]);
+        const url = new URL(window.location.href);
+        const urlTab = url.searchParams.get("tab");
+        const storedTab = window.localStorage.getItem(tabStorageKey);
+
+        if (validTabs.has(urlTab)) {
+            window.localStorage.setItem(tabStorageKey, urlTab);
+        } else if (validTabs.has(storedTab) && window.location.pathname === "/dashboard/relations") {
+            url.searchParams.set("tab", storedTab);
+            url.hash = url.hash || "relaties";
+            window.location.replace(url.toString());
+        }
+
+        relationTabs.forEach((tab) => {
+            tab.addEventListener("click", () => {
+                if (validTabs.has(tab.dataset.relationTab)) {
+                    window.localStorage.setItem(tabStorageKey, tab.dataset.relationTab);
+                }
+            });
+        });
+    }
+
+    const persistSelects = document.querySelectorAll("[data-persist-select]");
+    persistSelects.forEach((select) => {
+        const key = select.dataset.persistSelect;
+        const param = select.dataset.persistParam || select.name;
+        const url = new URL(window.location.href);
+        const hasUrlValue = url.searchParams.has(param);
+        const storedValue = window.localStorage.getItem(key);
+
+        const syncSelectState = () => {
+            select.classList.toggle("select-has-value", Boolean(select.value));
+        };
+
+        if (hasUrlValue) {
+            if (select.value) {
+                window.localStorage.setItem(key, select.value);
+            } else {
+                window.localStorage.removeItem(key);
+            }
+        } else if (storedValue) {
+            if (![...select.options].some((option) => option.value === storedValue)) {
+                select.add(new Option(storedValue, storedValue));
+            }
+            select.value = storedValue;
+            syncSelectState();
+            if ((window.location.pathname === "/dashboard/relations" || window.location.pathname === "/dashboard/vacancies") && !url.searchParams.has("q")) {
+                url.searchParams.set(param, storedValue);
+                url.hash = url.hash || (window.location.pathname === "/dashboard/vacancies" ? "vacatures" : "relaties");
+                window.location.replace(url.toString());
+                return;
+            }
+        }
+
+        syncSelectState();
+        select.addEventListener("change", () => {
+            if (select.value) {
+                window.localStorage.setItem(key, select.value);
+            } else {
+                window.localStorage.removeItem(key);
+            }
+            syncSelectState();
+        });
+    });
+
+    document.querySelectorAll("[data-clear-persist]").forEach((clearLink) => {
+        clearLink.addEventListener("click", () => {
+            clearLink.dataset.clearPersist.split(",").forEach((key) => {
+                if (key.trim()) {
+                    window.localStorage.removeItem(key.trim());
+                }
+            });
+        });
+    });
+
     document.querySelectorAll("[data-sort-table]").forEach((table) => {
         const tbody = table.tBodies[0];
         if (!tbody) {
@@ -114,6 +192,14 @@
     const relationForm = document.querySelector("[data-relation-form]");
     const relationTypeSelect = relationForm?.querySelector("[data-relation-type]");
     const relationFormPanel = document.querySelector("#relatie-formulier");
+    const relationEditorModal = document.querySelector("[data-relation-editor-modal]");
+
+    const closeRelationEditor = () => {
+        const closeUrl = relationEditorModal?.dataset.closeUrl;
+        if (closeUrl) {
+            window.location.href = closeUrl;
+        }
+    };
 
     const closeRelationModal = () => {
         if (relationModal) {
@@ -142,6 +228,18 @@
     relationModal?.addEventListener("click", (event) => {
         if (event.target === relationModal) {
             closeRelationModal();
+        }
+    });
+
+    relationEditorModal?.addEventListener("click", (event) => {
+        if (event.target === relationEditorModal) {
+            closeRelationEditor();
+        }
+    });
+
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && relationEditorModal) {
+            closeRelationEditor();
         }
     });
 

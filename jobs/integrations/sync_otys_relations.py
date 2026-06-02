@@ -33,6 +33,25 @@ CANDIDATE_FIELDS = {
         "emailPrimary": 1,
     },
 }
+CANDIDATE_DETAIL_FIELD_GROUPS = [
+    {
+        "_label": "Addresses",
+        "uid": 1,
+        "Addresses": {
+            "address": 1,
+            "city": 1,
+            "postcode": 1,
+            "countryCode": 1,
+        },
+    },
+    {
+        "_label": "ExtraPhoneNumbers",
+        "uid": 1,
+        "ExtraPhoneNumbers": {
+            "phoneNumber": 1,
+        },
+    },
+]
 VACANCY_FIELDS = {
     "uid": 1,
     "title": 1,
@@ -105,6 +124,7 @@ def main():
             limit=args.limit,
             max_rows=args.max,
         )
+        rows = enrich_candidate_details(client, session_id, rows)
         candidate_rows = [normalize_candidate(row) for row in rows if row.get("uid") and candidate_name(row)]
 
     if args.target in ("all", "vacancies"):
@@ -216,6 +236,46 @@ def fetch_all(fetch_page, label: str, limit: int, max_rows: int = 0) -> tuple[li
     return rows[:max_rows] if max_rows else rows, total_count or len(rows)
 
 
+def enrich_candidate_details(client: OtysClient, session_id: str, rows: list[dict]) -> list[dict]:
+    enriched_rows = []
+    total = len(rows)
+    disabled_groups = set()
+    for index, row in enumerate(rows, start=1):
+        candidate_id = str(row.get("uid", "")).strip()
+        if not candidate_id:
+            enriched_rows.append(row)
+            continue
+        for detail_fields in CANDIDATE_DETAIL_FIELD_GROUPS:
+            group_label = detail_fields.get("_label", "detail")
+            if group_label in disabled_groups:
+                continue
+            request_fields = {key: value for key, value in detail_fields.items() if key != "_label"}
+            try:
+                response = client.get_candidate_detail(session_id, candidate_id, what=request_fields)
+                detail = response.get("result") or {}
+                if isinstance(detail, dict):
+                    row = deep_merge_copy(row, detail)
+            except Exception as exc:
+                if "Abstract_field" in str(exc):
+                    disabled_groups.add(group_label)
+                    print(f"candidate_detail_group_disabled={group_label} error={exc}", flush=True)
+                else:
+                    print(f"candidate_detail_group_skipped={candidate_id} group={group_label} error={exc}", flush=True)
+        enriched_rows.append(row)
+        print_progress("candidate_details", total, index)
+    return enriched_rows
+
+
+def deep_merge_copy(base: dict, extra: dict) -> dict:
+    merged = dict(base)
+    for key, value in extra.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = deep_merge_copy(merged[key], value)
+        elif value not in (None, "", {}, []):
+            merged[key] = value
+    return merged
+
+
 def normalize_principal(row: dict) -> dict:
     return {
         "otys_id": str(row.get("uid", "")).strip(),
@@ -233,6 +293,7 @@ def normalize_principal(row: dict) -> dict:
 
 def normalize_candidate(row: dict) -> dict:
     person = row.get("Person") if isinstance(row.get("Person"), dict) else {}
+    address = first_collection_item(row.get("Addresses"))
     first_name = clean_value(person.get("firstName"))
     last_name = clean_value(person.get("lastName"))
     return {
@@ -241,12 +302,57 @@ def normalize_candidate(row: dict) -> dict:
         "first_name": first_name,
         "last_name": last_name,
         "email": clean_value(person.get("emailPrimary")),
-        "phone": "",
-        "city": "",
+        "phone": candidate_phone(row),
+        "mobile_phone": candidate_phone(row),
+        "address": clean_value(address.get("address")),
+        "postal_code": clean_value(address.get("postcode")),
+        "city": clean_value(address.get("city")),
+        "country": clean_value(address.get("countryCode")),
         "status": clean_value(row.get("status")),
         "entry_date_time": clean_value(row.get("entryDateTime")),
         "raw_data": row,
     }
+
+
+def candidate_phone(row: dict) -> str:
+    direct_phone = clean_value(row.get("phoneMobile") or row.get("phoneNumber"))
+    if direct_phone:
+        return direct_phone
+
+    candidates = []
+    for collection_name in ("PhoneNumbers", "ExtraPhoneNumbers"):
+        collection = row.get(collection_name)
+        if isinstance(collection, dict):
+            candidates.extend(collection.values())
+        elif isinstance(collection, list):
+            candidates.extend(collection)
+
+    fallback = ""
+    for item in candidates:
+        if isinstance(item, dict):
+            phone = clean_value(item.get("phoneNumber") or item.get("number") or item.get("value"))
+            phone_type = clean_value(item.get("type")).lower()
+            if phone and not fallback:
+                fallback = phone
+            if phone and phone_type in {"mobile", "primary", "mobiel", "privé", "prive"}:
+                return phone
+        else:
+            phone = clean_value(item)
+            if phone and not fallback:
+                fallback = phone
+    return fallback
+
+
+def first_collection_item(collection) -> dict:
+    if isinstance(collection, dict):
+        for value in collection.values():
+            if isinstance(value, dict):
+                return value
+    if isinstance(collection, list):
+        for value in collection:
+            if isinstance(value, dict):
+                return value
+    return {}
 
 
 def normalize_vacancy(row: dict) -> dict:
@@ -470,9 +576,9 @@ def upsert_dashboard_candidate(cursor, row: dict) -> None:
         """
         INSERT INTO relations (
             relation_type, external_id, name, first_name, last_name, email, phone,
-            city, status, source, raw_data, imported_at, updated_at
+            address, street, postal_code, city, country, status, source, raw_data, imported_at, updated_at
         )
-        VALUES ('candidate', %s, %s, %s, %s, %s, %s, %s, %s, 'otys', %s, NOW(), NOW())
+        VALUES ('candidate', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'otys', %s, NOW(), NOW())
         ON CONFLICT (relation_type, external_id)
         WHERE external_id IS NOT NULL
         DO UPDATE SET
@@ -481,7 +587,11 @@ def upsert_dashboard_candidate(cursor, row: dict) -> None:
             last_name = EXCLUDED.last_name,
             email = EXCLUDED.email,
             phone = EXCLUDED.phone,
+            address = EXCLUDED.address,
+            street = EXCLUDED.street,
+            postal_code = EXCLUDED.postal_code,
             city = EXCLUDED.city,
+            country = EXCLUDED.country,
             status = EXCLUDED.status,
             source = EXCLUDED.source,
             raw_data = EXCLUDED.raw_data,
@@ -495,7 +605,11 @@ def upsert_dashboard_candidate(cursor, row: dict) -> None:
             row["last_name"],
             row["email"],
             row["phone"],
+            row["address"],
+            row["address"],
+            row["postal_code"],
             row["city"],
+            row["country"],
             row["status"],
             Json(row["raw_data"]),
         ),
@@ -513,14 +627,17 @@ def upsert_otys_candidate(cursor, row: dict) -> None:
             email,
             phone,
             mobile_phone,
+            address,
+            postal_code,
             city,
+            country,
             status,
             entry_date_time,
             raw_data,
             synced_at,
             updated_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
         ON CONFLICT (otys_id) DO UPDATE SET
             name = EXCLUDED.name,
             first_name = EXCLUDED.first_name,
@@ -528,7 +645,10 @@ def upsert_otys_candidate(cursor, row: dict) -> None:
             email = EXCLUDED.email,
             phone = EXCLUDED.phone,
             mobile_phone = EXCLUDED.mobile_phone,
+            address = EXCLUDED.address,
+            postal_code = EXCLUDED.postal_code,
             city = EXCLUDED.city,
+            country = EXCLUDED.country,
             status = EXCLUDED.status,
             entry_date_time = EXCLUDED.entry_date_time,
             raw_data = EXCLUDED.raw_data,
@@ -543,7 +663,10 @@ def upsert_otys_candidate(cursor, row: dict) -> None:
             row["email"],
             row["phone"],
             row.get("mobile_phone", ""),
+            row["address"],
+            row["postal_code"],
             row["city"],
+            row["country"],
             row["status"],
             row["entry_date_time"],
             Json(row["raw_data"]),
