@@ -20,6 +20,50 @@
         setTheme(themeToggle.checked ? "light" : "dark");
     });
 
+    const sidebar = document.querySelector(".sidebar");
+    const mobileMenuToggle = document.querySelector("[data-mobile-menu-toggle]");
+    const mobileMenu = document.querySelector("[data-mobile-menu]");
+    const mobileMenuBreakpoint = window.matchMedia("(max-width: 980px)");
+
+    const setMobileMenuOpen = (isOpen) => {
+        if (!sidebar || !mobileMenuToggle || !mobileMenu) {
+            return;
+        }
+        sidebar.classList.toggle("sidebar--open", isOpen);
+        mobileMenuToggle.setAttribute("aria-expanded", String(isOpen));
+        mobileMenuToggle.setAttribute("aria-label", isOpen ? "Menu sluiten" : "Menu openen");
+    };
+
+    mobileMenuToggle?.addEventListener("click", () => {
+        const isOpen = mobileMenuToggle.getAttribute("aria-expanded") === "true";
+        setMobileMenuOpen(!isOpen);
+    });
+
+    mobileMenu?.querySelectorAll("a").forEach((link) => {
+        link.addEventListener("click", () => setMobileMenuOpen(false));
+    });
+
+    document.addEventListener("click", (event) => {
+        if (!mobileMenuBreakpoint.matches || !sidebar?.classList.contains("sidebar--open")) {
+            return;
+        }
+        if (!sidebar.contains(event.target)) {
+            setMobileMenuOpen(false);
+        }
+    });
+
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+            setMobileMenuOpen(false);
+        }
+    });
+
+    mobileMenuBreakpoint.addEventListener?.("change", (event) => {
+        if (!event.matches) {
+            setMobileMenuOpen(false);
+        }
+    });
+
     const relationTabs = document.querySelectorAll("[data-relation-tab]");
     if (relationTabs.length) {
         const tabStorageKey = "dashboard-relations-tab";
@@ -355,35 +399,47 @@
             }
         };
 
-        const filterCandidates = () => {
+        const chooseCurrentCandidate = () => {
+            if (!select.value) {
+                const firstCandidate = [...select.options].find((option) => option.value);
+                if (firstCandidate) {
+                    select.value = firstCandidate.value;
+                }
+            }
+            if (select.value) {
+                applySelectedCandidate();
+            }
+        };
+
+        const loadCandidates = async (query, previousValue, sequence) => {
+            try {
+                const response = await fetch(`${searchUrl}?q=${encodeURIComponent(query)}&limit=80`);
+                if (!response.ok || sequence !== candidateSearchSequence) {
+                    return false;
+                }
+                const data = await response.json();
+                const results = Array.isArray(data.results) ? data.results : [];
+                renderCandidateOptions(results, previousValue);
+                chooseCurrentCandidate();
+                renderSuggestions();
+                return true;
+            } catch (error) {
+                console.warn("Kandidaten zoeken mislukt", error);
+                return false;
+            }
+        };
+
+        const filterCandidates = (delay = 70) => {
             const query = (searchInput?.value || "").trim();
-            if (!searchUrl || query.length < 2) {
+            if (!searchUrl) {
                 return;
             }
             window.clearTimeout(candidateSearchTimer);
             candidateSearchTimer = window.setTimeout(async () => {
                 const sequence = candidateSearchSequence + 1;
                 candidateSearchSequence = sequence;
-                const previousValue = select.value;
-                try {
-                    const response = await fetch(`${searchUrl}?q=${encodeURIComponent(query)}&limit=50`);
-                    if (!response.ok || sequence !== candidateSearchSequence) {
-                        return;
-                    }
-                    const data = await response.json();
-                    const results = Array.isArray(data.results) ? data.results : [];
-                    renderCandidateOptions(results, previousValue);
-                    if (!select.value && results.length) {
-                        select.value = results[0].value;
-                    }
-                    renderSuggestions();
-                    if (select.value) {
-                        applySelectedCandidate();
-                    }
-                } catch (error) {
-                    console.warn("Kandidaten zoeken mislukt", error);
-                }
-            }, 180);
+                await loadCandidates(query, select.value, sequence);
+            }, delay);
         };
 
         const renderSuggestions = () => {
@@ -400,10 +456,6 @@
                 .slice(0, 4);
             suggestionsTarget.innerHTML = "";
             if (!scored.length) {
-                const empty = document.createElement("span");
-                empty.className = "candidate-suggestion-empty";
-                empty.textContent = "Geen sterke suggestie. Zoek handmatig hieronder.";
-                suggestionsTarget.append(empty);
                 return;
             }
             scored.forEach(({ option, score }) => {
@@ -420,7 +472,30 @@
         };
 
         select.addEventListener("change", applySelectedCandidate);
-        searchInput?.addEventListener("input", filterCandidates);
+        searchInput?.addEventListener("input", () => filterCandidates());
+        searchInput?.addEventListener("keydown", async (event) => {
+            if (event.key !== "Enter") {
+                return;
+            }
+            event.preventDefault();
+            window.clearTimeout(candidateSearchTimer);
+            const query = (searchInput.value || "").trim();
+            if (searchUrl) {
+                const sequence = candidateSearchSequence + 1;
+                candidateSearchSequence = sequence;
+                await loadCandidates(query, select.value, sequence);
+            }
+            chooseCurrentCandidate();
+            form?.requestSubmit();
+        });
+        select.addEventListener("keydown", (event) => {
+            if (event.key !== "Enter") {
+                return;
+            }
+            event.preventDefault();
+            chooseCurrentCandidate();
+            form?.requestSubmit();
+        });
         employeeNameInput?.addEventListener("input", renderSuggestions);
         employeePhoneInput?.addEventListener("input", renderSuggestions);
         renderSuggestions();

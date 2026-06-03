@@ -18,7 +18,7 @@
         </title>
         <link rel="icon" href="/dashboard/static/favicon.ico" sizes="any">
         <link rel="shortcut icon" href="/dashboard/static/favicon.ico">
-        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260602-14">
+        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260603-01">
     </head>
     <body class="page-{{ active_page }}">
         {% macro confidence_light(field) -%}
@@ -33,8 +33,13 @@
                 <a class="brand" href="/dashboard" aria-label="Top Groep Nederland dashboard">
                     <img src="/dashboard/static/top-groep-nederland.png" alt="Top Groep Nederland">
                 </a>
+                <button class="mobile-menu-toggle" type="button" aria-expanded="false" aria-controls="dashboard-navigation" aria-label="Menu openen" data-mobile-menu-toggle>
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
 
-                <nav class="side-nav" aria-label="Hoofdnavigatie">
+                <nav class="side-nav" id="dashboard-navigation" aria-label="Hoofdnavigatie" data-mobile-menu>
                     <span class="side-nav__group">Dashboard</span>
                     <a class="side-nav__item {% if active_page == 'overview' %}side-nav__item--active{% endif %}" href="/dashboard"><span class="side-nav__label">Overzicht</span><span class="module-status module-status--green" title="Compleet"></span></a>
 
@@ -1558,8 +1563,8 @@
                                                         <strong>{{ parsed_employee_name or 'Geen naam gevonden' }}</strong>
                                                     </div>
                                                     <div class="candidate-suggestions" data-candidate-suggestions aria-label="Kandidaatsuggesties"></div>
-                                                    <input type="search" placeholder="Zoek handmatig..." data-candidate-match-search>
-                                                    <select name="matched_relation_id" size="6" data-candidate-match-select data-candidate-search-url="/api/candidates/search">
+                                                    <input type="search" placeholder="Zoek kandidaat..." data-candidate-match-search autocomplete="off">
+                                                    <select name="matched_relation_id" size="4" data-candidate-match-select data-candidate-search-url="/api/candidates/search">
                                                         <option value="">Geen kandidaat gekoppeld</option>
                                                         {% for candidate in timesheet_candidate_options %}
                                                         {% set candidate_name_match = parsed_employee_name and candidate.name and parsed_employee_name|lower == candidate.name|lower %}
@@ -1639,10 +1644,7 @@
                                                 </label>
                                             </div>
 
-                                            <div class="preview-actions">
-                                                <button class="ghost-button" type="submit">Koppel kandidaat</button>
-                                                <button class="ghost-button" type="submit">Correcties opslaan</button>
-                                            </div>
+                                            <button class="sr-only" type="submit">Opslaan</button>
                                 </form>
                                 <form class="workflow-actions" action="/api/whatsapp/timesheet/{{ selected_message.id }}/validate" method="post">
                                     <input type="hidden" name="principal_id" value="{{ selected_message.selected_principal_id or '' }}" data-workflow-principal-id>
@@ -1838,6 +1840,6 @@
                 </section>
             </main>
         </div>
-        <script src="/dashboard/static/dashboard.js?v=20260602-14"></script>
+        <script src="/dashboard/static/dashboard.js?v=20260603-01"></script>
     </body>
 </html>
