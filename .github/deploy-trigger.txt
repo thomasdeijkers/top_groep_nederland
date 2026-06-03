@@ -1,0 +1,4 @@
+Deploy trigger for mobile dashboard menu rollout.
+
+Triggered: 2026-06-03
+Base commit: b5e2449d1fd9d7ef10699aa1e7bba6a7a01be675
