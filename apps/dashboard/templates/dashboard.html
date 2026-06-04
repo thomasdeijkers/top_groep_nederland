@@ -116,6 +116,11 @@
                             {% else %}Werkmodule voor Top Groep Nederland.{% endif %}
                         </p>
                     </div>
+                    {% if auth_enabled %}
+                        <form class="dashboard-logout" method="post" action="/logout">
+                            <button type="submit">Afmelden</button>
+                        </form>
+                    {% endif %}
                 </header>
 
                 <section class="stats-grid overview-only" aria-label="Dashboard statistieken">

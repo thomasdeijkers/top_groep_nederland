@@ -6,6 +6,7 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
 
+from apps.dashboard.auth import auth_enabled
 from apps.dashboard.placeholders import (
     ACTIVITY_ITEMS,
     MODULES,
@@ -225,6 +226,7 @@ def _dashboard_context(
         server_overview = get_server_overview()
         return {
             "active_page": active_page,
+            "auth_enabled": auth_enabled(),
             "stats": stats["cards"],
             "database": server_overview["database"],
             "modules": MODULES,
@@ -374,6 +376,7 @@ def _dashboard_context(
 
     return {
         "active_page": active_page,
+        "auth_enabled": auth_enabled(),
         "stats": stats["cards"],
         "database": stats["database"],
         "modules": MODULES,

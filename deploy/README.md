@@ -43,6 +43,30 @@ Na DNS en nginx:
 sudo certbot --nginx -d tgn.opticore-insights.nl
 ```
 
-## 4. Deploy
+## 4. Twee-factor-authenticatie
+
+Het dashboard kan gratis worden beveiligd met een authenticator-app zoals Google Authenticator. De app gebruikt TOTP-codes en heeft geen externe betaalde dienst nodig.
+
+Genereer een gebruikersnaam, wachtwoord-hash en authenticator-secret:
+
+```bash
+python deploy/generate_auth_secrets.py
+```
+
+Plaats de uitgeprinte waarden in de server `.env`:
+
+```text
+TGN_AUTH_ENABLED=true
+TGN_AUTH_USERNAME=<gebruikersnaam>
+TGN_AUTH_PASSWORD_HASH=<gegenereerde hash>
+TGN_TOTP_SECRET=<gegenereerde TOTP secret>
+TGN_SESSION_SECRET=<gegenereerde sessie secret>
+```
+
+Voeg de uitgeprinte `otpauth://...` URL toe aan Google Authenticator. Dat kan handmatig, of door de URL eenmalig om te zetten naar een QR-code op een vertrouwde beheercomputer.
+
+Laat `TGN_AUTH_ENABLED` leeg of `false` in lokale/staging omgevingen waar je nog zonder login wilt testen.
+
+## 5. Deploy
 
 Elke push naar `main` start de GitHub Actions deploy. Handmatig kan via `Actions` -> `Deploy TGN dashboard` -> `Run workflow`.

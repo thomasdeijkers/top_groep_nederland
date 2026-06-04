@@ -3,10 +3,12 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from apps.dashboard.auth import auth_middleware, router as auth_router
 from apps.dashboard.router import router as dashboard_router
 from shared.db.connection import get_connection
 
 app = FastAPI(title="Top Groep Nederland API")
+app.middleware("http")(auth_middleware)
 
 dashboard_dir = Path(__file__).resolve().parents[1] / "dashboard"
 app.mount(
@@ -14,6 +16,7 @@ app.mount(
     StaticFiles(directory=dashboard_dir / "static"),
     name="dashboard-static",
 )
+app.include_router(auth_router)
 app.include_router(dashboard_router)
 
 

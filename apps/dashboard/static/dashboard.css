@@ -227,6 +227,28 @@ a {
     margin-bottom: 8px;
 }
 
+.dashboard-logout {
+    flex: 0 0 auto;
+}
+
+.dashboard-logout button {
+    min-height: 38px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 6px;
+    padding: 0 14px;
+    color: #eef5f4;
+    background: rgba(255, 255, 255, 0.08);
+    font: inherit;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.dashboard-logout button:hover {
+    border-color: rgba(127, 209, 160, 0.55);
+    background: rgba(127, 209, 160, 0.16);
+}
+
 .eyebrow {
     margin: 0 0 8px;
     color: #7fd1a0;
