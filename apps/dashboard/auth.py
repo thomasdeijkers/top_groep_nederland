@@ -142,8 +142,9 @@ async def auth_middleware(request: Request, call_next):
 @router.get("/login", response_class=HTMLResponse)
 def login_page(request: Request, next: str = "/dashboard", error: str = ""):
     return templates.TemplateResponse(
+        request,
         "login.html",
-        {"request": request, "next": _safe_next(next), "error": error, "auth_enabled": auth_enabled()},
+        {"next": _safe_next(next), "error": error, "auth_enabled": auth_enabled()},
     )
 
 
