@@ -18,7 +18,7 @@
         </title>
         <link rel="icon" href="/dashboard/static/favicon.ico" sizes="any">
         <link rel="shortcut icon" href="/dashboard/static/favicon.ico">
-        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260605-13">
+        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260605-14">
     </head>
     <body class="page-{{ active_page }}">
         {% macro confidence_light(field) -%}
@@ -1578,7 +1578,7 @@
                                                 </div>
                                                 <div>
                                                     <dt>Beoordeling</dt>
-                                                    <dd>{% if relation_gate_missing %}Koppelingen ontbreken{% elif gated_overall_confidence > 95 %}Betrouwbaar{% elif gated_overall_confidence >= 80 %}Nalopen{% else %}Controleren{% endif %}</dd>
+                                                    <dd>{% if relation_gate_missing %}Kandidaat of opdrachtgever ontbreekt{% elif gated_overall_confidence > 95 %}Betrouwbaar{% elif gated_overall_confidence >= 80 %}Nalopen{% else %}Controleren{% endif %}</dd>
                                                 </div>
                                             </dl>
                                             <div class="confidence-legend confidence-legend--compact">
@@ -1607,6 +1607,9 @@
                                                         <span class="accordion-metric accordion-metric--{{ 'green' if selected_message.matched_relation_id else 'red' }}" data-candidate-match-summary>
                                                             <i></i>Kandidaat: {{ selected_message.matched_name if selected_message.matched_relation_id else 'Niet gekoppeld' }}
                                                         </span>
+                                                        {{ summary_status(selected_message.parsed_map.principal_name, 'Opdrachtgever') }}
+                                                        {{ summary_status(selected_message.parsed_map.work_name, 'Project', selected_message.project_name) }}
+                                                        {{ summary_status(selected_message.parsed_map.project_number, 'Projectnr') }}
                                                     </span>
                                                 </summary>
                                                 <div class="digital-timesheet-grid digital-timesheet-grid--primary">
@@ -1649,19 +1652,6 @@
                                                         </div>
                                                     </div>
                                                 </div>
-                                                </div>
-                                            </details>
-
-                                            <details class="timesheet-accordion">
-                                                <summary>
-                                                    <strong>Koppelingen</strong>
-                                                    <span class="accordion-metrics">
-                                                        {{ summary_status(selected_message.parsed_map.principal_name, 'Opdrachtgever') }}
-                                                        {{ summary_status(selected_message.parsed_map.work_name, 'Project', selected_message.project_name) }}
-                                                        {{ summary_status(selected_message.parsed_map.project_number, 'Projectnr') }}
-                                                    </span>
-                                                </summary>
-                                                <div class="digital-timesheet-grid digital-timesheet-grid--primary digital-timesheet-grid--links">
                                                 <label class="search-select-field"><span class="field-title">Opdrachtgever {{ confidence_light(selected_message.parsed_map.principal_name) }}</span>
                                                     <input type="search" placeholder="Zoek opdrachtgever..." data-principal-search autocomplete="off">
                                                     <select name="field_principal_name" data-principal-search-select data-principal-search-url="/api/principals/search">
@@ -1994,6 +1984,6 @@
                 </section>
             </main>
         </div>
-        <script src="/dashboard/static/dashboard.js?v=20260605-13"></script>
+        <script src="/dashboard/static/dashboard.js?v=20260605-14"></script>
     </body>
 </html>
