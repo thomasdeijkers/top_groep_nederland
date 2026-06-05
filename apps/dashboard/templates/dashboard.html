@@ -18,7 +18,7 @@
         </title>
         <link rel="icon" href="/dashboard/static/favicon.ico" sizes="any">
         <link rel="shortcut icon" href="/dashboard/static/favicon.ico">
-        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260603-01">
+        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260605-02">
     </head>
     <body class="page-{{ active_page }}">
         {% macro confidence_light(field) -%}
@@ -30,13 +30,13 @@
                 <span></span>{{ 'Leeg' if is_empty else confidence ~ '%' }}
             </span>
         {%- endmacro %}
-        {% macro summary_status(field, label, value=none, unit='') -%}
+        {% macro summary_status(field, label, value=none, unit='', target='') -%}
             {% set parsed_value = field.value if field is defined and field.value is defined else none %}
             {% set display_value = value if value is not none else parsed_value %}
             {% set is_empty = display_value is none or display_value|string|trim == '' %}
             {% set confidence = 0 if is_empty else field.confidence if field is defined and field.confidence is defined else 0 %}
             {% set level = 'red' if is_empty else 'green' if confidence > 95 else 'orange' if confidence >= 80 else 'red' %}
-            <span class="accordion-metric accordion-metric--{{ level }}" title="{{ label }}: {{ 'leeg' if is_empty else confidence ~ '% zekerheid' }}">
+            <span class="accordion-metric accordion-metric--{{ level }}" title="{{ label }}: {{ 'leeg' if is_empty else confidence ~ '% zekerheid' }}" data-summary-label="{{ label }}" data-summary-unit="{{ unit }}"{% if target %} data-summary-target="{{ target }}"{% endif %}>
                 <i></i>{{ label }}: {{ 'Leeg' if is_empty else display_value ~ unit }}
             </span>
         {%- endmacro %}
@@ -1566,6 +1566,7 @@
                                                 <div>
                                                     <p class="section-label">Digitale weekstaat</p>
                                                     <h3>Geparseerde urenstaat</h3>
+                                                    <span class="autosave-status" data-autosave-status>Wijzigingen worden automatisch opgeslagen</span>
                                                 </div>
                                             </div>
 
@@ -1654,8 +1655,8 @@
                                                 <summary>
                                                     <strong>Uren per dag</strong>
                                                     <span class="accordion-metrics">
-                                                        {{ summary_status(selected_message.parsed_map.total_hours, 'Totaal', selected_message.parsed_map.total_hours.value if selected_message.parsed_map.total_hours is defined else selected_message.hours, ' uur') }}
-                                                        {{ summary_status(selected_message.parsed_map.total_hours_check, 'Controle') }}
+                                                        {{ summary_status(selected_message.parsed_map.total_hours, 'Totaal', selected_message.parsed_map.total_hours.value if selected_message.parsed_map.total_hours is defined else selected_message.hours, ' uur', 'total_hours') }}
+                                                        {{ summary_status(selected_message.parsed_map.total_hours_check, 'Controle', none, '', 'total_hours_check') }}
                                                     </span>
                                                 </summary>
                                                 <div class="digital-week-table digital-week-table--with-total">
@@ -1674,7 +1675,7 @@
                                                 <summary>
                                                     <strong>Kilometers</strong>
                                                     <span class="accordion-metrics">
-                                                        {{ summary_status(selected_message.parsed_map.total_km, 'Totaal', none, ' km') }}
+                                                        {{ summary_status(selected_message.parsed_map.total_km, 'Totaal', none, ' km', 'total_km') }}
                                                         {{ summary_status(selected_message.parsed_map.single_trip_km, 'Enkele reis') }}
                                                     </span>
                                                 </summary>
@@ -1714,8 +1715,8 @@
                                                 <summary>
                                                     <strong>Controles en extra's</strong>
                                                     <span class="accordion-metrics">
-                                                        {{ summary_status(selected_message.parsed_map.calculated_total_hours, 'Uren') }}
-                                                        {{ summary_status(selected_message.parsed_map.calculated_total_km, 'Km') }}
+                                                        {{ summary_status(selected_message.parsed_map.calculated_total_hours, 'Uren', none, '', 'calculated_total_hours') }}
+                                                        {{ summary_status(selected_message.parsed_map.calculated_total_km, 'Km', none, '', 'calculated_total_km') }}
                                                         {{ summary_status(selected_message.parsed_map.signature, 'Handtekening') }}
                                                     </span>
                                                 </summary>
@@ -1941,6 +1942,6 @@
                 </section>
             </main>
         </div>
-        <script src="/dashboard/static/dashboard.js?v=20260603-01"></script>
+        <script src="/dashboard/static/dashboard.js?v=20260605-02"></script>
     </body>
 </html>

@@ -4589,6 +4589,28 @@ body[data-theme="light"] .theme-toggle strong {
     font-weight: 600;
 }
 
+.autosave-status {
+    display: inline-flex;
+    align-items: center;
+    margin-top: 3px;
+    color: #9dafba;
+    font-size: 0.72rem;
+    font-weight: 500;
+}
+
+.autosave-status[data-state="saving"],
+.autosave-status[data-state="pending"] {
+    color: #ffd18a;
+}
+
+.autosave-status[data-state="saved"] {
+    color: #9fe5b9;
+}
+
+.autosave-status[data-state="error"] {
+    color: #ffad9b;
+}
+
 .timesheet-accordion {
     overflow: hidden;
     border: 1px solid rgba(204, 216, 226, 0.13);

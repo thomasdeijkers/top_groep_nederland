@@ -538,6 +538,9 @@
         const calculatedKmInput = form.elements.field_calculated_total_km;
         const checkKmInput = form.elements.field_total_km_check;
         const absenceInput = form.elements.field_absence_code;
+        const autosaveStatus = form.querySelector("[data-autosave-status]");
+        let autosaveTimer = null;
+        let autosaveController = null;
         const dayCodeInputs = [
             ["field_monday_code", "field_monday_hours"],
             ["field_tuesday_code", "field_tuesday_hours"],
@@ -575,7 +578,29 @@
 
         const formatHours = (value) => Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2))).replace(".", ",");
 
-        const syncSumCheck = (inputs, totalField, calculatedField, checkField, unit, missingMessage) => {
+        const setAutosaveStatus = (text, state = "") => {
+            if (!autosaveStatus) {
+                return;
+            }
+            autosaveStatus.textContent = text;
+            autosaveStatus.dataset.state = state;
+        };
+
+        const setSummaryMetric = (target, value, state = "green") => {
+            const metric = form.querySelector(`[data-summary-target="${target}"]`);
+            if (!metric) {
+                return;
+            }
+            const label = metric.dataset.summaryLabel || "";
+            const unit = metric.dataset.summaryUnit || "";
+            const cleanValue = String(value || "").trim();
+            metric.classList.remove("accordion-metric--red", "accordion-metric--orange", "accordion-metric--green");
+            metric.classList.add(`accordion-metric--${cleanValue ? state : "red"}`);
+            metric.title = cleanValue ? `${label}: bijgewerkt` : `${label}: leeg`;
+            metric.innerHTML = `<i></i>${label}: ${cleanValue ? `${cleanValue}${unit}` : "Leeg"}`;
+        };
+
+        const syncSumCheck = (inputs, totalField, calculatedField, checkField, unit, missingMessage, updateTotal = false) => {
             if (!calculatedField || !checkField) {
                 return;
             }
@@ -583,22 +608,73 @@
             if (!values.length) {
                 calculatedField.value = "";
                 checkField.value = "";
+                if (updateTotal && totalField) {
+                    totalField.value = "";
+                }
+                setSummaryMetric(totalField?.name?.replace("field_", ""), "", "red");
+                setSummaryMetric(checkField.name.replace("field_", ""), "", "red");
+                setSummaryMetric(calculatedField.name.replace("field_", ""), "", "red");
                 return;
             }
             const calculated = values.reduce((sum, value) => sum + value, 0);
             calculatedField.value = formatHours(calculated);
+            if (updateTotal && totalField) {
+                totalField.value = calculatedField.value;
+            }
             const stated = parseHours(totalField?.value);
             if (stated === null) {
                 checkField.value = missingMessage;
+                setSummaryMetric(totalField?.name?.replace("field_", ""), "", "red");
+                setSummaryMetric(checkField.name.replace("field_", ""), checkField.value, "red");
+                setSummaryMetric(calculatedField.name.replace("field_", ""), calculatedField.value, "green");
                 return;
             }
             const difference = Math.abs(calculated - stated);
             checkField.value = difference < 0.005 ? "klopt" : `verschil ${formatHours(difference)} ${unit}`;
+            setSummaryMetric(totalField?.name?.replace("field_", ""), totalField?.value || "", difference < 0.005 ? "green" : "orange");
+            setSummaryMetric(checkField.name.replace("field_", ""), checkField.value, difference < 0.005 ? "green" : "orange");
+            setSummaryMetric(calculatedField.name.replace("field_", ""), calculatedField.value, "green");
         };
 
-        const syncTotalCheck = () => {
-            syncSumCheck(dayInputs, totalInput, calculatedInput, checkInput, "uur", "totaal ontbreekt");
-            syncSumCheck(kmInputs, totalKmInput, calculatedKmInput, checkKmInput, "km", "totaal km ontbreekt");
+        const syncTotalCheck = (source = "") => {
+            syncSumCheck(dayInputs, totalInput, calculatedInput, checkInput, "uur", "totaal ontbreekt", source === "hours");
+            syncSumCheck(kmInputs, totalKmInput, calculatedKmInput, checkKmInput, "km", "totaal km ontbreekt", source === "km");
+        };
+
+        const saveCorrections = async () => {
+            if (!form.action) {
+                return;
+            }
+            autosaveController?.abort();
+            autosaveController = new AbortController();
+            setAutosaveStatus("Opslaan...", "saving");
+            try {
+                const response = await fetch(form.action, {
+                    method: "POST",
+                    body: new FormData(form),
+                    headers: {
+                        "X-Requested-With": "fetch",
+                        Accept: "application/json",
+                    },
+                    signal: autosaveController.signal,
+                });
+                if (!response.ok) {
+                    throw new Error(`Opslaan mislukt: ${response.status}`);
+                }
+                setAutosaveStatus("Opgeslagen", "saved");
+            } catch (error) {
+                if (error.name === "AbortError") {
+                    return;
+                }
+                console.warn("Automatisch opslaan mislukt", error);
+                setAutosaveStatus("Niet opgeslagen", "error");
+            }
+        };
+
+        const scheduleAutosave = () => {
+            setAutosaveStatus("Wijziging klaarzetten...", "pending");
+            window.clearTimeout(autosaveTimer);
+            autosaveTimer = window.setTimeout(saveCorrections, 650);
         };
 
         const applyAbsenceCode = () => {
@@ -615,11 +691,37 @@
             });
         };
 
-        dayInputs.forEach((input) => input.addEventListener("input", syncTotalCheck));
-        totalInput?.addEventListener("input", syncTotalCheck);
-        kmInputs.forEach((input) => input.addEventListener("input", syncTotalCheck));
-        totalKmInput?.addEventListener("input", syncTotalCheck);
-        absenceInput?.addEventListener("change", applyAbsenceCode);
+        dayInputs.forEach((input) => input.addEventListener("input", () => {
+            syncTotalCheck("hours");
+            scheduleAutosave();
+        }));
+        totalInput?.addEventListener("input", () => {
+            syncTotalCheck("total");
+            scheduleAutosave();
+        });
+        kmInputs.forEach((input) => input.addEventListener("input", () => {
+            syncTotalCheck("km");
+            scheduleAutosave();
+        }));
+        totalKmInput?.addEventListener("input", () => {
+            syncTotalCheck("total_km");
+            scheduleAutosave();
+        });
+        form.addEventListener("change", () => {
+            syncWorkflowIds();
+            syncTotalCheck();
+            scheduleAutosave();
+        });
+        form.addEventListener("submit", (event) => {
+            event.preventDefault();
+            syncWorkflowIds();
+            syncTotalCheck();
+            saveCorrections();
+        });
+        absenceInput?.addEventListener("change", () => {
+            applyAbsenceCode();
+            scheduleAutosave();
+        });
         applyAbsenceCode();
         syncTotalCheck();
     });
@@ -660,7 +762,7 @@
 
     document.querySelectorAll("form").forEach((form) => {
         const action = form.getAttribute("action") || "";
-        if (!action.includes("/api/whatsapp/timesheet/") || action.includes("/delete")) {
+        if (!action.includes("/api/whatsapp/timesheet/") || action.includes("/delete") || action.includes("/corrections")) {
             return;
         }
         form.addEventListener("submit", () => {

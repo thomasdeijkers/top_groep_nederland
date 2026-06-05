@@ -2,7 +2,7 @@ from pathlib import Path
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, File, Form, Query, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
 
@@ -576,6 +576,8 @@ async def correct_whatsapp_timesheet(timesheet_id: int, request: Request):
     if matched_relation_id:
         description += f" Kandidaatkaart #{matched_relation_id} gekoppeld."
     _audit("Urenbriefje gecorrigeerd", "urenbriefje", timesheet_id, f"Urenbriefje {timesheet_id}", description, "Controle")
+    if request.headers.get("X-Requested-With") == "fetch":
+        return JSONResponse({"ok": True, "timesheet_id": timesheet_id})
     return RedirectResponse(f"/dashboard/timesheets?stage=valideren&timesheet={timesheet_id}", status_code=303)
 
 
