@@ -4316,6 +4316,7 @@ body[data-theme="light"] .theme-toggle strong {
 
 .document-preview-panel {
     display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
     gap: 7px;
     align-content: start;
     padding: 10px;
@@ -4353,8 +4354,8 @@ body[data-theme="light"] .theme-toggle strong {
 .document-frame {
     display: grid;
     place-items: center;
-    min-height: 230px;
-    max-height: 320px;
+    min-height: clamp(360px, 54vh, 720px);
+    max-height: none;
     overflow: auto;
     border: 1px solid rgba(204, 216, 226, 0.14);
     border-radius: 8px;
@@ -4362,13 +4363,16 @@ body[data-theme="light"] .theme-toggle strong {
 }
 
 .document-frame--compact {
-    min-height: 260px;
+    min-height: clamp(420px, 58vh, 760px);
+    height: clamp(420px, 58vh, 760px);
 }
 
 .document-frame img {
     display: block;
-    max-width: 100%;
-    max-height: 330px;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
     object-fit: contain;
     transform: rotate(var(--document-rotation, 0deg));
     transform-origin: center;
@@ -4378,7 +4382,8 @@ body[data-theme="light"] .theme-toggle strong {
     display: grid;
     place-items: center;
     width: 100%;
-    min-height: 260px;
+    height: 100%;
+    min-height: inherit;
     border: 0;
     background: transparent;
     color: #b8c8d1;
@@ -4386,6 +4391,7 @@ body[data-theme="light"] .theme-toggle strong {
 }
 
 .document-zoom-button span {
+    display: none;
     margin-top: 8px;
     color: #9fb0bd;
     font-size: 0.78rem;
@@ -4642,12 +4648,15 @@ body[data-theme="light"] .theme-toggle strong {
     min-width: 0;
 }
 
-.accordion-metrics span {
+.accordion-metric {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     min-width: 0;
-    max-width: 150px;
+    max-width: 180px;
     overflow: hidden;
     padding: 3px 7px;
-    border: 1px solid rgba(204, 216, 226, 0.12);
+    border: 1px solid rgba(204, 216, 226, 0.14);
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.035);
     color: #c6d4dc;
@@ -4656,6 +4665,43 @@ body[data-theme="light"] .theme-toggle strong {
     line-height: 1.2;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.accordion-metric i {
+    width: 9px;
+    height: 9px;
+    flex: 0 0 9px;
+    border-radius: 999px;
+}
+
+.accordion-metric--red {
+    border-color: rgba(239, 95, 87, 0.26);
+    color: #ffc0b3;
+}
+
+.accordion-metric--red i {
+    background: #ef5f57;
+    box-shadow: 0 0 0 3px rgba(239, 95, 87, 0.14);
+}
+
+.accordion-metric--orange {
+    border-color: rgba(246, 166, 58, 0.26);
+    color: #ffd18a;
+}
+
+.accordion-metric--orange i {
+    background: #f6a63a;
+    box-shadow: 0 0 0 3px rgba(246, 166, 58, 0.14);
+}
+
+.accordion-metric--green {
+    border-color: rgba(82, 210, 115, 0.24);
+    color: #a8ebbd;
+}
+
+.accordion-metric--green i {
+    background: #52d273;
+    box-shadow: 0 0 0 3px rgba(82, 210, 115, 0.13);
 }
 
 .timesheet-accordion > .digital-timesheet-grid,

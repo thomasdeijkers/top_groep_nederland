@@ -22,10 +22,22 @@
     </head>
     <body class="page-{{ active_page }}">
         {% macro confidence_light(field) -%}
-            {% set confidence = field.confidence if field is defined and field.confidence is defined else 0 %}
-            {% set level = 'green' if confidence > 95 else 'orange' if confidence >= 80 else 'red' %}
-            <span class="field-light field-light--{{ level }}" title="Zekerheid {{ confidence }}%">
-                <span></span>{{ confidence }}%
+            {% set value = field.value if field is defined and field.value is defined else none %}
+            {% set is_empty = value is none or value|string|trim == '' %}
+            {% set confidence = 0 if is_empty else field.confidence if field is defined and field.confidence is defined else 0 %}
+            {% set level = 'red' if is_empty else 'green' if confidence > 95 else 'orange' if confidence >= 80 else 'red' %}
+            <span class="field-light field-light--{{ level }}" title="{{ 'Veld is leeg' if is_empty else 'Zekerheid ' ~ confidence ~ '%' }}">
+                <span></span>{{ 'Leeg' if is_empty else confidence ~ '%' }}
+            </span>
+        {%- endmacro %}
+        {% macro summary_status(field, label, value=none, unit='') -%}
+            {% set parsed_value = field.value if field is defined and field.value is defined else none %}
+            {% set display_value = value if value is not none else parsed_value %}
+            {% set is_empty = display_value is none or display_value|string|trim == '' %}
+            {% set confidence = 0 if is_empty else field.confidence if field is defined and field.confidence is defined else 0 %}
+            {% set level = 'red' if is_empty else 'green' if confidence > 95 else 'orange' if confidence >= 80 else 'red' %}
+            <span class="accordion-metric accordion-metric--{{ level }}" title="{{ label }}: {{ 'leeg' if is_empty else confidence ~ '% zekerheid' }}">
+                <i></i>{{ label }}: {{ 'Leeg' if is_empty else display_value ~ unit }}
             </span>
         {%- endmacro %}
         <div class="app-shell">
@@ -1557,13 +1569,13 @@
                                                 </div>
                                             </div>
 
-                                            <details class="timesheet-accordion">
+                                            <details class="timesheet-accordion" open>
                                                 <summary>
                                                     <strong>Basisgegevens</strong>
                                                     <span class="accordion-metrics">
-                                                        <span>Score {{ selected_message.overall_confidence }}%</span>
-                                                        <span>Week {{ selected_message.parsed_map.week_number.value if selected_message.parsed_map.week_number is defined else '-' }}</span>
-                                                        <span>{{ selected_message.parsed_map.date.value if selected_message.parsed_map.date is defined else selected_message.work_date or '-' }}</span>
+                                                        {{ summary_status(selected_message.parsed_map.week_number, 'Week') }}
+                                                        {{ summary_status(selected_message.parsed_map.date, 'Datum', selected_message.parsed_map.date.value if selected_message.parsed_map.date is defined else selected_message.work_date) }}
+                                                        {{ summary_status(selected_message.parsed_map.employee_phone, 'Telefoon') }}
                                                     </span>
                                                 </summary>
                                                 <div class="digital-timesheet-grid digital-timesheet-grid--primary">
@@ -1597,9 +1609,9 @@
                                                 <summary>
                                                     <strong>Koppelingen</strong>
                                                     <span class="accordion-metrics">
-                                                        <span>Score {{ selected_message.overall_confidence }}%</span>
-                                                        <span>{{ selected_message.matched_name or 'Geen match' }}</span>
-                                                        <span>{{ selected_message.project_name or 'Geen project' }}</span>
+                                                        {{ summary_status(selected_message.parsed_map.employee_name, 'Kandidaat', selected_message.matched_name if selected_message.matched_name and selected_message.matched_name != 'Geen match' else none) }}
+                                                        {{ summary_status(selected_message.parsed_map.principal_name, 'Opdrachtgever') }}
+                                                        {{ summary_status(selected_message.parsed_map.work_name, 'Project', selected_message.project_name) }}
                                                     </span>
                                                 </summary>
                                                 <div class="digital-timesheet-grid digital-timesheet-grid--primary">
@@ -1642,8 +1654,8 @@
                                                 <summary>
                                                     <strong>Uren per dag</strong>
                                                     <span class="accordion-metrics">
-                                                        <span>Score {{ selected_message.overall_confidence }}%</span>
-                                                        <span>Totaal {{ selected_message.parsed_map.total_hours.value if selected_message.parsed_map.total_hours is defined else selected_message.hours or '-' }} uur</span>
+                                                        {{ summary_status(selected_message.parsed_map.total_hours, 'Totaal', selected_message.parsed_map.total_hours.value if selected_message.parsed_map.total_hours is defined else selected_message.hours, ' uur') }}
+                                                        {{ summary_status(selected_message.parsed_map.total_hours_check, 'Controle') }}
                                                     </span>
                                                 </summary>
                                                 <div class="digital-week-table digital-week-table--with-total">
@@ -1662,9 +1674,8 @@
                                                 <summary>
                                                     <strong>Kilometers</strong>
                                                     <span class="accordion-metrics">
-                                                        <span>Score {{ selected_message.overall_confidence }}%</span>
-                                                        <span>Totaal {{ selected_message.parsed_map.total_km.value if selected_message.parsed_map.total_km is defined else '-' }} km</span>
-                                                        <span>Enkele reis {{ selected_message.parsed_map.single_trip_km.value if selected_message.parsed_map.single_trip_km is defined else '-' }}</span>
+                                                        {{ summary_status(selected_message.parsed_map.total_km, 'Totaal', none, ' km') }}
+                                                        {{ summary_status(selected_message.parsed_map.single_trip_km, 'Enkele reis') }}
                                                     </span>
                                                 </summary>
                                                 <div class="digital-week-table digital-week-table--with-total">
@@ -1683,8 +1694,8 @@
                                                 <summary>
                                                     <strong>Dagcodes en verzuim</strong>
                                                     <span class="accordion-metrics">
-                                                        <span>Score {{ selected_message.overall_confidence }}%</span>
-                                                        <span>Verzuim {{ selected_message.parsed_map.absence_code.value if selected_message.parsed_map.absence_code is defined else '-' }}</span>
+                                                        {{ summary_status(selected_message.parsed_map.absence_code, 'Verzuim') }}
+                                                        {{ summary_status(selected_message.parsed_map.monday_code, 'Code ma') }}
                                                     </span>
                                                 </summary>
                                                 <div class="digital-week-table digital-week-table--codes digital-week-table--codes-with-absence">
@@ -1703,9 +1714,9 @@
                                                 <summary>
                                                     <strong>Controles en extra's</strong>
                                                     <span class="accordion-metrics">
-                                                        <span>Score {{ selected_message.overall_confidence }}%</span>
-                                                        <span>Uren {{ selected_message.parsed_map.calculated_total_hours.value if selected_message.parsed_map.calculated_total_hours is defined else '-' }}</span>
-                                                        <span>Km {{ selected_message.parsed_map.calculated_total_km.value if selected_message.parsed_map.calculated_total_km is defined else '-' }}</span>
+                                                        {{ summary_status(selected_message.parsed_map.calculated_total_hours, 'Uren') }}
+                                                        {{ summary_status(selected_message.parsed_map.calculated_total_km, 'Km') }}
+                                                        {{ summary_status(selected_message.parsed_map.signature, 'Handtekening') }}
                                                     </span>
                                                 </summary>
                                                 <div class="digital-timesheet-grid digital-timesheet-grid--compact">
