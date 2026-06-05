@@ -1537,7 +1537,12 @@
                                                 </div>
                                             </div>
 
-                                            <div class="digital-timesheet-grid">
+                                            <details class="timesheet-accordion" open>
+                                                <summary>
+                                                    <strong>Basisgegevens</strong>
+                                                    <span>Week, datum, opdrachtgever en werknemer</span>
+                                                </summary>
+                                                <div class="digital-timesheet-grid digital-timesheet-grid--primary">
                                                 <label><span class="field-title">Week {{ confidence_light(selected_message.parsed_map.week_number) }}</span><input name="field_week_number" value="{{ selected_message.parsed_map.week_number.value if selected_message.parsed_map.week_number is defined else '' }}"></label>
                                                 <label><span class="field-title">Datum {{ confidence_light(selected_message.parsed_map.date) }}</span><input name="field_date" value="{{ selected_message.parsed_map.date.value if selected_message.parsed_map.date is defined else selected_message.work_date or '' }}"></label>
                                                 <label><span class="field-title">Opdrachtgever {{ confidence_light(selected_message.parsed_map.principal_name) }}</span>
@@ -1561,6 +1566,15 @@
                                                     {% endif %}
                                                 </label>
                                                 <label><span class="field-title">Telefoon werknemer {{ confidence_light(selected_message.parsed_map.employee_phone) }}</span><input name="field_employee_phone" value="{{ parsed_employee_phone }}"></label>
+                                                </div>
+                                            </details>
+
+                                            <details class="timesheet-accordion">
+                                                <summary>
+                                                    <strong>Koppelingen</strong>
+                                                    <span>Kandidaat, project, werknummer en locatie</span>
+                                                </summary>
+                                                <div class="digital-timesheet-grid digital-timesheet-grid--primary">
                                                 <div class="candidate-match-control">
                                                     <span class="field-title">Kandidaat koppelen</span>
                                                     <div class="parsed-candidate-name">
@@ -1593,9 +1607,15 @@
                                                 <label><span class="field-title">Werknummer {{ confidence_light(selected_message.parsed_map.work_number) }}</span><input name="field_work_number" value="{{ selected_message.parsed_map.work_number.value if selected_message.parsed_map.work_number is defined else '' }}"></label>
                                                 <label><span class="field-title">Plaats {{ confidence_light(selected_message.parsed_map.location) }}</span><input name="field_location" value="{{ selected_message.parsed_map.location.value if selected_message.parsed_map.location is defined else selected_message.employee_city }}"></label>
                                                 <label><span class="field-title">Kilometers enkele reis {{ confidence_light(selected_message.parsed_map.single_trip_km) }}</span><input name="field_single_trip_km" value="{{ selected_message.parsed_map.single_trip_km.value if selected_message.parsed_map.single_trip_km is defined else '' }}"></label>
-                                            </div>
+                                                </div>
+                                            </details>
 
-                                            <div class="digital-week-table digital-week-table--with-total">
+                                            <details class="timesheet-accordion" open>
+                                                <summary>
+                                                    <strong>Uren per dag</strong>
+                                                    <span>Direct controleren en corrigeren</span>
+                                                </summary>
+                                                <div class="digital-week-table digital-week-table--with-total">
                                                 <label><span class="week-head">Ma {{ confidence_light(selected_message.parsed_map.monday_hours) }}</span><input name="field_monday_hours" value="{{ selected_message.parsed_map.monday_hours.value if selected_message.parsed_map.monday_hours is defined else '' }}"></label>
                                                 <label><span class="week-head">Di {{ confidence_light(selected_message.parsed_map.tuesday_hours) }}</span><input name="field_tuesday_hours" value="{{ selected_message.parsed_map.tuesday_hours.value if selected_message.parsed_map.tuesday_hours is defined else '' }}"></label>
                                                 <label><span class="week-head">Wo {{ confidence_light(selected_message.parsed_map.wednesday_hours) }}</span><input name="field_wednesday_hours" value="{{ selected_message.parsed_map.wednesday_hours.value if selected_message.parsed_map.wednesday_hours is defined else '' }}"></label>
@@ -1604,9 +1624,15 @@
                                                 <label><span class="week-head">Za {{ confidence_light(selected_message.parsed_map.saturday_hours) }}</span><input name="field_saturday_hours" value="{{ selected_message.parsed_map.saturday_hours.value if selected_message.parsed_map.saturday_hours is defined else '' }}"></label>
                                                 <label><span class="week-head">Zo {{ confidence_light(selected_message.parsed_map.sunday_hours) }}</span><input name="field_sunday_hours" value="{{ selected_message.parsed_map.sunday_hours.value if selected_message.parsed_map.sunday_hours is defined else '' }}"></label>
                                                 <label><span class="week-head">Totaal {{ confidence_light(selected_message.parsed_map.total_hours) }}</span><input name="field_total_hours" value="{{ selected_message.parsed_map.total_hours.value if selected_message.parsed_map.total_hours is defined else selected_message.hours or '' }}"></label>
-                                            </div>
+                                                </div>
+                                            </details>
 
-                                            <div class="digital-week-table digital-week-table--with-total">
+                                            <details class="timesheet-accordion">
+                                                <summary>
+                                                    <strong>Kilometers</strong>
+                                                    <span>Alleen openen als reiskilometers nodig zijn</span>
+                                                </summary>
+                                                <div class="digital-week-table digital-week-table--with-total">
                                                 <label><span class="week-head">Km ma {{ confidence_light(selected_message.parsed_map.monday_km) }}</span><input name="field_monday_km" value="{{ selected_message.parsed_map.monday_km.value if selected_message.parsed_map.monday_km is defined else '' }}"></label>
                                                 <label><span class="week-head">Km di {{ confidence_light(selected_message.parsed_map.tuesday_km) }}</span><input name="field_tuesday_km" value="{{ selected_message.parsed_map.tuesday_km.value if selected_message.parsed_map.tuesday_km is defined else '' }}"></label>
                                                 <label><span class="week-head">Km wo {{ confidence_light(selected_message.parsed_map.wednesday_km) }}</span><input name="field_wednesday_km" value="{{ selected_message.parsed_map.wednesday_km.value if selected_message.parsed_map.wednesday_km is defined else '' }}"></label>
@@ -1615,9 +1641,15 @@
                                                 <label><span class="week-head">Km za {{ confidence_light(selected_message.parsed_map.saturday_km) }}</span><input name="field_saturday_km" value="{{ selected_message.parsed_map.saturday_km.value if selected_message.parsed_map.saturday_km is defined else '' }}"></label>
                                                 <label><span class="week-head">Km zo {{ confidence_light(selected_message.parsed_map.sunday_km) }}</span><input name="field_sunday_km" value="{{ selected_message.parsed_map.sunday_km.value if selected_message.parsed_map.sunday_km is defined else '' }}"></label>
                                                 <label><span class="week-head">Totaal km {{ confidence_light(selected_message.parsed_map.total_km) }}</span><input name="field_total_km" value="{{ selected_message.parsed_map.total_km.value if selected_message.parsed_map.total_km is defined else '' }}"></label>
-                                            </div>
+                                                </div>
+                                            </details>
 
-                                            <div class="digital-week-table digital-week-table--codes digital-week-table--codes-with-absence">
+                                            <details class="timesheet-accordion">
+                                                <summary>
+                                                    <strong>Dagcodes en verzuim</strong>
+                                                    <span>Codes per dag en verzuimcode</span>
+                                                </summary>
+                                                <div class="digital-week-table digital-week-table--codes digital-week-table--codes-with-absence">
                                                 <label><span class="week-head">Code ma {{ confidence_light(selected_message.parsed_map.monday_code) }}</span><input name="field_monday_code" value="{{ selected_message.parsed_map.monday_code.value if selected_message.parsed_map.monday_code is defined else '' }}"></label>
                                                 <label><span class="week-head">Code di {{ confidence_light(selected_message.parsed_map.tuesday_code) }}</span><input name="field_tuesday_code" value="{{ selected_message.parsed_map.tuesday_code.value if selected_message.parsed_map.tuesday_code is defined else '' }}"></label>
                                                 <label><span class="week-head">Code wo {{ confidence_light(selected_message.parsed_map.wednesday_code) }}</span><input name="field_wednesday_code" value="{{ selected_message.parsed_map.wednesday_code.value if selected_message.parsed_map.wednesday_code is defined else '' }}"></label>
@@ -1626,9 +1658,15 @@
                                                 <label><span class="week-head">Code za {{ confidence_light(selected_message.parsed_map.saturday_code) }}</span><input name="field_saturday_code" value="{{ selected_message.parsed_map.saturday_code.value if selected_message.parsed_map.saturday_code is defined else '' }}"></label>
                                                 <label><span class="week-head">Code zo {{ confidence_light(selected_message.parsed_map.sunday_code) }}</span><input name="field_sunday_code" value="{{ selected_message.parsed_map.sunday_code.value if selected_message.parsed_map.sunday_code is defined else '' }}"></label>
                                                 <label><span class="week-head">Verzuim {{ confidence_light(selected_message.parsed_map.absence_code) }}</span><input name="field_absence_code" value="{{ selected_message.parsed_map.absence_code.value if selected_message.parsed_map.absence_code is defined else '' }}" data-absence-code></label>
-                                            </div>
+                                                </div>
+                                            </details>
 
-                                            <div class="digital-timesheet-grid digital-timesheet-grid--compact">
+                                            <details class="timesheet-accordion">
+                                                <summary>
+                                                    <strong>Controles en extra's</strong>
+                                                    <span>Totalen, kosten, opmerkingen en handtekeningen</span>
+                                                </summary>
+                                                <div class="digital-timesheet-grid digital-timesheet-grid--compact">
                                                 <label><span class="field-title">Berekend totaal {{ confidence_light(selected_message.parsed_map.calculated_total_hours) }}</span><input name="field_calculated_total_hours" value="{{ selected_message.parsed_map.calculated_total_hours.value if selected_message.parsed_map.calculated_total_hours is defined else '' }}" readonly></label>
                                                 <label><span class="field-title">Controle totaal {{ confidence_light(selected_message.parsed_map.total_hours_check) }}</span><input name="field_total_hours_check" value="{{ selected_message.parsed_map.total_hours_check.value if selected_message.parsed_map.total_hours_check is defined else '' }}" readonly></label>
                                                 <label><span class="field-title">Berekend km totaal {{ confidence_light(selected_message.parsed_map.calculated_total_km) }}</span><input name="field_calculated_total_km" value="{{ selected_message.parsed_map.calculated_total_km.value if selected_message.parsed_map.calculated_total_km is defined else '' }}" readonly></label>
@@ -1647,7 +1685,8 @@
                                                     <input name="field_client_signature" value="{{ selected_message.parsed_map.client_signature.value if selected_message.parsed_map.client_signature is defined else '' }}">
                                                     <button class="field-suggestion" type="button" data-fill-field="field_client_signature" data-fill-value="aanwezig">Aanwezig</button>
                                                 </label>
-                                            </div>
+                                                </div>
+                                            </details>
 
                                             <button class="sr-only" type="submit">Opslaan</button>
                                 </form>

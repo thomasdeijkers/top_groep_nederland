@@ -4419,8 +4419,8 @@ body[data-theme="light"] .theme-toggle strong {
 
 .digital-timesheet-form {
     display: grid;
-    gap: 8px;
-    padding: 12px;
+    gap: 7px;
+    padding: 10px;
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 8px;
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.035));
@@ -4437,10 +4437,74 @@ body[data-theme="light"] .theme-toggle strong {
     margin: 0;
 }
 
+.timesheet-accordion {
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.11);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.035);
+}
+
+.timesheet-accordion summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    min-height: 42px;
+    padding: 8px 12px;
+    color: #eef6f8;
+    cursor: pointer;
+    list-style: none;
+}
+
+.timesheet-accordion summary::-webkit-details-marker {
+    display: none;
+}
+
+.timesheet-accordion summary::after {
+    content: "+";
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    flex: 0 0 24px;
+    border-radius: 7px;
+    background: rgba(127, 209, 160, 0.12);
+    color: #9fe5b9;
+    font-weight: 900;
+}
+
+.timesheet-accordion[open] summary::after {
+    content: "-";
+}
+
+.timesheet-accordion summary:hover {
+    background: rgba(127, 209, 160, 0.08);
+}
+
+.timesheet-accordion summary strong {
+    font-size: 0.95rem;
+}
+
+.timesheet-accordion summary span {
+    margin-left: auto;
+    color: #9fb0bd;
+    font-size: 0.76rem;
+    font-weight: 800;
+}
+
+.timesheet-accordion > .digital-timesheet-grid,
+.timesheet-accordion > .digital-week-table {
+    margin: 0 8px 8px;
+}
+
 .digital-timesheet-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 7px;
+}
+
+.digital-timesheet-grid--primary {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .digital-timesheet-grid--compact {
@@ -4458,7 +4522,7 @@ body[data-theme="light"] .theme-toggle strong {
 
 .digital-timesheet-grid input,
 .digital-timesheet-grid select {
-    min-height: 36px;
+    min-height: 34px;
     padding-top: 0;
     padding-bottom: 0;
 }
@@ -4492,7 +4556,7 @@ body[data-theme="light"] .theme-toggle strong {
     display: grid;
     grid-template-columns: repeat(8, minmax(54px, 1fr));
     gap: 5px;
-    padding: 8px;
+    padding: 7px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
     background: rgba(255, 255, 255, 0.045);
@@ -4526,9 +4590,13 @@ body[data-theme="light"] .theme-toggle strong {
 }
 
 .digital-week-table input {
-    min-height: 32px;
+    min-height: 30px;
     padding: 0 8px;
     text-align: center;
+}
+
+.timesheet-review-panel .workflow-actions {
+    margin-top: 8px;
 }
 
 .compact-review-bar,
