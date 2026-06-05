@@ -25,7 +25,7 @@
             {% set value = field.value if field is defined and field.value is defined else none %}
             {% set is_empty = value is none or value|string|trim == '' %}
             {% set confidence = 0 if is_empty else field.confidence if field is defined and field.confidence is defined else 0 %}
-            {% set level = 'red' if is_empty else 'green' if confidence > 95 else 'orange' if confidence >= 80 else 'red' %}
+            {% set level = 'red' if is_empty else 'green' if confidence >= 95 else 'orange' if confidence >= 80 else 'red' %}
             <span class="field-light field-light--{{ level }}" title="{{ 'Veld is leeg' if is_empty else 'Zekerheid ' ~ confidence ~ '%' }}">
                 <span></span>{{ 'Leeg' if is_empty else confidence ~ '%' }}
             </span>
@@ -35,7 +35,7 @@
             {% set display_value = value if value is not none else parsed_value %}
             {% set is_empty = display_value is none or display_value|string|trim == '' %}
             {% set confidence = 0 if is_empty else field.confidence if field is defined and field.confidence is defined else 0 %}
-            {% set level = 'red' if is_empty else 'green' if confidence > 95 else 'orange' if confidence >= 80 else 'red' %}
+            {% set level = 'red' if is_empty else 'green' if confidence >= 95 else 'orange' if confidence >= 80 else 'red' %}
             <span class="accordion-metric accordion-metric--{{ level }}" title="{{ label }}: {{ 'leeg' if is_empty else confidence ~ '% zekerheid' }}" data-summary-label="{{ label }}" data-summary-unit="{{ unit }}"{% if target %} data-summary-target="{{ target }}"{% endif %}>
                 <i></i>{{ label }}: {{ 'Leeg' if is_empty else display_value ~ unit }}
             </span>
@@ -1438,7 +1438,7 @@
                                             <td data-sort-value="{{ message.workflow_stage_label }}"><span class="status-tag">{{ message.workflow_stage_label }}</span></td>
                                             <td data-sort-value="{{ message.matched_name }}">{{ message.matched_name }}</td>
                                             <td data-sort-value="{{ message.overall_confidence }}">
-                                                <span class="confidence-pill confidence-{{ 'high' if message.overall_confidence > 95 else 'medium' if message.overall_confidence >= 80 else 'low' }}">
+                                                <span class="confidence-pill confidence-{{ 'high' if message.overall_confidence >= 95 else 'medium' if message.overall_confidence >= 80 else 'low' }}">
                                                     {{ message.overall_confidence }}%
                                                 </span>
                                             </td>
@@ -1481,7 +1481,7 @@
                                         <span>{{ selected_message.sender_phone }} - match: {{ selected_message.matched_name }}</span>
                                     </div>
                                     <div class="compact-review-bar__right">
-                                        <span class="confidence-pill confidence-{{ 'high' if gated_overall_confidence > 95 else 'medium' if gated_overall_confidence >= 80 else 'low' }}">
+                                        <span class="confidence-pill confidence-{{ 'high' if gated_overall_confidence >= 95 else 'medium' if gated_overall_confidence >= 80 else 'low' }}">
                                             {{ gated_overall_confidence }}%
                                         </span>
                                     </div>
@@ -1547,7 +1547,7 @@
                                         <summary>
                                             <span>
                                                 <small>Parsing score</small>
-                                                <strong class="parse-grade parse-grade--{{ 'green' if gated_overall_confidence > 95 else 'orange' if gated_overall_confidence >= 80 else 'red' }}">{{ "%.1f"|format((gated_overall_confidence or 0) / 10)|replace('.', ',') }}</strong>
+                                                <strong class="parse-grade parse-grade--{{ 'green' if gated_overall_confidence >= 95 else 'orange' if gated_overall_confidence >= 80 else 'red' }}">{{ "%.1f"|format((gated_overall_confidence or 0) / 10)|replace('.', ',') }}</strong>
                                             </span>
                                             <span>
                                                 <small>Zekerheid</small>
@@ -1555,7 +1555,7 @@
                                             </span>
                                             <span>
                                                 <small>Controle score</small>
-                                                <strong class="parse-grade parse-grade--{{ 'green' if gated_control_score > 95 else 'orange' if gated_control_score >= 80 else 'red' }}">{{ "%.1f"|format((gated_control_score or 0) / 10)|replace('.', ',') }}</strong>
+                                                <strong class="parse-grade parse-grade--{{ 'green' if gated_control_score >= 95 else 'orange' if gated_control_score >= 80 else 'red' }}">{{ "%.1f"|format((gated_control_score or 0) / 10)|replace('.', ',') }}</strong>
                                             </span>
                                             <span>
                                                 <small>Totaal uren</small>
@@ -1578,7 +1578,7 @@
                                                 </div>
                                                 <div>
                                                     <dt>Beoordeling</dt>
-                                                    <dd>{% if relation_gate_missing %}Kandidaat of opdrachtgever ontbreekt{% elif gated_overall_confidence > 95 %}Betrouwbaar{% elif gated_overall_confidence >= 80 %}Nalopen{% else %}Controleren{% endif %}</dd>
+                                                    <dd>{% if relation_gate_missing %}Kandidaat of opdrachtgever ontbreekt{% elif gated_overall_confidence >= 95 %}Betrouwbaar{% elif gated_overall_confidence >= 80 %}Nalopen{% else %}Controleren{% endif %}</dd>
                                                 </div>
                                             </dl>
                                             <div class="confidence-legend confidence-legend--compact">
