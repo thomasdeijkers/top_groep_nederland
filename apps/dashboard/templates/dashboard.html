@@ -18,7 +18,7 @@
         </title>
         <link rel="icon" href="/dashboard/static/favicon.ico" sizes="any">
         <link rel="shortcut icon" href="/dashboard/static/favicon.ico">
-        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260605-07">
+        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260605-08">
     </head>
     <body class="page-{{ active_page }}">
         {% macro confidence_light(field) -%}
@@ -1527,6 +1527,19 @@
                                     </div>
 
                                     <div class="timesheet-review-sidebar">
+                                    {% set control_score_data = namespace(total=0, count=0) %}
+                                    {% for control_field in [
+                                        selected_message.parsed_map.total_hours_check if selected_message.parsed_map.total_hours_check is defined else none,
+                                        selected_message.parsed_map.total_km_check if selected_message.parsed_map.total_km_check is defined else none,
+                                        selected_message.parsed_map.signature if selected_message.parsed_map.signature is defined else none
+                                    ] %}
+                                        {% set control_value = control_field.value if control_field is not none and control_field.value is defined else none %}
+                                        {% if control_value is not none and control_value|string|trim %}
+                                            {% set control_score_data.total = control_score_data.total + (control_field.confidence if control_field.confidence is defined else 0) %}
+                                            {% set control_score_data.count = control_score_data.count + 1 %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% set control_score = (control_score_data.total / control_score_data.count)|round|int if control_score_data.count else 0 %}
                                     <details class="parse-score-panel parse-score-panel--compact">
                                         <summary>
                                             <span>
@@ -1536,6 +1549,10 @@
                                             <span>
                                                 <small>Zekerheid</small>
                                                 <strong>{{ selected_message.overall_confidence }}%</strong>
+                                            </span>
+                                            <span>
+                                                <small>Controle score</small>
+                                                <strong class="parse-grade parse-grade--{{ 'green' if control_score > 95 else 'orange' if control_score >= 80 else 'red' }}">{{ "%.1f"|format((control_score or 0) / 10)|replace('.', ',') }}</strong>
                                             </span>
                                             <span>
                                                 <small>Totaal uren</small>
@@ -1590,8 +1607,9 @@
                                                 <div class="digital-timesheet-grid digital-timesheet-grid--primary">
                                                 <label><span class="field-title">Week {{ confidence_light(selected_message.parsed_map.week_number) }}</span><input name="field_week_number" value="{{ selected_message.parsed_map.week_number.value if selected_message.parsed_map.week_number is defined else '' }}"></label>
                                                 <label><span class="field-title">Datum {{ confidence_light(selected_message.parsed_map.date) }}</span><input name="field_date" value="{{ selected_message.parsed_map.date.value if selected_message.parsed_map.date is defined else selected_message.work_date or '' }}"></label>
-                                                <label><span class="field-title">Opdrachtgever {{ confidence_light(selected_message.parsed_map.principal_name) }}</span>
-                                                    <select name="field_principal_name">
+                                                <label class="search-select-field"><span class="field-title">Opdrachtgever {{ confidence_light(selected_message.parsed_map.principal_name) }}</span>
+                                                    <input type="search" placeholder="Zoek opdrachtgever..." data-principal-search autocomplete="off">
+                                                    <select name="field_principal_name" data-principal-search-select data-principal-search-url="/api/principals/search">
                                                         <option value="">Kies opdrachtgever</option>
                                                         {% for principal in principal_options %}
                                                         <option value="{{ principal.name }}" data-id="{{ principal.id }}" {% if selected_message.selected_principal_id == principal.id or selected_message.principal_name == principal.name %}selected{% endif %}>{{ principal.name }}</option>
@@ -1618,18 +1636,16 @@
                                                 <summary>
                                                     <strong>Koppelingen</strong>
                                                     <span class="accordion-metrics">
-                                                        {{ summary_status(selected_message.parsed_map.employee_name, 'Kandidaat', selected_message.matched_name if selected_message.matched_name and selected_message.matched_name != 'Geen match' else none) }}
+                                                        <span class="accordion-metric accordion-metric--{{ 'green' if selected_message.matched_relation_id else 'red' }}">
+                                                            <i></i>Kandidaat: {{ selected_message.matched_name if selected_message.matched_relation_id else 'Niet gekoppeld' }}
+                                                        </span>
                                                         {{ summary_status(selected_message.parsed_map.principal_name, 'Opdrachtgever') }}
                                                         {{ summary_status(selected_message.parsed_map.work_name, 'Project', selected_message.project_name) }}
                                                     </span>
                                                 </summary>
                                                 <div class="digital-timesheet-grid digital-timesheet-grid--primary digital-timesheet-grid--links">
                                                 <div class="candidate-match-control">
-                                                    <span class="field-title">Kandidaat koppelen</span>
-                                                    <div class="parsed-candidate-name">
-                                                        <span>Geparst</span>
-                                                        <strong>{{ parsed_employee_name or 'Geen naam gevonden' }}</strong>
-                                                    </div>
+                                                    <span class="field-title">Kandidaat koppelen <small>Geparst: {{ parsed_employee_name or 'geen naam gevonden' }}</small></span>
                                                     <div class="candidate-suggestions" data-candidate-suggestions aria-label="Kandidaatsuggesties"></div>
                                                     <input type="search" placeholder="Zoek kandidaat op naam of telefoon..." data-candidate-match-search autocomplete="off">
                                                     <select name="matched_relation_id" size="6" data-candidate-match-select data-candidate-search-url="/api/candidates/search">
@@ -1637,7 +1653,7 @@
                                                         {% for candidate in timesheet_candidate_options %}
                                                         {% set candidate_name_match = parsed_employee_name and candidate.name and parsed_employee_name|lower == candidate.name|lower %}
                                                         {% set candidate_phone_match = parsed_employee_phone and candidate.phone and (parsed_employee_phone|string|replace(' ', '')|replace('-', '') == candidate.phone|string|replace(' ', '')|replace('-', '')) %}
-                                                        <option value="{{ candidate.id }}" data-name="{{ candidate.name }}" data-phone="{{ candidate.phone if candidate.phone != '-' else '' }}" data-city="{{ candidate.city }}" data-source="Dashboard" {% if selected_message.matched_name == candidate.name or candidate_name_match or candidate_phone_match %}selected{% endif %}>
+                                                        <option value="{{ candidate.id }}" data-name="{{ candidate.name }}" data-phone="{{ candidate.phone if candidate.phone != '-' else '' }}" data-city="{{ candidate.city }}" data-source="Dashboard" {% if selected_message.matched_relation_id == candidate.id %}selected{% endif %}>
                                                             {% if candidate_phone_match or candidate_name_match %}Beste match - {% endif %}{{ candidate.name }}{% if candidate.phone and candidate.phone != '-' %} | {{ candidate.phone }}{% endif %}{% if candidate.city and candidate.city != '-' %} | {{ candidate.city }}{% endif %}
                                                         </option>
                                                         {% endfor %}
@@ -1965,6 +1981,6 @@
                 </section>
             </main>
         </div>
-        <script src="/dashboard/static/dashboard.js?v=20260605-07"></script>
+        <script src="/dashboard/static/dashboard.js?v=20260605-08"></script>
     </body>
 </html>

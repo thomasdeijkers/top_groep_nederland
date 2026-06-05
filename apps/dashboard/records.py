@@ -2180,7 +2180,8 @@ def list_whatsapp_timesheets(limit: int = 25) -> list[dict]:
                            w.selected_project_id,
                            w.validated_at,
                            w.payroll_sent_at,
-                           w.source_channel
+                           w.source_channel,
+                           w.matched_relation_id
                     FROM whatsapp_timesheet_inbox w
                     LEFT JOIN relations r
                         ON r.id = w.matched_relation_id
@@ -2244,6 +2245,7 @@ def _format_whatsapp_row(row) -> dict:
         "payroll_sent_at": row[24],
         "source_channel": source_channel,
         "source_channel_label": source_labels.get(source_channel, "Handmatige verwerking"),
+        "matched_relation_id": row[26],
     }
 
 

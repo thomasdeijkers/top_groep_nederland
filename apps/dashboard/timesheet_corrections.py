@@ -5,7 +5,12 @@ from apps.dashboard.data_store import ensure_dashboard_tables
 from shared.db.connection import get_connection
 
 
-def save_field_corrections(timesheet_id: int, corrections: dict[str, str], matched_relation_id: int | None = None) -> None:
+def save_field_corrections(
+    timesheet_id: int,
+    corrections: dict[str, str],
+    matched_relation_id: int | None = None,
+    clear_candidate_match: bool = False,
+) -> None:
     ensure_dashboard_tables()
     with get_connection() as conn:
         with conn.cursor() as cursor:
@@ -84,8 +89,8 @@ def save_field_corrections(timesheet_id: int, corrections: dict[str, str], match
                 """
                 UPDATE whatsapp_timesheet_inbox
                 SET parsed_fields = %s,
-                    matched_relation_id = COALESCE(%s, matched_relation_id),
-                    matched_candidate_name = COALESCE(%s, matched_candidate_name),
+                    matched_relation_id = CASE WHEN %s THEN NULL ELSE COALESCE(%s, matched_relation_id) END,
+                    matched_candidate_name = CASE WHEN %s THEN NULL ELSE COALESCE(%s, matched_candidate_name) END,
                     employee_name = COALESCE(%s, NULLIF(%s, ''), employee_name),
                     sender_phone = COALESCE(%s, NULLIF(%s, ''), sender_phone),
                     overall_confidence = LEAST(98, GREATEST(COALESCE(overall_confidence, 0), 80)),
@@ -95,7 +100,9 @@ def save_field_corrections(timesheet_id: int, corrections: dict[str, str], match
                 """,
                 (
                     Json(parsed_fields),
+                    clear_candidate_match,
                     matched_relation_id,
+                    clear_candidate_match,
                     matched_candidate_name,
                     matched_candidate_name,
                     corrections.get("employee_name", ""),

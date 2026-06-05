@@ -400,12 +400,6 @@
         };
 
         const chooseCurrentCandidate = () => {
-            if (!select.value) {
-                const firstCandidate = [...select.options].find((option) => option.value);
-                if (firstCandidate) {
-                    select.value = firstCandidate.value;
-                }
-            }
             if (select.value) {
                 applySelectedCandidate();
             }
@@ -456,6 +450,10 @@
                 .slice(0, 4);
             suggestionsTarget.innerHTML = "";
             if (!scored.length) {
+                const empty = document.createElement("div");
+                empty.className = "candidate-suggestion-empty";
+                empty.textContent = "Geen match in kandidatendatabase";
+                suggestionsTarget.append(empty);
                 return;
             }
             scored.forEach(({ option, score }) => {
@@ -544,6 +542,9 @@
         const autosaveStatus = form.querySelector("[data-autosave-status]");
         let autosaveTimer = null;
         let autosaveController = null;
+        const principalSearchInput = form.querySelector("[data-principal-search]");
+        let principalSearchTimer = null;
+        let principalSearchSequence = 0;
         const dayCodeInputs = [
             ["field_monday_code", "field_monday_hours"],
             ["field_tuesday_code", "field_tuesday_hours"],
@@ -566,7 +567,72 @@
             }
         };
 
-        principalSelect?.addEventListener("change", syncWorkflowIds);
+        const renderPrincipalOptions = (principals, selectedValue, selectedLabel) => {
+            if (!principalSelect) {
+                return;
+            }
+            principalSelect.innerHTML = "";
+            principalSelect.append(new Option("Kies opdrachtgever", ""));
+            const hasSelectedInResults = principals.some((principal) => String(principal.name || "") === selectedValue);
+            if (selectedValue && selectedLabel && !hasSelectedInResults) {
+                const selectedOption = new Option(selectedLabel, selectedValue);
+                selectedOption.dataset.id = principalTarget?.value || "";
+                selectedOption.selected = true;
+                principalSelect.append(selectedOption);
+            }
+            principals.forEach((principal) => {
+                if (!principal.name) {
+                    return;
+                }
+                const option = new Option(principal.name, principal.name);
+                option.dataset.id = principal.id || "";
+                option.selected = principal.name === selectedValue;
+                principalSelect.append(option);
+            });
+        };
+
+        const searchPrincipals = () => {
+            const searchUrl = principalSelect?.dataset.principalSearchUrl;
+            if (!searchUrl || !principalSearchInput) {
+                return;
+            }
+            window.clearTimeout(principalSearchTimer);
+            principalSearchTimer = window.setTimeout(async () => {
+                const sequence = principalSearchSequence + 1;
+                principalSearchSequence = sequence;
+                const selectedOption = principalSelect.selectedOptions[0];
+                const selectedValue = principalSelect.value;
+                const selectedLabel = selectedOption?.textContent?.trim() || selectedValue;
+                try {
+                    const response = await fetch(`${searchUrl}?q=${encodeURIComponent(principalSearchInput.value.trim())}&limit=250`);
+                    if (!response.ok || sequence !== principalSearchSequence) {
+                        return;
+                    }
+                    const data = await response.json();
+                    renderPrincipalOptions(Array.isArray(data.results) ? data.results : [], selectedValue, selectedLabel);
+                    syncWorkflowIds();
+                } catch (error) {
+                    console.warn("Opdrachtgevers zoeken mislukt", error);
+                }
+            }, 120);
+        };
+
+        principalSelect?.addEventListener("change", () => {
+            if (principalSearchInput) {
+                principalSearchInput.value = principalSelect.value || "";
+            }
+            syncWorkflowIds();
+        });
+        principalSearchInput?.addEventListener("input", searchPrincipals);
+        principalSearchInput?.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                searchPrincipals();
+            }
+        });
+        if (principalSearchInput && principalSelect?.value) {
+            principalSearchInput.value = principalSelect.value;
+        }
         projectSelect?.addEventListener("change", syncWorkflowIds);
         syncWorkflowIds();
 

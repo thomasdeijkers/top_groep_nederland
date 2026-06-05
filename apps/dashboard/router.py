@@ -313,7 +313,8 @@ def _dashboard_context(
     candidate_relations = list_relations(query=query, relation_type="candidate", status=active_status) if data_page == "relations" else []
     timesheet_candidate_options = list_relations(limit=200, relation_type="candidate") if data_page == "timesheets" else []
     principal_relations = list_relations(query=query, relation_type="principal", status=active_status) if data_page == "relations" else []
-    principals = list_principals(limit=100, query=query if data_page == "relations" else "") if data_page in {"relations", "vacancies", "projects", "timesheets"} else []
+    principal_limit = 500 if data_page == "timesheets" else 100
+    principals = list_principals(limit=principal_limit, query=query if data_page == "relations" else "") if data_page in {"relations", "vacancies", "projects", "timesheets"} else []
     imported_candidates = list_candidates(query=query) if data_page == "relations" else []
     imported_tickets = list_tickets() if data_page == "tickets" else []
     imported_vacancies = list_vacancies(query=query, status=active_status) if data_page == "vacancies" else []
@@ -570,8 +571,15 @@ async def correct_whatsapp_timesheet(timesheet_id: int, request: Request):
         for key, value in form.items()
         if key.startswith("field_")
     }
-    matched_relation_id = ensure_relation_for_candidate_match(str(form.get("matched_relation_id") or ""))
-    save_field_corrections(timesheet_id, corrections, matched_relation_id=matched_relation_id)
+    matched_relation_raw = str(form.get("matched_relation_id") or "").strip()
+    matched_relation_id = ensure_relation_for_candidate_match(matched_relation_raw)
+    clear_candidate_match = "matched_relation_id" in form and not matched_relation_raw
+    save_field_corrections(
+        timesheet_id,
+        corrections,
+        matched_relation_id=matched_relation_id,
+        clear_candidate_match=clear_candidate_match,
+    )
     description = _audit_changed_fields(corrections)
     if matched_relation_id:
         description += f" Kandidaatkaart #{matched_relation_id} gekoppeld."
@@ -584,6 +592,11 @@ async def correct_whatsapp_timesheet(timesheet_id: int, request: Request):
 @router.get("/api/candidates/search")
 def search_candidates(q: str = "", limit: int = Query(40, ge=1, le=80)):
     return {"results": search_candidate_matches(q, limit)}
+
+
+@router.get("/api/principals/search")
+def search_principals(q: str = "", limit: int = Query(120, ge=1, le=500)):
+    return {"results": list_principals(limit=limit, query=q)}
 
 
 @router.post("/api/whatsapp/timesheet/{timesheet_id}/reparse")

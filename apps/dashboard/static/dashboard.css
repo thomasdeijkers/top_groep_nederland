@@ -1659,7 +1659,7 @@ select.select-has-value {
 
 .candidate-match-control {
     display: grid;
-    grid-template-columns: minmax(180px, 0.8fr) minmax(260px, 1.2fr);
+    grid-template-columns: 1fr;
     gap: 10px;
     grid-column: 1 / -1;
     padding: 10px;
@@ -1671,14 +1671,32 @@ select.select-has-value {
 
 .candidate-match-control > .field-title {
     grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
     justify-content: flex-start;
     color: #e9f3f6;
     font-size: 0.9rem;
 }
 
+.candidate-match-control > .field-title small {
+    color: #aab8c3;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
 .candidate-match-control input[type="search"] {
     min-height: 38px;
     font-size: 0.9rem;
+}
+
+.search-select-field {
+    gap: 8px;
+}
+
+.search-select-field input[type="search"] {
+    min-height: 36px;
+    font-size: 0.88rem;
 }
 
 .candidate-match-control select {
