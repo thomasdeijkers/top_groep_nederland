@@ -18,7 +18,7 @@
         </title>
         <link rel="icon" href="/dashboard/static/favicon.ico" sizes="any">
         <link rel="shortcut icon" href="/dashboard/static/favicon.ico">
-        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260605-12">
+        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260605-13">
     </head>
     <body class="page-{{ active_page }}">
         {% macro confidence_light(field) -%}
@@ -1625,15 +1625,15 @@
                                                 </label>
                                                 <label><span class="field-title">Telefoon werknemer {{ confidence_light(selected_message.parsed_map.employee_phone) }}</span><input name="field_employee_phone" value="{{ parsed_employee_phone }}"></label>
                                                 <div class="candidate-match-control candidate-match-control--basis">
-                                                    <span class="field-title">Kandidaat koppelen</span>
+                                                    <span class="field-title">Kandidaat</span>
                                                     <div class="candidate-match-grid">
                                                         <div class="candidate-match-parsed">
-                                                            <small>Pars resultaat</small>
+                                                            <small>Gelezen op briefje</small>
                                                             <strong>{{ parsed_employee_name or 'Geen naam gevonden' }}</strong>
                                                             <span>{{ parsed_employee_phone or 'Geen telefoon gevonden' }}</span>
                                                         </div>
                                                         <div class="candidate-match-picker">
-                                                            <small>Databasekoppeling</small>
+                                                            <small>Gekozen kandidaat</small>
                                                             <input type="search" placeholder="Zoek kandidaat op naam of telefoon..." data-candidate-match-search autocomplete="off">
                                                             <div class="candidate-suggestions" data-candidate-suggestions aria-label="Kandidaatsuggesties"></div>
                                                             <select name="matched_relation_id" size="4" data-candidate-match-select data-candidate-search-url="/api/candidates/search">
@@ -1641,7 +1641,7 @@
                                                                 {% for candidate in timesheet_candidate_options %}
                                                                 {% set candidate_name_match = parsed_employee_name and candidate.name and parsed_employee_name|lower == candidate.name|lower %}
                                                                 {% set candidate_phone_match = parsed_employee_phone and candidate.phone and (parsed_employee_phone|string|replace(' ', '')|replace('-', '') == candidate.phone|string|replace(' ', '')|replace('-', '')) %}
-                                                                <option value="{{ candidate.id }}" data-name="{{ candidate.name }}" data-phone="{{ candidate.phone if candidate.phone != '-' else '' }}" data-city="{{ candidate.city }}" data-source="Dashboard" {% if selected_message.matched_relation_id == candidate.id %}selected{% endif %}>
+                                                                <option value="{{ candidate.id }}" data-name="{{ candidate.name }}" data-phone="{{ candidate.phone if candidate.phone != '-' else '' }}" data-city="{{ candidate.city }}" {% if selected_message.matched_relation_id == candidate.id %}selected{% endif %}>
                                                                     {% if candidate_phone_match or candidate_name_match %}Suggestie - {% endif %}{{ candidate.name }}{% if candidate.phone and candidate.phone != '-' %} | {{ candidate.phone }}{% endif %}{% if candidate.city and candidate.city != '-' %} | {{ candidate.city }}{% endif %}
                                                                 </option>
                                                                 {% endfor %}
@@ -1994,6 +1994,6 @@
                 </section>
             </main>
         </div>
-        <script src="/dashboard/static/dashboard.js?v=20260605-12"></script>
+        <script src="/dashboard/static/dashboard.js?v=20260605-13"></script>
     </body>
 </html>

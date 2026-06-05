@@ -401,11 +401,10 @@
             select.append(emptyOption);
             results.forEach((candidate) => {
                 const parts = [candidate.name, candidate.phone, candidate.city].filter(Boolean);
-                const option = new Option(`${parts.join(" | ")}${candidate.source ? ` - ${candidate.source}` : ""}`, candidate.value);
+                const option = new Option(parts.join(" | "), candidate.value);
                 option.dataset.name = candidate.name || "";
                 option.dataset.phone = candidate.phone || "";
                 option.dataset.city = candidate.city || "";
-                option.dataset.source = candidate.source || "";
                 select.append(option);
             });
             if (selectedValue && [...select.options].some((option) => option.value === selectedValue)) {

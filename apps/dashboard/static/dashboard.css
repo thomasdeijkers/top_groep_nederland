@@ -1790,7 +1790,13 @@ select.select-has-value {
 }
 
 select option {
-    background: #12171c;
+    background: #22333f;
+    color: #f8fbfd;
+}
+
+select option:checked {
+    background: #2b4a51;
+    color: #f8fbfd;
 }
 
 .relation-layout {
