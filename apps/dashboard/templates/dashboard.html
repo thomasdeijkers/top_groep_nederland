@@ -1506,6 +1506,7 @@
                                         <small>Draai de preview totdat het urenbriefje goed leesbaar is.</small>
                                     </div>
 
+                                    <div class="timesheet-review-sidebar">
                                     <details class="parse-score-panel parse-score-panel--compact">
                                         <summary>
                                             <span>
@@ -1547,7 +1548,6 @@
                                             </div>
                                         </div>
                                     </details>
-                                </div>
 
                                 <form class="digital-timesheet-form correction-form" id="digital-timesheet" action="/api/whatsapp/timesheet/{{ selected_message.id }}/corrections" method="post">
                                             <div class="digital-timesheet-header">
@@ -1557,10 +1557,14 @@
                                                 </div>
                                             </div>
 
-                                            <details class="timesheet-accordion" open>
+                                            <details class="timesheet-accordion">
                                                 <summary>
                                                     <strong>Basisgegevens</strong>
-                                                    <span>Week, datum, opdrachtgever en werknemer</span>
+                                                    <span class="accordion-metrics">
+                                                        <span>Score {{ selected_message.overall_confidence }}%</span>
+                                                        <span>Week {{ selected_message.parsed_map.week_number.value if selected_message.parsed_map.week_number is defined else '-' }}</span>
+                                                        <span>{{ selected_message.parsed_map.date.value if selected_message.parsed_map.date is defined else selected_message.work_date or '-' }}</span>
+                                                    </span>
                                                 </summary>
                                                 <div class="digital-timesheet-grid digital-timesheet-grid--primary">
                                                 <label><span class="field-title">Week {{ confidence_light(selected_message.parsed_map.week_number) }}</span><input name="field_week_number" value="{{ selected_message.parsed_map.week_number.value if selected_message.parsed_map.week_number is defined else '' }}"></label>
@@ -1592,7 +1596,11 @@
                                             <details class="timesheet-accordion">
                                                 <summary>
                                                     <strong>Koppelingen</strong>
-                                                    <span>Kandidaat, project, werknummer en locatie</span>
+                                                    <span class="accordion-metrics">
+                                                        <span>Score {{ selected_message.overall_confidence }}%</span>
+                                                        <span>{{ selected_message.matched_name or 'Geen match' }}</span>
+                                                        <span>{{ selected_message.project_name or 'Geen project' }}</span>
+                                                    </span>
                                                 </summary>
                                                 <div class="digital-timesheet-grid digital-timesheet-grid--primary">
                                                 <div class="candidate-match-control">
@@ -1630,10 +1638,13 @@
                                                 </div>
                                             </details>
 
-                                            <details class="timesheet-accordion" open>
+                                            <details class="timesheet-accordion">
                                                 <summary>
                                                     <strong>Uren per dag</strong>
-                                                    <span>Direct controleren en corrigeren</span>
+                                                    <span class="accordion-metrics">
+                                                        <span>Score {{ selected_message.overall_confidence }}%</span>
+                                                        <span>Totaal {{ selected_message.parsed_map.total_hours.value if selected_message.parsed_map.total_hours is defined else selected_message.hours or '-' }} uur</span>
+                                                    </span>
                                                 </summary>
                                                 <div class="digital-week-table digital-week-table--with-total">
                                                 <label><span class="week-head">Ma {{ confidence_light(selected_message.parsed_map.monday_hours) }}</span><input name="field_monday_hours" value="{{ selected_message.parsed_map.monday_hours.value if selected_message.parsed_map.monday_hours is defined else '' }}"></label>
@@ -1650,7 +1661,11 @@
                                             <details class="timesheet-accordion">
                                                 <summary>
                                                     <strong>Kilometers</strong>
-                                                    <span>Alleen openen als reiskilometers nodig zijn</span>
+                                                    <span class="accordion-metrics">
+                                                        <span>Score {{ selected_message.overall_confidence }}%</span>
+                                                        <span>Totaal {{ selected_message.parsed_map.total_km.value if selected_message.parsed_map.total_km is defined else '-' }} km</span>
+                                                        <span>Enkele reis {{ selected_message.parsed_map.single_trip_km.value if selected_message.parsed_map.single_trip_km is defined else '-' }}</span>
+                                                    </span>
                                                 </summary>
                                                 <div class="digital-week-table digital-week-table--with-total">
                                                 <label><span class="week-head">Km ma {{ confidence_light(selected_message.parsed_map.monday_km) }}</span><input name="field_monday_km" value="{{ selected_message.parsed_map.monday_km.value if selected_message.parsed_map.monday_km is defined else '' }}"></label>
@@ -1667,7 +1682,10 @@
                                             <details class="timesheet-accordion">
                                                 <summary>
                                                     <strong>Dagcodes en verzuim</strong>
-                                                    <span>Codes per dag en verzuimcode</span>
+                                                    <span class="accordion-metrics">
+                                                        <span>Score {{ selected_message.overall_confidence }}%</span>
+                                                        <span>Verzuim {{ selected_message.parsed_map.absence_code.value if selected_message.parsed_map.absence_code is defined else '-' }}</span>
+                                                    </span>
                                                 </summary>
                                                 <div class="digital-week-table digital-week-table--codes digital-week-table--codes-with-absence">
                                                 <label><span class="week-head">Code ma {{ confidence_light(selected_message.parsed_map.monday_code) }}</span><input name="field_monday_code" value="{{ selected_message.parsed_map.monday_code.value if selected_message.parsed_map.monday_code is defined else '' }}"></label>
@@ -1684,7 +1702,11 @@
                                             <details class="timesheet-accordion">
                                                 <summary>
                                                     <strong>Controles en extra's</strong>
-                                                    <span>Totalen, kosten, opmerkingen en handtekeningen</span>
+                                                    <span class="accordion-metrics">
+                                                        <span>Score {{ selected_message.overall_confidence }}%</span>
+                                                        <span>Uren {{ selected_message.parsed_map.calculated_total_hours.value if selected_message.parsed_map.calculated_total_hours is defined else '-' }}</span>
+                                                        <span>Km {{ selected_message.parsed_map.calculated_total_km.value if selected_message.parsed_map.calculated_total_km is defined else '-' }}</span>
+                                                    </span>
                                                 </summary>
                                                 <div class="digital-timesheet-grid digital-timesheet-grid--compact">
                                                 <label><span class="field-title">Berekend totaal {{ confidence_light(selected_message.parsed_map.calculated_total_hours) }}</span><input name="field_calculated_total_hours" value="{{ selected_message.parsed_map.calculated_total_hours.value if selected_message.parsed_map.calculated_total_hours is defined else '' }}" readonly></label>
@@ -1710,6 +1732,7 @@
 
                                             <button class="sr-only" type="submit">Opslaan</button>
                                 </form>
+                                <div class="workflow-action-row">
                                 <form class="workflow-actions" action="/api/whatsapp/timesheet/{{ selected_message.id }}/validate" method="post">
                                     <input type="hidden" name="principal_id" value="{{ selected_message.selected_principal_id or '' }}" data-workflow-principal-id>
                                     <input type="hidden" name="project_id" value="{{ selected_message.selected_project_id or '' }}" data-workflow-project-id>
@@ -1718,6 +1741,9 @@
                                 <form class="workflow-actions" action="/api/whatsapp/timesheet/{{ selected_message.id }}/payroll" method="post">
                                     <button class="ghost-button" type="submit">Naar loonadministratie</button>
                                 </form>
+                                </div>
+                                </div>
+                                </div>
                             </div>
                             {% endif %}
                         </div>

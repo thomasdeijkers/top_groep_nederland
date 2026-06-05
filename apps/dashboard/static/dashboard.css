@@ -4301,10 +4301,17 @@ body[data-theme="light"] .theme-toggle strong {
 
 .document-review-layout {
     display: grid;
-    grid-template-columns: minmax(420px, 1.25fr) minmax(300px, 0.75fr);
-    gap: 10px;
+    grid-template-columns: minmax(420px, 0.9fr) minmax(520px, 1.1fr);
+    gap: 12px;
     align-items: start;
     margin-bottom: 10px;
+}
+
+.timesheet-review-sidebar {
+    display: grid;
+    gap: 8px;
+    align-content: start;
+    min-width: 0;
 }
 
 .document-preview-panel {
@@ -4555,8 +4562,8 @@ body[data-theme="light"] .theme-toggle strong {
 
 .digital-timesheet-form {
     display: grid;
-    gap: 6px;
-    padding: 10px;
+    gap: 7px;
+    padding: 8px;
     border: 1px solid rgba(204, 216, 226, 0.14);
     border-radius: 8px;
     background: #17242d;
@@ -4567,10 +4574,13 @@ body[data-theme="light"] .theme-toggle strong {
     align-items: flex-start;
     justify-content: space-between;
     gap: 10px;
+    padding: 0 2px 2px;
 }
 
 .digital-timesheet-header h3 {
     margin: 0;
+    font-size: 0.98rem;
+    font-weight: 600;
 }
 
 .timesheet-accordion {
@@ -4581,12 +4591,12 @@ body[data-theme="light"] .theme-toggle strong {
 }
 
 .timesheet-accordion summary {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(120px, 0.6fr) minmax(0, 1.4fr) 24px;
     align-items: center;
-    justify-content: space-between;
-    gap: 14px;
+    gap: 10px;
     min-height: 38px;
-    padding: 7px 11px;
+    padding: 6px 9px 6px 11px;
     color: #eef4f7;
     cursor: pointer;
     list-style: none;
@@ -4607,6 +4617,7 @@ body[data-theme="light"] .theme-toggle strong {
     background: rgba(127, 209, 160, 0.1);
     color: #9fe5b9;
     font-weight: 650;
+    justify-self: end;
 }
 
 .timesheet-accordion[open] summary::after {
@@ -4620,13 +4631,31 @@ body[data-theme="light"] .theme-toggle strong {
 .timesheet-accordion summary strong {
     font-size: 0.9rem;
     font-weight: 550;
+    min-width: 0;
 }
 
-.timesheet-accordion summary span {
-    margin-left: auto;
-    color: #aebec8;
-    font-size: 0.76rem;
+.accordion-metrics {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    min-width: 0;
+}
+
+.accordion-metrics span {
+    min-width: 0;
+    max-width: 150px;
+    overflow: hidden;
+    padding: 3px 7px;
+    border: 1px solid rgba(204, 216, 226, 0.12);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.035);
+    color: #c6d4dc;
+    font-size: 0.72rem;
     font-weight: 500;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .timesheet-accordion > .digital-timesheet-grid,
@@ -4739,7 +4768,13 @@ body[data-theme="light"] .theme-toggle strong {
 }
 
 .timesheet-review-panel .workflow-actions {
-    margin-top: 8px;
+    margin: 0;
+}
+
+.workflow-action-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 
 .compact-review-bar,
