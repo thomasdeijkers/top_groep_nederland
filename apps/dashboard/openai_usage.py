@@ -1,4 +1,5 @@
 import os
+import time
 from decimal import Decimal
 
 from apps.dashboard.data_store import ensure_dashboard_tables
@@ -12,6 +13,8 @@ MODEL_PRICING_USD_PER_1M = {
     "gpt-5-nano": {"input": Decimal("0.05"), "cached_input": Decimal("0.005"), "output": Decimal("0.40")},
 }
 OPENAI_USAGE_COST_MULTIPLIER = Decimal("4")
+_USAGE_CACHE_TTL_SECONDS = 60
+_USAGE_CACHE: tuple[float, dict] | None = None
 
 
 def estimate_openai_cost(model: str, usage: dict) -> Decimal:
@@ -38,6 +41,7 @@ def _pricing(model: str) -> dict:
 
 
 def record_openai_usage(source: str, source_id: int | None, model: str, usage: dict) -> None:
+    global _USAGE_CACHE
     ensure_dashboard_tables()
     cost = estimate_openai_cost(model, usage)
     with get_connection() as conn:
@@ -62,9 +66,15 @@ def record_openai_usage(source: str, source_id: int | None, model: str, usage: d
                 ),
             )
         conn.commit()
+    _USAGE_CACHE = None
 
 
 def get_openai_usage_summary() -> dict:
+    global _USAGE_CACHE
+    now = time.monotonic()
+    if _USAGE_CACHE and now - _USAGE_CACHE[0] < _USAGE_CACHE_TTL_SECONDS:
+        return dict(_USAGE_CACHE[1])
+
     try:
         ensure_dashboard_tables()
         with get_connection() as conn:
@@ -90,7 +100,7 @@ def get_openai_usage_summary() -> dict:
                     """
                 )
                 month = cursor.fetchone()
-        return {
+        summary = {
             "requests": total[0],
             "input_tokens": total[1],
             "output_tokens": total[2],
@@ -100,6 +110,8 @@ def get_openai_usage_summary() -> dict:
             "month_tokens": month[1],
             "month_cost_usd": _display_cost(month[2]),
         }
+        _USAGE_CACHE = (now, summary)
+        return dict(summary)
     except Exception:
         return {
             "requests": 0,

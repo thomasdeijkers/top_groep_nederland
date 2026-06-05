@@ -3,7 +3,14 @@ from pathlib import Path
 from shared.db.connection import get_connection
 
 
+_TABLES_READY = False
+
+
 def ensure_dashboard_tables():
+    global _TABLES_READY
+    if _TABLES_READY:
+        return
+
     migrations = [
         Path("migrations/001_otys_organizations.sql"),
         Path("migrations/002_candidates_principals_tickets.sql"),
@@ -29,6 +36,7 @@ def ensure_dashboard_tables():
         Path("migrations/022_otys_staging_tables.sql"),
         Path("migrations/023_otys_api_usage.sql"),
         Path("migrations/024_otys_relations_backfill.sql"),
+        Path("migrations/025_dashboard_performance_indexes.sql"),
     ]
 
     with get_connection() as conn:
@@ -36,3 +44,4 @@ def ensure_dashboard_tables():
             for migration in migrations:
                 cursor.execute(migration.read_text(encoding="utf-8"))
         conn.commit()
+    _TABLES_READY = True

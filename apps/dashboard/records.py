@@ -966,12 +966,56 @@ def list_projects(limit: int = 100, query: str = "") -> list[dict]:
 def get_project(project_id: int | None) -> dict | None:
     if not project_id:
         return None
-    projects = list_projects(limit=500)
-    project = next((item for item in projects if item["id"] == project_id), None)
-    if not project:
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT v.id,
+                           v.title,
+                           v.reference_number,
+                           v.relation_name,
+                           v.location,
+                           v.status,
+                           v.updated_at,
+                           v.payroll_cao_setting_id,
+                           c.name,
+                           COUNT(b.id),
+                           COALESCE(SUM(b.hours), 0),
+                           MAX(b.work_date)
+                    FROM vacancies v
+                    LEFT JOIN payroll_cao_settings c
+                        ON c.id = v.payroll_cao_setting_id
+                    LEFT JOIN project_time_bookings b
+                        ON b.project_id = v.id
+                    WHERE v.id = %s
+                    GROUP BY v.id, c.name;
+                    """,
+                    (project_id,),
+                )
+                row = cursor.fetchone()
+        if not row:
+            return None
+        project = {
+            "id": row[0],
+            "title": row[1],
+            "reference_number": row[2] or "",
+            "relation_name": row[3] or "",
+            "location": row[4] or "",
+            "status": row[5] or "Actief",
+            "updated_at": row[6].strftime("%d-%m-%Y %H:%M") if row[6] else "-",
+            "payroll_cao_setting_id": row[7],
+            "cao_name": row[8] or "Nog niet gekoppeld",
+            "booking_count": row[9] or 0,
+            "total_hours": _format_number(row[10]),
+            "last_booking_date": row[11].strftime("%d-%m-%Y") if row[11] else "-",
+            "recent_bookings": [],
+            "bookings": list_project_time_bookings(project_id),
+        }
+        return project
+    except Exception:
         return None
-    project["bookings"] = list_project_time_bookings(project_id)
-    return project
 
 
 def list_project_time_bookings(project_id: int, limit: int = 250) -> list[dict]:
@@ -1260,13 +1304,70 @@ def get_payroll_period_defaults() -> dict:
 def get_payroll_period(period_id: int | None) -> dict | None:
     if not period_id:
         return None
-    period = next((item for item in list_payroll_periods(limit=200) if item["id"] == period_id), None)
-    if not period:
-        period = next((item for item in list_payroll_periods(limit=200, archived=True) if item["id"] == period_id), None)
-    if period:
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT p.id,
+                           p.year,
+                           p.period_number,
+                           p.name,
+                           p.start_date,
+                           p.end_date,
+                           p.status,
+                           p.notes,
+                           COALESCE(w.week_count, 0),
+                           COALESCE(b.booking_count, 0),
+                           COALESCE(b.total_hours, 0),
+                           p.updated_at
+                    FROM payroll_periods p
+                    LEFT JOIN (
+                        SELECT payroll_period_id, COUNT(*) AS week_count
+                        FROM payroll_period_weeks
+                        GROUP BY payroll_period_id
+                    ) w ON w.payroll_period_id = p.id
+                    LEFT JOIN (
+                        SELECT p2.id AS payroll_period_id,
+                               COUNT(b.id) AS booking_count,
+                               SUM(b.hours) AS total_hours
+                        FROM payroll_periods p2
+                        LEFT JOIN project_time_bookings b
+                            ON b.payroll_period_id = p2.id
+                            OR (b.payroll_period_id IS NULL AND b.work_date BETWEEN p2.start_date AND p2.end_date)
+                        WHERE p2.id = %s
+                        GROUP BY p2.id
+                    ) b ON b.payroll_period_id = p.id
+                    WHERE p.id = %s;
+                    """,
+                    (period_id, period_id),
+                )
+                row = cursor.fetchone()
+                if not row:
+                    return None
+                period = {
+                    "id": row[0],
+                    "year": row[1],
+                    "period_number": row[2],
+                    "display_period_number": row[2],
+                    "name": _payroll_period_name(row[2], row[4], row[5]) if row[4] and row[5] else row[3],
+                    "start_date": row[4].strftime("%d-%m-%Y") if row[4] else "-",
+                    "end_date": row[5].strftime("%d-%m-%Y") if row[5] else "-",
+                    "status": row[6] or "concept",
+                    "notes": row[7] or "",
+                    "week_count": row[8] or 0,
+                    "booking_count": row[9] or 0,
+                    "total_hours": _format_number(row[10]),
+                    "updated_at": row[11].strftime("%d-%m-%Y %H:%M") if row[11] else "-",
+                    "weeks": [],
+                }
+                _attach_period_weeks(cursor, [period])
         period["payroll_rows"] = list_payroll_period_payroll(period_id)
         period["payroll_totals"] = _payroll_period_totals(period["payroll_rows"])
-    return period
+        return period
+    except Exception:
+        return None
 
 
 def list_payroll_period_payroll(period_id: int) -> list[dict]:
@@ -1624,36 +1725,41 @@ def _attach_project_bookings(cursor, projects: list[dict], per_project: int = 5)
         return
     cursor.execute(
         """
-        SELECT b.project_id,
-               b.id,
-               b.timesheet_inbox_id,
-               b.relation_id,
-               b.principal_id,
-               COALESCE(r.name, w.employee_name, w.matched_candidate_name, ''),
-               b.work_date,
-               b.hours,
-               b.status,
-               b.payroll_cao_setting_id,
-               c.name,
-               b.updated_at
-        FROM project_time_bookings b
-        LEFT JOIN relations r
-            ON r.id = b.relation_id
-        LEFT JOIN whatsapp_timesheet_inbox w
-            ON w.id = b.timesheet_inbox_id
-        LEFT JOIN payroll_cao_settings c
-            ON c.id = b.payroll_cao_setting_id
-        WHERE b.project_id = ANY(%s)
-        ORDER BY b.project_id, b.work_date DESC NULLS LAST, b.updated_at DESC, b.id DESC;
+        SELECT *
+        FROM (
+            SELECT b.project_id,
+                   b.id,
+                   b.timesheet_inbox_id,
+                   b.relation_id,
+                   b.principal_id,
+                   COALESCE(r.name, w.employee_name, w.matched_candidate_name, ''),
+                   b.work_date,
+                   b.hours,
+                   b.status,
+                   b.payroll_cao_setting_id,
+                   c.name,
+                   b.updated_at,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY b.project_id
+                       ORDER BY b.work_date DESC NULLS LAST, b.updated_at DESC, b.id DESC
+                   ) AS row_number
+            FROM project_time_bookings b
+            LEFT JOIN relations r
+                ON r.id = b.relation_id
+            LEFT JOIN whatsapp_timesheet_inbox w
+                ON w.id = b.timesheet_inbox_id
+            LEFT JOIN payroll_cao_settings c
+                ON c.id = b.payroll_cao_setting_id
+            WHERE b.project_id = ANY(%s)
+        ) ranked_bookings
+        WHERE row_number <= %s
+        ORDER BY project_id, work_date DESC NULLS LAST, updated_at DESC, id DESC;
         """,
-        (project_ids,),
+        (project_ids, per_project),
     )
     project_map = {project["id"]: project for project in projects}
-    counters = {project_id: 0 for project_id in project_ids}
     for row in cursor.fetchall():
         project_id = row[0]
-        if counters.get(project_id, 0) >= per_project:
-            continue
         project = project_map.get(project_id)
         if not project:
             continue
@@ -1672,7 +1778,6 @@ def _attach_project_bookings(cursor, projects: list[dict], per_project: int = 5)
                 "updated_at": row[11].strftime("%d-%m-%Y %H:%M") if row[11] else "-",
             }
         )
-        counters[project_id] = counters.get(project_id, 0) + 1
 
 
 def list_cao_settings(limit: int = 25) -> list[dict]:
