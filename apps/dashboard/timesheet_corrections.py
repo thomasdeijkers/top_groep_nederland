@@ -33,10 +33,13 @@ def save_field_corrections(
                 original = parsed_fields.get(field_key, {})
                 original_value = str(original.get("value", ""))
                 original_confidence = original.get("confidence", 0)
+                if corrected_value == original_value:
+                    continue
                 parsed_fields[field_key] = {
                     "value": corrected_value,
                     "confidence": 98 if corrected_value else 0,
                     "corrected": True,
+                    "verified": True,
                 }
                 if not corrected_value and not original_value:
                     continue
@@ -75,12 +78,14 @@ def save_field_corrections(
                         "value": matched_candidate_name or corrections.get("employee_name", ""),
                         "confidence": 98,
                         "corrected": True,
+                        "verified": True,
                     }
                     if matched_candidate_phone:
                         parsed_fields["employee_phone"] = {
                             "value": matched_candidate_phone,
                             "confidence": 98,
                             "corrected": True,
+                            "verified": True,
                         }
 
             _apply_absence_code_to_day_codes(parsed_fields)
@@ -289,28 +294,50 @@ def _recalculate_sum_check(
 
     calculated = sum(known_values, Decimal("0"))
     calculated_text = _format_decimal(calculated)
-    parsed_fields[calculated_key] = {"value": calculated_text, "confidence": 98, "corrected": True}
     current_total = _decimal_or_none((parsed_fields.get(total_key) or {}).get("value"))
     original_total = _decimal_or_none(original_total_value)
     stated_total = current_total if current_total is not None else original_total
+    known_day_payloads = [
+        parsed_fields.get(key) or {}
+        for key in day_keys
+        if _decimal_or_none((parsed_fields.get(key) or {}).get("value")) is not None
+    ]
+    all_days_verified = bool(known_day_payloads) and all(payload.get("verified") for payload in known_day_payloads)
+    total_verified = bool((parsed_fields.get(total_key) or {}).get("verified"))
+    verified_check = all_days_verified and total_verified
+    calculated_confidence = 98 if all_days_verified else 60
+    parsed_fields[calculated_key] = {
+        "value": calculated_text,
+        "confidence": calculated_confidence,
+        "corrected": True,
+        "verified": all_days_verified,
+    }
     if stated_total is None:
-        parsed_fields[check_key] = {"value": missing_message, "confidence": 98, "corrected": True}
+        parsed_fields[check_key] = {"value": missing_message, "confidence": 60, "corrected": True, "verified": False}
     elif stated_total == calculated:
         parsed_fields[total_key] = {
             "value": _format_decimal(stated_total),
-            "confidence": 98,
+            "confidence": 98 if total_verified else 60,
             "corrected": True,
+            "verified": total_verified,
         }
-        parsed_fields[check_key] = {"value": "klopt", "confidence": 98, "corrected": True}
+        parsed_fields[check_key] = {
+            "value": "klopt",
+            "confidence": 98 if verified_check else 60,
+            "corrected": True,
+            "verified": verified_check,
+        }
     else:
         existing_total = parsed_fields.get(total_key) or {}
         parsed_fields[total_key] = {
             "value": _format_decimal(stated_total),
             "confidence": min(int(existing_total.get("confidence", 0) or 0), 60),
             "corrected": True,
+            "verified": total_verified,
         }
         parsed_fields[check_key] = {
             "value": f"bijlage {_format_decimal(stated_total)}, som {_format_decimal(calculated)}",
             "confidence": 60,
             "corrected": True,
+            "verified": False,
         }

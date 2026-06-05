@@ -2203,6 +2203,7 @@ def list_whatsapp_timesheets(limit: int = 25) -> list[dict]:
 
 def _format_whatsapp_row(row) -> dict:
     fields = row[18] or {}
+    _cap_unverified_timesheet_numbers(fields)
     _ensure_total_check(fields)
     source_channel = (row[25] or "manual_upload").strip() or "manual_upload"
     source_labels = {
@@ -2283,6 +2284,38 @@ def _ensure_total_check(fields: dict) -> None:
             "km",
             "totaal km ontbreekt",
         )
+
+
+def _cap_unverified_timesheet_numbers(fields: dict) -> None:
+    critical_keys = (
+        "monday_hours",
+        "tuesday_hours",
+        "wednesday_hours",
+        "thursday_hours",
+        "friday_hours",
+        "saturday_hours",
+        "sunday_hours",
+        "total_hours",
+        "calculated_total_hours",
+        "total_hours_check",
+        "monday_km",
+        "tuesday_km",
+        "wednesday_km",
+        "thursday_km",
+        "friday_km",
+        "saturday_km",
+        "sunday_km",
+        "total_km",
+        "calculated_total_km",
+        "total_km_check",
+    )
+    for key in critical_keys:
+        payload = fields.get(key)
+        if not isinstance(payload, dict) or payload.get("verified"):
+            continue
+        if str(payload.get("value") or "").strip():
+            payload["confidence"] = min(int(payload.get("confidence", 0) or 0), 60)
+            fields[key] = payload
 
 
 def _ensure_sum_check(
