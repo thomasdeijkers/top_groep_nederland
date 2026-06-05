@@ -290,14 +290,25 @@ def _recalculate_sum_check(
     calculated = sum(known_values, Decimal("0"))
     calculated_text = _format_decimal(calculated)
     parsed_fields[calculated_key] = {"value": calculated_text, "confidence": 98, "corrected": True}
+    current_total = _decimal_or_none((parsed_fields.get(total_key) or {}).get("value"))
     original_total = _decimal_or_none(original_total_value)
-    stated_total = original_total if original_total is not None else _decimal_or_none((parsed_fields.get(total_key) or {}).get("value"))
-    parsed_fields[total_key] = {"value": calculated_text, "confidence": 90 if stated_total != calculated else 98, "corrected": True}
+    stated_total = current_total if current_total is not None else original_total
     if stated_total is None:
         parsed_fields[check_key] = {"value": missing_message, "confidence": 98, "corrected": True}
     elif stated_total == calculated:
+        parsed_fields[total_key] = {
+            "value": _format_decimal(stated_total),
+            "confidence": 98,
+            "corrected": True,
+        }
         parsed_fields[check_key] = {"value": "klopt", "confidence": 98, "corrected": True}
     else:
+        existing_total = parsed_fields.get(total_key) or {}
+        parsed_fields[total_key] = {
+            "value": _format_decimal(stated_total),
+            "confidence": min(int(existing_total.get("confidence", 0) or 0), 60),
+            "corrected": True,
+        }
         parsed_fields[check_key] = {
             "value": f"bijlage {_format_decimal(stated_total)}, som {_format_decimal(calculated)}",
             "confidence": 60,

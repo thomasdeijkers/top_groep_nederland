@@ -669,7 +669,7 @@
             metric.innerHTML = `<i></i>${label}: ${cleanValue ? `${cleanValue}${unit}` : "Leeg"}`;
         };
 
-        const syncSumCheck = (inputs, totalField, calculatedField, checkField, unit, missingMessage, updateTotal = false) => {
+        const syncSumCheck = (inputs, totalField, calculatedField, checkField, unit, missingMessage) => {
             if (!calculatedField || !checkField) {
                 return;
             }
@@ -684,11 +684,7 @@
             }
             const calculated = values.reduce((sum, value) => sum + value, 0);
             calculatedField.value = formatHours(calculated);
-            const parsedTotal = parseHours(totalField?.value);
-            if (updateTotal && totalField) {
-                totalField.value = calculatedField.value;
-            }
-            const stated = updateTotal ? parsedTotal : parseHours(totalField?.value);
+            const stated = parseHours(totalField?.value);
             if (stated === null) {
                 checkField.value = missingMessage;
                 setSummaryMetric(totalField?.name?.replace("field_", ""), "", "red");
@@ -697,20 +693,20 @@
                 return;
             }
             const difference = Math.abs(calculated - stated);
-            if (updateTotal && difference >= 0.005) {
+            if (difference >= 0.005) {
                 checkField.value = `bijlage ${formatHours(stated)}, som ${formatHours(calculated)}`;
             } else {
-                checkField.value = difference < 0.005 ? "klopt" : `verschil ${formatHours(difference)} ${unit}`;
+                checkField.value = "klopt";
             }
-            const checkState = difference < 0.005 ? "green" : updateTotal ? "red" : "orange";
+            const checkState = difference < 0.005 ? "green" : "red";
             setSummaryMetric(totalField?.name?.replace("field_", ""), totalField?.value || "", difference < 0.005 ? "green" : "orange");
             setSummaryMetric(checkField.name.replace("field_", ""), checkField.value, checkState);
             setSummaryMetric(calculatedField.name.replace("field_", ""), calculatedField.value, "green");
         };
 
         const syncTotalCheck = (source = "") => {
-            syncSumCheck(dayInputs, totalInput, calculatedInput, checkInput, "uur", "totaal ontbreekt", source === "hours");
-            syncSumCheck(kmInputs, totalKmInput, calculatedKmInput, checkKmInput, "km", "totaal km ontbreekt", source === "km");
+            syncSumCheck(dayInputs, totalInput, calculatedInput, checkInput, "uur", "totaal ontbreekt");
+            syncSumCheck(kmInputs, totalKmInput, calculatedKmInput, checkKmInput, "km", "totaal km ontbreekt");
         };
 
         const saveCorrections = async () => {

@@ -18,7 +18,7 @@
         </title>
         <link rel="icon" href="/dashboard/static/favicon.ico" sizes="any">
         <link rel="shortcut icon" href="/dashboard/static/favicon.ico">
-        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260605-10">
+        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260605-11">
     </head>
     <body class="page-{{ active_page }}">
         {% macro confidence_light(field) -%}
@@ -1472,6 +1472,8 @@
                             {% if active_timesheet_tab == 'task' and selected_timesheet %}
                             <div class="timesheet-review-panel" id="timesheet-review">
                                 {% set selected_message = selected_timesheet %}
+                                {% set relation_gate_missing = not selected_message.matched_relation_id or not selected_message.selected_principal_id %}
+                                {% set gated_overall_confidence = ([selected_message.overall_confidence or 0, 60]|min) if relation_gate_missing else selected_message.overall_confidence %}
                                 <div class="compact-review-bar">
                                     <div>
                                         <p class="section-label">Controle</p>
@@ -1479,8 +1481,8 @@
                                         <span>{{ selected_message.sender_phone }} - match: {{ selected_message.matched_name }}</span>
                                     </div>
                                     <div class="compact-review-bar__right">
-                                        <span class="confidence-pill confidence-{{ 'high' if selected_message.overall_confidence > 95 else 'medium' if selected_message.overall_confidence >= 80 else 'low' }}">
-                                            {{ selected_message.overall_confidence }}%
+                                        <span class="confidence-pill confidence-{{ 'high' if gated_overall_confidence > 95 else 'medium' if gated_overall_confidence >= 80 else 'low' }}">
+                                            {{ gated_overall_confidence }}%
                                         </span>
                                     </div>
                                 </div>
@@ -1540,19 +1542,20 @@
                                         {% endif %}
                                     {% endfor %}
                                     {% set control_score = (control_score_data.total / control_score_data.count)|round|int if control_score_data.count else 0 %}
+                                    {% set gated_control_score = ([control_score, 60]|min) if relation_gate_missing else control_score %}
                                     <details class="parse-score-panel parse-score-panel--compact">
                                         <summary>
                                             <span>
                                                 <small>Parsing score</small>
-                                                <strong class="parse-grade parse-grade--{{ 'green' if selected_message.overall_confidence > 95 else 'orange' if selected_message.overall_confidence >= 80 else 'red' }}">{{ "%.1f"|format((selected_message.overall_confidence or 0) / 10)|replace('.', ',') }}</strong>
+                                                <strong class="parse-grade parse-grade--{{ 'green' if gated_overall_confidence > 95 else 'orange' if gated_overall_confidence >= 80 else 'red' }}">{{ "%.1f"|format((gated_overall_confidence or 0) / 10)|replace('.', ',') }}</strong>
                                             </span>
                                             <span>
                                                 <small>Zekerheid</small>
-                                                <strong>{{ selected_message.overall_confidence }}%</strong>
+                                                <strong>{{ gated_overall_confidence }}%</strong>
                                             </span>
                                             <span>
                                                 <small>Controle score</small>
-                                                <strong class="parse-grade parse-grade--{{ 'green' if control_score > 95 else 'orange' if control_score >= 80 else 'red' }}">{{ "%.1f"|format((control_score or 0) / 10)|replace('.', ',') }}</strong>
+                                                <strong class="parse-grade parse-grade--{{ 'green' if gated_control_score > 95 else 'orange' if gated_control_score >= 80 else 'red' }}">{{ "%.1f"|format((gated_control_score or 0) / 10)|replace('.', ',') }}</strong>
                                             </span>
                                             <span>
                                                 <small>Totaal uren</small>
@@ -1575,7 +1578,7 @@
                                                 </div>
                                                 <div>
                                                     <dt>Beoordeling</dt>
-                                                    <dd>{% if selected_message.overall_confidence > 95 %}Betrouwbaar{% elif selected_message.overall_confidence >= 80 %}Nalopen{% else %}Controleren{% endif %}</dd>
+                                                    <dd>{% if relation_gate_missing %}Koppelingen ontbreken{% elif gated_overall_confidence > 95 %}Betrouwbaar{% elif gated_overall_confidence >= 80 %}Nalopen{% else %}Controleren{% endif %}</dd>
                                                 </div>
                                             </dl>
                                             <div class="confidence-legend confidence-legend--compact">
@@ -1604,22 +1607,11 @@
                                                         <span class="accordion-metric accordion-metric--{{ 'green' if selected_message.matched_relation_id else 'red' }}">
                                                             <i></i>Kandidaat: {{ selected_message.matched_name if selected_message.matched_relation_id else 'Niet gekoppeld' }}
                                                         </span>
-                                                        {{ summary_status(selected_message.parsed_map.employee_phone, 'Telefoon') }}
                                                     </span>
                                                 </summary>
                                                 <div class="digital-timesheet-grid digital-timesheet-grid--primary">
                                                 <label><span class="field-title">Week {{ confidence_light(selected_message.parsed_map.week_number) }}</span><input name="field_week_number" value="{{ selected_message.parsed_map.week_number.value if selected_message.parsed_map.week_number is defined else '' }}"></label>
                                                 <label><span class="field-title">Datum {{ confidence_light(selected_message.parsed_map.date) }}</span><input name="field_date" value="{{ selected_message.parsed_map.date.value if selected_message.parsed_map.date is defined else selected_message.work_date or '' }}"></label>
-                                                <label class="search-select-field"><span class="field-title">Opdrachtgever {{ confidence_light(selected_message.parsed_map.principal_name) }}</span>
-                                                    <input type="search" placeholder="Zoek opdrachtgever..." data-principal-search autocomplete="off">
-                                                    <select name="field_principal_name" data-principal-search-select data-principal-search-url="/api/principals/search">
-                                                        <option value="">Kies opdrachtgever</option>
-                                                        {% for principal in principal_options %}
-                                                        <option value="{{ principal.name }}" data-id="{{ principal.id }}" {% if selected_message.selected_principal_id == principal.id or selected_message.principal_name == principal.name %}selected{% endif %}>{{ principal.name }}</option>
-                                                        {% endfor %}
-                                                    </select>
-                                                </label>
-                                                <label><span class="field-title">Projectnummer {{ confidence_light(selected_message.parsed_map.project_number) }}</span><input name="field_project_number" value="{{ selected_message.parsed_map.project_number.value if selected_message.parsed_map.project_number is defined else '' }}"></label>
                                                 {% set parsed_employee_name = selected_message.parsed_map.employee_name.value if selected_message.parsed_map.employee_name is defined else selected_message.employee_name %}
                                                 {% set parsed_employee_phone = selected_message.parsed_map.employee_phone.value if selected_message.parsed_map.employee_phone is defined else selected_message.sender_phone %}
                                                 <label>
@@ -1666,11 +1658,19 @@
                                                     <span class="accordion-metrics">
                                                         {{ summary_status(selected_message.parsed_map.principal_name, 'Opdrachtgever') }}
                                                         {{ summary_status(selected_message.parsed_map.work_name, 'Project', selected_message.project_name) }}
+                                                        {{ summary_status(selected_message.parsed_map.project_number, 'Projectnr') }}
                                                     </span>
                                                 </summary>
                                                 <div class="digital-timesheet-grid digital-timesheet-grid--primary digital-timesheet-grid--links">
-                                                <label><span class="field-title">Naam ondertekenaar {{ confidence_light(selected_message.parsed_map.signer_name) }}</span><input name="field_signer_name" value="{{ selected_message.parsed_map.signer_name.value if selected_message.parsed_map.signer_name is defined else '' }}"></label>
-                                                <label><span class="field-title">Telefoon ondertekenaar {{ confidence_light(selected_message.parsed_map.signer_phone) }}</span><input name="field_signer_phone" value="{{ selected_message.parsed_map.signer_phone.value if selected_message.parsed_map.signer_phone is defined else '' }}"></label>
+                                                <label class="search-select-field"><span class="field-title">Opdrachtgever {{ confidence_light(selected_message.parsed_map.principal_name) }}</span>
+                                                    <input type="search" placeholder="Zoek opdrachtgever..." data-principal-search autocomplete="off">
+                                                    <select name="field_principal_name" data-principal-search-select data-principal-search-url="/api/principals/search">
+                                                        <option value="">Kies opdrachtgever</option>
+                                                        {% for principal in principal_options %}
+                                                        <option value="{{ principal.name }}" data-id="{{ principal.id }}" {% if selected_message.selected_principal_id == principal.id or selected_message.principal_name == principal.name %}selected{% endif %}>{{ principal.name }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </label>
                                                 <label><span class="field-title">Project {{ confidence_light(selected_message.parsed_map.work_name) }}</span>
                                                     <select name="field_work_name">
                                                         <option value="">Kies project</option>
@@ -1679,6 +1679,7 @@
                                                         {% endfor %}
                                                     </select>
                                                 </label>
+                                                <label><span class="field-title">Projectnummer {{ confidence_light(selected_message.parsed_map.project_number) }}</span><input name="field_project_number" value="{{ selected_message.parsed_map.project_number.value if selected_message.parsed_map.project_number is defined else '' }}"></label>
                                                 <label><span class="field-title">Werknummer {{ confidence_light(selected_message.parsed_map.work_number) }}</span><input name="field_work_number" value="{{ selected_message.parsed_map.work_number.value if selected_message.parsed_map.work_number is defined else '' }}"></label>
                                                 <label><span class="field-title">Plaats {{ confidence_light(selected_message.parsed_map.location) }}</span><input name="field_location" value="{{ selected_message.parsed_map.location.value if selected_message.parsed_map.location is defined else selected_message.employee_city }}"></label>
                                                 <label><span class="field-title">Kilometers enkele reis {{ confidence_light(selected_message.parsed_map.single_trip_km) }}</span><input name="field_single_trip_km" value="{{ selected_message.parsed_map.single_trip_km.value if selected_message.parsed_map.single_trip_km is defined else '' }}"></label>
@@ -1778,6 +1779,8 @@
                                                 <label><span class="field-title">Kosten {{ confidence_light(selected_message.parsed_map.expenses) }}</span><input name="field_expenses" value="{{ selected_message.parsed_map.expenses.value if selected_message.parsed_map.expenses is defined else '' }}"></label>
                                                 <label><span class="field-title">Parkeerkosten {{ confidence_light(selected_message.parsed_map.parking_costs) }}</span><input name="field_parking_costs" value="{{ selected_message.parsed_map.parking_costs.value if selected_message.parsed_map.parking_costs is defined else '' }}"></label>
                                                 <label><span class="field-title">Factureren met tegenbon {{ confidence_light(selected_message.parsed_map.invoice_with_receipt) }}</span><input name="field_invoice_with_receipt" value="{{ selected_message.parsed_map.invoice_with_receipt.value if selected_message.parsed_map.invoice_with_receipt is defined else '' }}"></label>
+                                                <label><span class="field-title">Naam ondertekenaar {{ confidence_light(selected_message.parsed_map.signer_name) }}</span><input name="field_signer_name" value="{{ selected_message.parsed_map.signer_name.value if selected_message.parsed_map.signer_name is defined else '' }}"></label>
+                                                <label><span class="field-title">Telefoon ondertekenaar {{ confidence_light(selected_message.parsed_map.signer_phone) }}</span><input name="field_signer_phone" value="{{ selected_message.parsed_map.signer_phone.value if selected_message.parsed_map.signer_phone is defined else '' }}"></label>
                                                 <label>
                                                     <span class="field-title">Handtekening {{ confidence_light(selected_message.parsed_map.signature) }}</span>
                                                     <input name="field_signature" value="{{ selected_message.parsed_map.signature.value if selected_message.parsed_map.signature is defined else '' }}">
@@ -1991,6 +1994,6 @@
                 </section>
             </main>
         </div>
-        <script src="/dashboard/static/dashboard.js?v=20260605-10"></script>
+        <script src="/dashboard/static/dashboard.js?v=20260605-11"></script>
     </body>
 </html>

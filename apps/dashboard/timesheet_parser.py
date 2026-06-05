@@ -136,9 +136,9 @@ def _parse_with_openai(content: bytes, filename: str) -> dict | None:
                             "Behandel handtekeningen als visuele markeringen, niet als OCR-tekst. Laat alleen leeg als het vak echt leeg is. "
                             "Neem ook naam ondertekenaar, telefoon ondertekenaar, werknummer, opmerkingen, verzuimcode, dagcodes, parkeerkosten, factureren met tegenbon ja/nee en handtekening/stempel opdrachtgever over als die zichtbaar zijn. "
                             "Vul calculated_total_hours met de optelsom van ma t/m zo. "
-                            "Vul total_hours_check met 'klopt' als de optelsom gelijk is aan totaal, anders met een korte melding zoals 'verschil 2 uur'. "
+                            "Vul total_hours_check met 'klopt' als de optelsom gelijk is aan het zichtbaar ingevulde totaal. Bij verschil: vermeld beide waarden, bijvoorbeeld 'bijlage 40, som 40,5'. "
                             "Vul calculated_total_km met de optelsom van monday_km t/m sunday_km. "
-                            "Vul total_km_check met 'klopt' als de optelsom gelijk is aan total_km, anders met een korte melding. "
+                            "Vul total_km_check met 'klopt' als de optelsom gelijk is aan total_km. Bij verschil: vermeld beide waarden, bijvoorbeeld 'bijlage 185, som 180'. "
                             "Bij twijfel liever een lagere confidence dan een gok."
                         ),
                     },
@@ -341,7 +341,7 @@ def _check_total_hours(fields: dict) -> None:
         fields["total_hours_check"] = {"value": "klopt", "confidence": 98}
         return
 
-    fields["total_hours_check"] = {"value": f"verschil {_format_decimal(abs(difference))} uur", "confidence": 90}
+    fields["total_hours_check"] = {"value": f"bijlage {_format_decimal(stated_total)}, som {_format_decimal(calculated)}", "confidence": 60}
     fields["total_hours"]["confidence"] = min(int(fields["total_hours"].get("confidence", 0)), 60)
 
 
@@ -374,7 +374,7 @@ def _check_total_km(fields: dict) -> None:
         fields["total_km_check"] = {"value": "klopt", "confidence": 98}
         return
 
-    fields["total_km_check"] = {"value": f"verschil {_format_decimal(abs(difference))} km", "confidence": 90}
+    fields["total_km_check"] = {"value": f"bijlage {_format_decimal(stated_total)}, som {_format_decimal(calculated)}", "confidence": 60}
     fields["total_km"]["confidence"] = min(int(fields["total_km"].get("confidence", 0)), 60)
 
 

@@ -4674,7 +4674,7 @@ body[data-theme="light"] .theme-toggle strong {
 
 .timesheet-accordion summary {
     display: grid;
-    grid-template-columns: minmax(120px, 0.6fr) minmax(0, 1.4fr) 24px;
+    grid-template-columns: minmax(112px, 150px) minmax(0, 1fr) 24px;
     align-items: center;
     gap: 10px;
     min-height: 38px;
@@ -4722,14 +4722,15 @@ body[data-theme="light"] .theme-toggle strong {
     justify-content: flex-end;
     gap: 6px;
     min-width: 0;
+    overflow: hidden;
 }
 
 .accordion-metric {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    min-width: 0;
-    max-width: 180px;
+    min-width: 74px;
+    max-width: 148px;
     overflow: hidden;
     padding: 3px 7px;
     border: 1px solid rgba(204, 216, 226, 0.14);
@@ -4741,6 +4742,10 @@ body[data-theme="light"] .theme-toggle strong {
     line-height: 1.2;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.accordion-metric {
+    contain: layout paint;
 }
 
 .accordion-metric i {
