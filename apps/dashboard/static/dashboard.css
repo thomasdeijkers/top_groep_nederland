@@ -13,19 +13,11 @@ body {
     position: relative;
     margin: 0;
     min-height: 100vh;
-    background:
-        radial-gradient(circle at 78% 8%, rgba(62, 132, 92, 0.2), transparent 24rem),
-        linear-gradient(135deg, #0f1215 0%, #161b1f 52%, #101316 100%);
+    background: #101820;
 }
 
 body::before {
-    position: fixed;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-    background: url("/dashboard/static/achtergrond.webp") center / cover no-repeat;
-    content: "";
-    opacity: 0.12;
+    display: none;
 }
 
 body[data-theme="light"] {
@@ -296,11 +288,12 @@ h2 {
     justify-content: center;
     min-height: 38px;
     padding: 0 13px;
-    border: 1px solid rgba(255, 255, 255, 0.13);
+    border: 1px solid rgba(204, 216, 226, 0.22);
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.06);
-    color: #cdd7df;
+    background: rgba(255, 255, 255, 0.035);
+    color: #dbe5ec;
     font-size: 0.88rem;
+    font-weight: 500;
     white-space: nowrap;
 }
 
@@ -1107,9 +1100,9 @@ h2 {
 
 .section-label {
     margin-bottom: 7px;
-    color: #ffb88a;
+    color: #f0b06f;
     font-size: 0.74rem;
-    font-weight: 800;
+    font-weight: 650;
     letter-spacing: 0.08em;
     text-transform: uppercase;
 }
@@ -4028,7 +4021,7 @@ body[data-theme="light"] .theme-toggle strong {
     text-decoration: none;
     font: inherit;
     font-size: 0.78rem;
-    font-weight: 800;
+    font-weight: 500;
     cursor: pointer;
 }
 
@@ -4043,10 +4036,47 @@ body[data-theme="light"] .theme-toggle strong {
     margin: 0 0 10px;
 }
 
+.message-tools {
+    display: block;
+    justify-self: end;
+    width: fit-content;
+    margin: -2px 0 6px auto;
+}
+
+.message-tools summary {
+    min-height: 32px;
+    padding: 0 10px;
+    border: 1px solid rgba(204, 216, 226, 0.18);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.03);
+    color: #cbd7df;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 500;
+    list-style: none;
+}
+
+.message-tools summary::-webkit-details-marker {
+    display: none;
+}
+
+.message-tools summary:hover {
+    border-color: rgba(127, 209, 160, 0.34);
+    color: #ffffff;
+}
+
+.message-tools div {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 8px;
+}
+
 .compact-actions .ghost-button {
-    min-height: 34px;
-    padding: 0 12px;
-    font-size: 0.82rem;
+    min-height: 32px;
+    padding: 0 10px;
+    font-size: 0.8rem;
 }
 
 .confidence-pill {
@@ -4057,7 +4087,7 @@ body[data-theme="light"] .theme-toggle strong {
     min-height: 28px;
     border-radius: 999px;
     font-size: 0.8rem;
-    font-weight: 800;
+    font-weight: 600;
 }
 
 .confidence-high {
@@ -4154,10 +4184,47 @@ body[data-theme="light"] .theme-toggle strong {
 .timesheet-review-panel {
     order: 2;
     min-height: 360px;
-    padding: 14px 16px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 14px;
+    border: 1px solid rgba(204, 216, 226, 0.14);
     border-radius: 8px;
-    background: rgba(12, 31, 50, 0.5);
+    background: #13212a;
+    color: #eef4f7;
+}
+
+.timesheet-review-panel strong,
+.timesheet-review-panel b {
+    font-weight: 600;
+}
+
+.timesheet-review-panel .field-title,
+.timesheet-review-panel .field-light,
+.timesheet-review-panel .week-head,
+.timesheet-review-panel label {
+    font-weight: 500;
+}
+
+.timesheet-review-panel .field-suggestion,
+.timesheet-review-panel .document-toolbar span,
+.timesheet-review-panel .document-zoom-button span {
+    font-weight: 500;
+}
+
+.timesheet-review-panel .workflow-actions {
+    display: inline-flex;
+    margin: 8px 8px 0 0;
+}
+
+.timesheet-review-panel .workflow-actions .ghost-button {
+    min-height: 34px;
+    border-color: rgba(127, 209, 160, 0.28);
+    background: rgba(127, 209, 160, 0.08);
+    color: #e8f6ee;
+    font-size: 0.84rem;
+}
+
+.timesheet-review-panel .workflow-actions .ghost-button:hover {
+    border-color: rgba(127, 209, 160, 0.46);
+    background: rgba(127, 209, 160, 0.13);
 }
 
 .manual-processing {
@@ -4234,15 +4301,20 @@ body[data-theme="light"] .theme-toggle strong {
 
 .document-review-layout {
     display: grid;
-    grid-template-columns: minmax(420px, 1.35fr) minmax(260px, 0.65fr);
-    gap: 12px;
+    grid-template-columns: minmax(420px, 1.25fr) minmax(300px, 0.75fr);
+    gap: 10px;
     align-items: start;
+    margin-bottom: 10px;
 }
 
 .document-preview-panel {
     display: grid;
-    gap: 8px;
+    gap: 7px;
     align-content: start;
+    padding: 10px;
+    border: 1px solid rgba(204, 216, 226, 0.13);
+    border-radius: 8px;
+    background: #17242d;
 }
 
 .document-preview-header {
@@ -4254,7 +4326,7 @@ body[data-theme="light"] .theme-toggle strong {
 
 .document-preview-header span,
 .document-preview-panel small {
-    color: #9fb0bd;
+    color: #b4c3cc;
     font-size: 0.82rem;
 }
 
@@ -4274,20 +4346,16 @@ body[data-theme="light"] .theme-toggle strong {
 .document-frame {
     display: grid;
     place-items: center;
-    min-height: 260px;
-    max-height: 360px;
+    min-height: 230px;
+    max-height: 320px;
     overflow: auto;
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(204, 216, 226, 0.14);
     border-radius: 8px;
-    background:
-        linear-gradient(45deg, rgba(255, 255, 255, 0.04) 25%, transparent 25%),
-        linear-gradient(-45deg, rgba(255, 255, 255, 0.04) 25%, transparent 25%),
-        rgba(255, 255, 255, 0.05);
-    background-size: 24px 24px;
+    background: #0f1921;
 }
 
 .document-frame--compact {
-    min-height: 300px;
+    min-height: 260px;
 }
 
 .document-frame img {
@@ -4303,7 +4371,7 @@ body[data-theme="light"] .theme-toggle strong {
     display: grid;
     place-items: center;
     width: 100%;
-    min-height: 300px;
+    min-height: 260px;
     border: 0;
     background: transparent;
     color: #b8c8d1;
@@ -4319,70 +4387,138 @@ body[data-theme="light"] .theme-toggle strong {
 
 .parse-score-panel {
     display: grid;
-    gap: 10px;
-    padding: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    gap: 8px;
+    padding: 0;
+    border: 1px solid rgba(204, 216, 226, 0.16);
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.055);
+    background: #17242d;
+    color: #eef4f7;
 }
 
-.parse-score-panel h3 {
-    margin: 0;
-}
-
-.parse-score {
-    display: inline-flex;
+.parse-score-panel summary {
+    display: grid;
+    grid-template-columns: minmax(130px, 0.9fr) repeat(2, minmax(110px, 1fr)) 24px;
     align-items: center;
-    justify-content: center;
-    width: 96px;
-    height: 96px;
-    border-radius: 999px;
-    font-size: 1.6rem;
-    font-weight: 950;
+    gap: 10px;
+    min-height: 78px;
+    padding: 12px;
+    cursor: pointer;
+    list-style: none;
 }
 
-.parse-score--red {
-    background: rgba(239, 95, 87, 0.16);
-    color: #ffad9b;
-    box-shadow: inset 0 0 0 2px rgba(239, 95, 87, 0.34);
+.parse-score-panel summary::-webkit-details-marker {
+    display: none;
 }
 
-.parse-score--orange {
-    background: rgba(246, 166, 58, 0.16);
-    color: #ffd18a;
-    box-shadow: inset 0 0 0 2px rgba(246, 166, 58, 0.34);
-}
-
-.parse-score--green {
-    background: rgba(82, 210, 115, 0.16);
+.parse-score-panel summary::after {
+    content: "+";
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    background: rgba(127, 209, 160, 0.12);
     color: #9fe5b9;
-    box-shadow: inset 0 0 0 2px rgba(82, 210, 115, 0.34);
+    font-weight: 700;
+}
+
+.parse-score-panel[open] summary::after {
+    content: "-";
+}
+
+.parse-score-panel summary span {
+    display: grid;
+    gap: 3px;
+}
+
+.parse-score-panel summary small {
+    color: #9dafba;
+    font-size: 0.72rem;
+    font-weight: 500;
+}
+
+.parse-score-panel summary strong {
+    color: #f6fafc;
+    font-size: 0.92rem;
+    font-weight: 600;
+}
+
+.parse-grade {
+    width: fit-content;
+    min-width: 58px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 1.24rem !important;
+    line-height: 1;
+    text-align: center;
+}
+
+.parse-grade--red,
+.parse-score--red {
+    background: rgba(239, 95, 87, 0.14);
+    color: #ffad9b;
+    box-shadow: inset 0 0 0 1px rgba(239, 95, 87, 0.32);
+}
+
+.parse-grade--orange,
+.parse-score--orange {
+    background: rgba(246, 166, 58, 0.14);
+    color: #ffd18a;
+    box-shadow: inset 0 0 0 1px rgba(246, 166, 58, 0.32);
+}
+
+.parse-grade--green,
+.parse-score--green {
+    background: rgba(82, 210, 115, 0.14);
+    color: #9fe5b9;
+    box-shadow: inset 0 0 0 1px rgba(82, 210, 115, 0.32);
+}
+
+.parse-score-details {
+    display: grid;
+    gap: 8px;
+    padding: 0 12px 12px;
 }
 
 .parse-score-panel dl {
     display: grid;
-    gap: 6px;
+    gap: 0;
     margin: 0;
+    border-top: 1px solid rgba(204, 216, 226, 0.11);
 }
 
 .parse-score-panel dl div {
-    display: grid;
-    gap: 3px;
-    padding-bottom: 6px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 0;
+    border-bottom: 1px solid rgba(204, 216, 226, 0.09);
 }
 
 .parse-score-panel dt {
-    color: #91a1ae;
-    font-size: 0.74rem;
-    font-weight: 850;
-    text-transform: uppercase;
+    color: #a7b7c2;
+    font-size: 0.78rem;
+    font-weight: 500;
 }
 
 .parse-score-panel dd {
     margin: 0;
-    color: #ffffff;
-    font-weight: 850;
+    color: #f6fafc;
+    font-weight: 500;
+    text-align: right;
+}
+
+.confidence-legend--compact {
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 7px 8px;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.confidence-legend--compact span {
+    font-size: 0.74rem;
+    font-weight: 500;
 }
 
 .document-frame--auto-rotated img {
@@ -4419,11 +4555,11 @@ body[data-theme="light"] .theme-toggle strong {
 
 .digital-timesheet-form {
     display: grid;
-    gap: 7px;
+    gap: 6px;
     padding: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(204, 216, 226, 0.14);
     border-radius: 8px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.035));
+    background: #17242d;
 }
 
 .digital-timesheet-header {
@@ -4439,9 +4575,9 @@ body[data-theme="light"] .theme-toggle strong {
 
 .timesheet-accordion {
     overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.11);
+    border: 1px solid rgba(204, 216, 226, 0.13);
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.035);
+    background: #1a2a34;
 }
 
 .timesheet-accordion summary {
@@ -4449,9 +4585,9 @@ body[data-theme="light"] .theme-toggle strong {
     align-items: center;
     justify-content: space-between;
     gap: 14px;
-    min-height: 42px;
-    padding: 8px 12px;
-    color: #eef6f8;
+    min-height: 38px;
+    padding: 7px 11px;
+    color: #eef4f7;
     cursor: pointer;
     list-style: none;
 }
@@ -4468,9 +4604,9 @@ body[data-theme="light"] .theme-toggle strong {
     height: 24px;
     flex: 0 0 24px;
     border-radius: 7px;
-    background: rgba(127, 209, 160, 0.12);
+    background: rgba(127, 209, 160, 0.1);
     color: #9fe5b9;
-    font-weight: 900;
+    font-weight: 650;
 }
 
 .timesheet-accordion[open] summary::after {
@@ -4482,14 +4618,15 @@ body[data-theme="light"] .theme-toggle strong {
 }
 
 .timesheet-accordion summary strong {
-    font-size: 0.95rem;
+    font-size: 0.9rem;
+    font-weight: 550;
 }
 
 .timesheet-accordion summary span {
     margin-left: auto;
-    color: #9fb0bd;
+    color: #aebec8;
     font-size: 0.76rem;
-    font-weight: 800;
+    font-weight: 500;
 }
 
 .timesheet-accordion > .digital-timesheet-grid,
@@ -4515,9 +4652,9 @@ body[data-theme="light"] .theme-toggle strong {
 .digital-timesheet-grid label {
     display: grid;
     gap: 4px;
-    color: #aebbc8;
+    color: #bdc9d1;
     font-size: 0.76rem;
-    font-weight: 800;
+    font-weight: 500;
 }
 
 .digital-timesheet-grid input,
@@ -4525,6 +4662,9 @@ body[data-theme="light"] .theme-toggle strong {
     min-height: 34px;
     padding-top: 0;
     padding-bottom: 0;
+    border-color: rgba(204, 216, 226, 0.16);
+    background: #22333f;
+    color: #f8fbfd;
 }
 
 .digital-timesheet-grid--compact label {
@@ -4557,9 +4697,9 @@ body[data-theme="light"] .theme-toggle strong {
     grid-template-columns: repeat(8, minmax(54px, 1fr));
     gap: 5px;
     padding: 7px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(204, 216, 226, 0.12);
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.045);
+    background: #1e2e39;
 }
 
 .digital-week-table--with-total {
@@ -4578,9 +4718,9 @@ body[data-theme="light"] .theme-toggle strong {
     display: grid;
     justify-items: center;
     gap: 3px;
-    color: #aebbc8;
+    color: #bdc9d1;
     font-size: 0.72rem;
-    font-weight: 800;
+    font-weight: 500;
     text-align: center;
 }
 
@@ -4593,6 +4733,9 @@ body[data-theme="light"] .theme-toggle strong {
     min-height: 30px;
     padding: 0 8px;
     text-align: center;
+    border-color: rgba(204, 216, 226, 0.16);
+    background: #253743;
+    color: #f8fbfd;
 }
 
 .timesheet-review-panel .workflow-actions {
@@ -4612,11 +4755,12 @@ body[data-theme="light"] .theme-toggle strong {
 .review-header h2 {
     margin: 0 0 3px;
     font-size: 1rem;
+    font-weight: 600;
 }
 
 .compact-review-bar span,
 .review-header span {
-    color: #aab5bf;
+    color: #b4c3cc;
     font-size: 0.88rem;
 }
 

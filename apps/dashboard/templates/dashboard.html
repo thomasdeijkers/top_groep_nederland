@@ -1464,17 +1464,20 @@
                                         </span>
                                     </div>
                                 </div>
-                                <div class="review-message-actions compact-actions">
-                                    <form action="/api/whatsapp/timesheet/{{ selected_message.id }}/reparse" method="post">
-                                        <button class="ghost-button" type="submit">Opnieuw parsen met OpenAI</button>
-                                    </form>
-                                    <form action="/api/whatsapp/timesheet/{{ selected_message.id }}/archive" method="post">
-                                        <button class="ghost-button" type="submit">Bericht archiveren</button>
-                                    </form>
-                                    <form action="/api/whatsapp/timesheet/{{ selected_message.id }}/delete" method="post">
-                                        <button class="ghost-button danger-button" type="submit">Bericht verwijderen</button>
-                                    </form>
-                                </div>
+                                <details class="review-message-actions compact-actions message-tools">
+                                    <summary>Berichtopties</summary>
+                                    <div>
+                                        <form action="/api/whatsapp/timesheet/{{ selected_message.id }}/reparse" method="post">
+                                            <button class="ghost-button" type="submit">Opnieuw parsen</button>
+                                        </form>
+                                        <form action="/api/whatsapp/timesheet/{{ selected_message.id }}/archive" method="post">
+                                            <button class="ghost-button" type="submit">Archiveren</button>
+                                        </form>
+                                        <form action="/api/whatsapp/timesheet/{{ selected_message.id }}/delete" method="post">
+                                            <button class="ghost-button danger-button" type="submit">Verwijderen</button>
+                                        </form>
+                                    </div>
+                                </details>
 
                                 <div class="document-review-layout">
                                     <div class="document-preview-panel">
@@ -1503,30 +1506,47 @@
                                         <small>Draai de preview totdat het urenbriefje goed leesbaar is.</small>
                                     </div>
 
-                                    <aside class="parse-score-panel">
-                                        <p class="section-label">Parsing</p>
-                                        <h3>Algemene parsingscore</h3>
-                                        <strong class="parse-score parse-score--{{ 'green' if selected_message.overall_confidence > 95 else 'orange' if selected_message.overall_confidence >= 80 else 'red' }}">{{ selected_message.overall_confidence }}%</strong>
-                                        <dl>
-                                            <div>
-                                                <dt>Match</dt>
-                                                <dd>{{ selected_message.matched_name }}</dd>
+                                    <details class="parse-score-panel parse-score-panel--compact">
+                                        <summary>
+                                            <span>
+                                                <small>Parsing score</small>
+                                                <strong class="parse-grade parse-grade--{{ 'green' if selected_message.overall_confidence > 95 else 'orange' if selected_message.overall_confidence >= 80 else 'red' }}">{{ "%.1f"|format((selected_message.overall_confidence or 0) / 10)|replace('.', ',') }}</strong>
+                                            </span>
+                                            <span>
+                                                <small>Zekerheid</small>
+                                                <strong>{{ selected_message.overall_confidence }}%</strong>
+                                            </span>
+                                            <span>
+                                                <small>Totaal uren</small>
+                                                <strong>{{ selected_message.parsed_map.total_hours.value if selected_message.parsed_map.total_hours is defined else selected_message.hours or '-' }}</strong>
+                                            </span>
+                                        </summary>
+                                        <div class="parse-score-details">
+                                            <dl>
+                                                <div>
+                                                    <dt>Match</dt>
+                                                    <dd>{{ selected_message.matched_name }}</dd>
+                                                </div>
+                                                <div>
+                                                    <dt>Telefoon</dt>
+                                                    <dd>{{ selected_message.sender_phone }}</dd>
+                                                </div>
+                                                <div>
+                                                    <dt>Status</dt>
+                                                    <dd>{{ selected_message.workflow_stage_label }}</dd>
+                                                </div>
+                                                <div>
+                                                    <dt>Beoordeling</dt>
+                                                    <dd>{% if selected_message.overall_confidence > 95 %}Betrouwbaar{% elif selected_message.overall_confidence >= 80 %}Nalopen{% else %}Controleren{% endif %}</dd>
+                                                </div>
+                                            </dl>
+                                            <div class="confidence-legend confidence-legend--compact">
+                                                <span><i class="legend-dot legend-dot--red"></i>0-80%</span>
+                                                <span><i class="legend-dot legend-dot--orange"></i>80-95%</span>
+                                                <span><i class="legend-dot legend-dot--green"></i>&gt;95%</span>
                                             </div>
-                                            <div>
-                                                <dt>Telefoon</dt>
-                                                <dd>{{ selected_message.sender_phone }}</dd>
-                                            </div>
-                                            <div>
-                                                <dt>Status</dt>
-                                                <dd>{{ selected_message.workflow_stage_label }}</dd>
-                                            </div>
-                                        </dl>
-                                        <div class="confidence-legend confidence-legend--stacked">
-                                            <span><i class="legend-dot legend-dot--red"></i>0-80% controleren</span>
-                                            <span><i class="legend-dot legend-dot--orange"></i>80-95% nalopen</span>
-                                            <span><i class="legend-dot legend-dot--green"></i>&gt;95% betrouwbaar</span>
                                         </div>
-                                    </aside>
+                                    </details>
                                 </div>
 
                                 <form class="digital-timesheet-form correction-form" id="digital-timesheet" action="/api/whatsapp/timesheet/{{ selected_message.id }}/corrections" method="post">
@@ -1693,10 +1713,10 @@
                                 <form class="workflow-actions" action="/api/whatsapp/timesheet/{{ selected_message.id }}/validate" method="post">
                                     <input type="hidden" name="principal_id" value="{{ selected_message.selected_principal_id or '' }}" data-workflow-principal-id>
                                     <input type="hidden" name="project_id" value="{{ selected_message.selected_project_id or '' }}" data-workflow-project-id>
-                                    <button class="ghost-button" type="submit">Uren valideren voor loonberekening</button>
+                                    <button class="ghost-button" type="submit">Valideren</button>
                                 </form>
                                 <form class="workflow-actions" action="/api/whatsapp/timesheet/{{ selected_message.id }}/payroll" method="post">
-                                    <button class="ghost-button" type="submit">Doorsturen naar loonadministratie</button>
+                                    <button class="ghost-button" type="submit">Naar loonadministratie</button>
                                 </form>
                             </div>
                             {% endif %}
