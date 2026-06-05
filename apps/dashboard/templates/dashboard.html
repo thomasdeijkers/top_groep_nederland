@@ -18,7 +18,7 @@
         </title>
         <link rel="icon" href="/dashboard/static/favicon.ico" sizes="any">
         <link rel="shortcut icon" href="/dashboard/static/favicon.ico">
-        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260605-11">
+        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260605-12">
     </head>
     <body class="page-{{ active_page }}">
         {% macro confidence_light(field) -%}
@@ -1604,7 +1604,7 @@
                                                     <span class="accordion-metrics">
                                                         {{ summary_status(selected_message.parsed_map.week_number, 'Week') }}
                                                         {{ summary_status(selected_message.parsed_map.date, 'Datum', selected_message.parsed_map.date.value if selected_message.parsed_map.date is defined else selected_message.work_date) }}
-                                                        <span class="accordion-metric accordion-metric--{{ 'green' if selected_message.matched_relation_id else 'red' }}">
+                                                        <span class="accordion-metric accordion-metric--{{ 'green' if selected_message.matched_relation_id else 'red' }}" data-candidate-match-summary>
                                                             <i></i>Kandidaat: {{ selected_message.matched_name if selected_message.matched_relation_id else 'Niet gekoppeld' }}
                                                         </span>
                                                     </span>
@@ -1994,6 +1994,6 @@
                 </section>
             </main>
         </div>
-        <script src="/dashboard/static/dashboard.js?v=20260605-11"></script>
+        <script src="/dashboard/static/dashboard.js?v=20260605-12"></script>
     </body>
 </html>

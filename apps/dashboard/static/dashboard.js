@@ -305,6 +305,7 @@
         const employeeNameInput = form?.querySelector('[name="field_employee_name"]');
         const employeePhoneInput = form?.querySelector('[name="field_employee_phone"]');
         const suggestionsTarget = form?.querySelector("[data-candidate-suggestions]");
+        const summaryTarget = form?.querySelector("[data-candidate-match-summary]");
         const searchUrl = select.dataset.candidateSearchUrl;
         let candidateSearchTimer = null;
         let candidateSearchSequence = 0;
@@ -368,6 +369,11 @@
         const applySelectedCandidate = () => {
             const option = select.selectedOptions[0];
             if (!option || !option.value) {
+                if (summaryTarget) {
+                    summaryTarget.classList.remove("accordion-metric--green", "accordion-metric--orange");
+                    summaryTarget.classList.add("accordion-metric--red");
+                    summaryTarget.innerHTML = "<i></i>Kandidaat: Niet gekoppeld";
+                }
                 return;
             }
             if (employeeNameInput && option.dataset.name) {
@@ -377,6 +383,14 @@
             if (employeePhoneInput && option.dataset.phone) {
                 employeePhoneInput.value = option.dataset.phone;
                 employeePhoneInput.dispatchEvent(new Event("input", { bubbles: true }));
+            }
+            if (searchInput && option.dataset.name) {
+                searchInput.value = option.dataset.name;
+            }
+            if (summaryTarget) {
+                summaryTarget.classList.remove("accordion-metric--red", "accordion-metric--orange");
+                summaryTarget.classList.add("accordion-metric--green");
+                summaryTarget.innerHTML = `<i></i>Kandidaat: ${option.dataset.name || option.textContent}`;
             }
         };
 

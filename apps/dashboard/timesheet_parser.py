@@ -238,6 +238,7 @@ def _normalize_openai_result(data: dict, filename: str) -> dict:
             "value": value,
             "confidence": _field_confidence(value, raw.get("confidence")),
         }
+    _cap_handwritten_number_confidence(fields)
     _check_total_hours(fields)
     _check_total_km(fields)
 
@@ -268,6 +269,32 @@ def _normalize_usage(usage: dict) -> dict:
         "output_tokens": _safe_int(usage.get("output_tokens")),
         "total_tokens": _safe_int(usage.get("total_tokens")),
     }
+
+
+def _cap_handwritten_number_confidence(fields: dict) -> None:
+    critical_keys = (
+        "monday_hours",
+        "tuesday_hours",
+        "wednesday_hours",
+        "thursday_hours",
+        "friday_hours",
+        "saturday_hours",
+        "sunday_hours",
+        "total_hours",
+        "monday_km",
+        "tuesday_km",
+        "wednesday_km",
+        "thursday_km",
+        "friday_km",
+        "saturday_km",
+        "sunday_km",
+        "total_km",
+    )
+    for key in critical_keys:
+        field = fields.get(key) or {}
+        if str(field.get("value") or "").strip():
+            field["confidence"] = min(int(field.get("confidence", 0) or 0), 60)
+            fields[key] = field
 
 
 def _data_url(content: bytes, filename: str) -> str | None:
@@ -330,15 +357,20 @@ def _check_total_hours(fields: dict) -> None:
         return
 
     calculated = sum(known_days, Decimal("0"))
-    fields["calculated_total_hours"] = {"value": _format_decimal(calculated), "confidence": 98}
+    day_confidence = min(
+        [int((fields.get(key) or {}).get("confidence", 0) or 0) for key in day_keys if _decimal_or_none((fields.get(key) or {}).get("value")) is not None]
+        or [0]
+    )
+    fields["calculated_total_hours"] = {"value": _format_decimal(calculated), "confidence": min(98, day_confidence)}
     stated_total = _decimal_or_none(fields.get("total_hours", {}).get("value", ""))
     if stated_total is None:
-        fields["total_hours_check"] = {"value": "totaal ontbreekt", "confidence": 98}
+        fields["total_hours_check"] = {"value": "totaal ontbreekt", "confidence": min(60, day_confidence)}
         return
 
     difference = calculated - stated_total
     if difference == 0:
-        fields["total_hours_check"] = {"value": "klopt", "confidence": 98}
+        total_confidence = int(fields.get("total_hours", {}).get("confidence", 0) or 0)
+        fields["total_hours_check"] = {"value": "klopt", "confidence": min(98, day_confidence, total_confidence)}
         return
 
     fields["total_hours_check"] = {"value": f"bijlage {_format_decimal(stated_total)}, som {_format_decimal(calculated)}", "confidence": 60}
@@ -363,15 +395,20 @@ def _check_total_km(fields: dict) -> None:
         return
 
     calculated = sum(known_days, Decimal("0"))
-    fields["calculated_total_km"] = {"value": _format_decimal(calculated), "confidence": 98}
+    day_confidence = min(
+        [int((fields.get(key) or {}).get("confidence", 0) or 0) for key in day_keys if _decimal_or_none((fields.get(key) or {}).get("value")) is not None]
+        or [0]
+    )
+    fields["calculated_total_km"] = {"value": _format_decimal(calculated), "confidence": min(98, day_confidence)}
     stated_total = _decimal_or_none(fields.get("total_km", {}).get("value", ""))
     if stated_total is None:
-        fields["total_km_check"] = {"value": "totaal km ontbreekt", "confidence": 98}
+        fields["total_km_check"] = {"value": "totaal km ontbreekt", "confidence": min(60, day_confidence)}
         return
 
     difference = calculated - stated_total
     if difference == 0:
-        fields["total_km_check"] = {"value": "klopt", "confidence": 98}
+        total_confidence = int(fields.get("total_km", {}).get("confidence", 0) or 0)
+        fields["total_km_check"] = {"value": "klopt", "confidence": min(98, day_confidence, total_confidence)}
         return
 
     fields["total_km_check"] = {"value": f"bijlage {_format_decimal(stated_total)}, som {_format_decimal(calculated)}", "confidence": 60}
