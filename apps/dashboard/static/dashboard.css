@@ -1659,21 +1659,35 @@ select.select-has-value {
 
 .candidate-match-control {
     display: grid;
-    gap: 6px;
-    padding: 8px;
+    grid-template-columns: minmax(180px, 0.8fr) minmax(260px, 1.2fr);
+    gap: 10px;
+    grid-column: 1 / -1;
+    padding: 10px;
     border: 1px solid rgba(127, 209, 160, 0.28);
     border-radius: 8px;
     border-color: rgba(127, 209, 160, 0.28);
     background: rgba(127, 209, 160, 0.06);
 }
 
+.candidate-match-control > .field-title {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    color: #e9f3f6;
+    font-size: 0.9rem;
+}
+
 .candidate-match-control input[type="search"] {
-    min-height: 34px;
+    min-height: 38px;
+    font-size: 0.9rem;
 }
 
 .candidate-match-control select {
-    min-height: 88px;
+    grid-column: 1 / -1;
+    min-height: 150px;
+    padding: 8px;
     border-color: rgba(127, 209, 160, 0.35);
+    font-size: 0.9rem;
+    line-height: 1.45;
 }
 
 .parsed-candidate-name {
@@ -1685,6 +1699,7 @@ select.select-has-value {
     padding: 0 10px;
     border-radius: 7px;
     background: rgba(255, 255, 255, 0.06);
+    align-self: stretch;
 }
 
 .parsed-candidate-name span,
@@ -1702,15 +1717,16 @@ select.select-has-value {
 
 .candidate-suggestions {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 5px;
+    grid-template-columns: repeat(4, minmax(120px, 1fr));
+    gap: 8px;
+    grid-column: 1 / -1;
 }
 
 .candidate-suggestion {
     display: grid;
-    gap: 3px;
-    min-height: 34px;
-    padding: 5px 8px;
+    gap: 4px;
+    min-height: 48px;
+    padding: 8px 10px;
     border: 1px solid rgba(127, 209, 160, 0.26);
     border-radius: 7px;
     background: rgba(127, 209, 160, 0.09);
@@ -1726,8 +1742,16 @@ select.select-has-value {
 
 .candidate-suggestion strong {
     overflow: hidden;
+    color: #f8fbfd;
+    font-size: 0.86rem;
+    line-height: 1.25;
     text-overflow: ellipsis;
-    white-space: nowrap;
+    white-space: normal;
+}
+
+.candidate-suggestion span {
+    font-size: 0.76rem;
+    font-weight: 600;
 }
 
 .candidate-suggestion-empty {
@@ -4741,6 +4765,10 @@ body[data-theme="light"] .theme-toggle strong {
     grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.digital-timesheet-grid--links {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .digital-timesheet-grid--compact {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 6px;
@@ -5397,6 +5425,11 @@ body[data-theme="light"] .theme-toggle strong {
         grid-template-columns: repeat(4, minmax(74px, 1fr));
         overflow-x: auto;
     }
+
+    .candidate-match-control,
+    .candidate-suggestions {
+        grid-template-columns: 1fr;
+    }
 }
 
 @media (orientation: landscape) and (max-height: 560px) {
@@ -5450,5 +5483,26 @@ body[data-theme="light"] .theme-toggle strong {
 
     .table-wrap table {
         min-width: 1100px;
+    }
+}
+
+.digital-timesheet-grid.digital-timesheet-grid--links {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: start;
+}
+
+.digital-timesheet-grid--links > .candidate-match-control {
+    grid-column: 1 / -1;
+}
+
+.digital-timesheet-grid--links > label {
+    min-height: auto;
+}
+
+@media (max-width: 900px) {
+    .digital-timesheet-grid.digital-timesheet-grid--links,
+    .candidate-match-control,
+    .candidate-suggestions {
+        grid-template-columns: 1fr;
     }
 }

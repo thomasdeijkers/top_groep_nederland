@@ -18,7 +18,7 @@
         </title>
         <link rel="icon" href="/dashboard/static/favicon.ico" sizes="any">
         <link rel="shortcut icon" href="/dashboard/static/favicon.ico">
-        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260605-04">
+        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260605-06">
     </head>
     <body class="page-{{ active_page }}">
         {% macro confidence_light(field) -%}
@@ -38,6 +38,19 @@
             {% set level = 'red' if is_empty else 'green' if confidence > 95 else 'orange' if confidence >= 80 else 'red' %}
             <span class="accordion-metric accordion-metric--{{ level }}" title="{{ label }}: {{ 'leeg' if is_empty else confidence ~ '% zekerheid' }}" data-summary-label="{{ label }}" data-summary-unit="{{ unit }}"{% if target %} data-summary-target="{{ target }}"{% endif %}>
                 <i></i>{{ label }}: {{ 'Leeg' if is_empty else display_value ~ unit }}
+            </span>
+        {%- endmacro %}
+        {% macro summary_count(label, filled, total) -%}
+            {% set level = 'red' if filled == 0 else 'green' if filled == total else 'orange' %}
+            <span class="accordion-metric accordion-metric--{{ level }}" title="{{ label }}: {{ filled }} van {{ total }} ingevuld">
+                <i></i>{{ label }}: {{ filled }}/{{ total }}
+            </span>
+        {%- endmacro %}
+        {% macro presence_status(field, label) -%}
+            {% set value = field.value if field is defined and field.value is defined else none %}
+            {% set is_present = value is not none and value|string|trim != '' and value|string|lower|trim not in ['nee', 'geen', 'ontbreekt', 'niet aanwezig'] %}
+            <span class="accordion-metric accordion-metric--{{ 'green' if is_present else 'red' }}" title="{{ label }}: {{ 'aanwezig' if is_present else 'leeg' }}">
+                <i></i>{{ label }}: {{ 'aanwezig' if is_present else 'Leeg' }}
             </span>
         {%- endmacro %}
         <div class="app-shell">
@@ -1615,7 +1628,7 @@
                                                         {{ summary_status(selected_message.parsed_map.work_name, 'Project', selected_message.project_name) }}
                                                     </span>
                                                 </summary>
-                                                <div class="digital-timesheet-grid digital-timesheet-grid--primary">
+                                                <div class="digital-timesheet-grid digital-timesheet-grid--primary digital-timesheet-grid--links">
                                                 <div class="candidate-match-control">
                                                     <span class="field-title">Kandidaat koppelen</span>
                                                     <div class="parsed-candidate-name">
@@ -1623,8 +1636,8 @@
                                                         <strong>{{ parsed_employee_name or 'Geen naam gevonden' }}</strong>
                                                     </div>
                                                     <div class="candidate-suggestions" data-candidate-suggestions aria-label="Kandidaatsuggesties"></div>
-                                                    <input type="search" placeholder="Zoek kandidaat..." data-candidate-match-search autocomplete="off">
-                                                    <select name="matched_relation_id" size="4" data-candidate-match-select data-candidate-search-url="/api/candidates/search">
+                                                    <input type="search" placeholder="Zoek kandidaat op naam of telefoon..." data-candidate-match-search autocomplete="off">
+                                                    <select name="matched_relation_id" size="6" data-candidate-match-select data-candidate-search-url="/api/candidates/search">
                                                         <option value="">Geen kandidaat gekoppeld</option>
                                                         {% for candidate in timesheet_candidate_options %}
                                                         {% set candidate_name_match = parsed_employee_name and candidate.name and parsed_employee_name|lower == candidate.name|lower %}
@@ -1676,7 +1689,7 @@
                                                     <strong>Kilometers</strong>
                                                     <span class="accordion-metrics">
                                                         {{ summary_status(selected_message.parsed_map.total_km, 'Totaal', none, ' km', 'total_km') }}
-                                                        {{ summary_status(selected_message.parsed_map.single_trip_km, 'Enkele reis') }}
+                                                        {{ summary_status(selected_message.parsed_map.total_km_check, 'Controle', none, '', 'total_km_check') }}
                                                     </span>
                                                 </summary>
                                                 <div class="digital-week-table digital-week-table--with-total">
@@ -1695,8 +1708,23 @@
                                                 <summary>
                                                     <strong>Dagcodes en verzuim</strong>
                                                     <span class="accordion-metrics">
+                                                        {% set day_code_fields = [
+                                                            selected_message.parsed_map.monday_code,
+                                                            selected_message.parsed_map.tuesday_code,
+                                                            selected_message.parsed_map.wednesday_code,
+                                                            selected_message.parsed_map.thursday_code,
+                                                            selected_message.parsed_map.friday_code,
+                                                            selected_message.parsed_map.saturday_code,
+                                                            selected_message.parsed_map.sunday_code
+                                                        ] %}
+                                                        {% set day_code_count = namespace(value=0) %}
+                                                        {% for code_field in day_code_fields %}
+                                                            {% if code_field is defined and code_field.value is defined and code_field.value|string|trim %}
+                                                                {% set day_code_count.value = day_code_count.value + 1 %}
+                                                            {% endif %}
+                                                        {% endfor %}
+                                                        {{ summary_count('Dagcodes', day_code_count.value, 7) }}
                                                         {{ summary_status(selected_message.parsed_map.absence_code, 'Verzuim') }}
-                                                        {{ summary_status(selected_message.parsed_map.monday_code, 'Code ma') }}
                                                     </span>
                                                 </summary>
                                                 <div class="digital-week-table digital-week-table--codes digital-week-table--codes-with-absence">
@@ -1717,7 +1745,7 @@
                                                     <span class="accordion-metrics">
                                                         {{ summary_status(selected_message.parsed_map.calculated_total_hours, 'Uren', none, '', 'calculated_total_hours') }}
                                                         {{ summary_status(selected_message.parsed_map.calculated_total_km, 'Km', none, '', 'calculated_total_km') }}
-                                                        {{ summary_status(selected_message.parsed_map.signature, 'Handtekening') }}
+                                                        {{ presence_status(selected_message.parsed_map.signature, 'Handtekening') }}
                                                     </span>
                                                 </summary>
                                                 <div class="digital-timesheet-grid digital-timesheet-grid--compact">
@@ -1942,6 +1970,6 @@
                 </section>
             </main>
         </div>
-        <script src="/dashboard/static/dashboard.js?v=20260605-04"></script>
+        <script src="/dashboard/static/dashboard.js?v=20260605-06"></script>
     </body>
 </html>

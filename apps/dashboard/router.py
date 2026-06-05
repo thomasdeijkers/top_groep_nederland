@@ -313,7 +313,7 @@ def _dashboard_context(
     candidate_relations = list_relations(query=query, relation_type="candidate", status=active_status) if data_page == "relations" else []
     timesheet_candidate_options = list_relations(limit=200, relation_type="candidate") if data_page == "timesheets" else []
     principal_relations = list_relations(query=query, relation_type="principal", status=active_status) if data_page == "relations" else []
-    principals = list_principals(query=query if data_page == "relations" else "") if data_page in {"relations", "vacancies", "projects"} else []
+    principals = list_principals(limit=100, query=query if data_page == "relations" else "") if data_page in {"relations", "vacancies", "projects", "timesheets"} else []
     imported_candidates = list_candidates(query=query) if data_page == "relations" else []
     imported_tickets = list_tickets() if data_page == "tickets" else []
     imported_vacancies = list_vacancies(query=query, status=active_status) if data_page == "vacancies" else []
