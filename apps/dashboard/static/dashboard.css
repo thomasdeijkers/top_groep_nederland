@@ -1660,9 +1660,9 @@ select.select-has-value {
 .candidate-match-control {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 10px;
+    gap: 12px;
     grid-column: 1 / -1;
-    padding: 10px;
+    padding: 12px;
     border: 1px solid rgba(127, 209, 160, 0.28);
     border-radius: 8px;
     border-color: rgba(127, 209, 160, 0.28);
@@ -1670,22 +1670,52 @@ select.select-has-value {
 }
 
 .candidate-match-control > .field-title {
-    grid-column: 1 / -1;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    justify-content: flex-start;
     color: #e9f3f6;
-    font-size: 0.9rem;
+    font-size: 0.95rem;
 }
 
-.candidate-match-control > .field-title small {
+.candidate-match-grid {
+    display: grid;
+    grid-template-columns: minmax(180px, 0.45fr) minmax(320px, 1fr);
+    gap: 12px;
+    align-items: stretch;
+}
+
+.candidate-match-parsed,
+.candidate-match-picker {
+    display: grid;
+    gap: 8px;
+    align-content: start;
+}
+
+.candidate-match-parsed {
+    padding: 11px 12px;
+    border: 1px solid rgba(166, 180, 190, 0.22);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.candidate-match-parsed small,
+.candidate-match-picker > small,
+.candidate-suggestion span,
+.candidate-suggestion-empty {
     color: #aab8c3;
-    font-size: 0.78rem;
-    font-weight: 700;
+    font-size: 0.72rem;
+    font-weight: 800;
 }
 
-.candidate-match-control input[type="search"] {
+.candidate-match-parsed strong {
+    color: #f8fbfd;
+    font-size: 1rem;
+    line-height: 1.25;
+}
+
+.candidate-match-parsed span {
+    color: #cbd6dd;
+    font-size: 0.82rem;
+}
+
+.candidate-match-picker input[type="search"] {
     min-height: 38px;
     font-size: 0.9rem;
 }
@@ -1699,45 +1729,18 @@ select.select-has-value {
     font-size: 0.88rem;
 }
 
-.candidate-match-control select {
-    grid-column: 1 / -1;
-    min-height: 150px;
+.candidate-match-picker select {
+    min-height: 112px;
     padding: 8px;
     border-color: rgba(127, 209, 160, 0.35);
     font-size: 0.9rem;
     line-height: 1.45;
 }
 
-.parsed-candidate-name {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    min-height: 28px;
-    padding: 0 10px;
-    border-radius: 7px;
-    background: rgba(255, 255, 255, 0.06);
-    align-self: stretch;
-}
-
-.parsed-candidate-name span,
-.candidate-suggestion span,
-.candidate-suggestion-empty {
-    color: #aab8c3;
-    font-size: 0.72rem;
-    font-weight: 800;
-}
-
-.parsed-candidate-name strong {
-    color: #f5fff8;
-    font-size: 0.9rem;
-}
-
 .candidate-suggestions {
     display: grid;
-    grid-template-columns: repeat(4, minmax(120px, 1fr));
+    grid-template-columns: repeat(2, minmax(140px, 1fr));
     gap: 8px;
-    grid-column: 1 / -1;
 }
 
 .candidate-suggestion {
@@ -1774,7 +1777,11 @@ select.select-has-value {
 
 .candidate-suggestion-empty {
     grid-column: 1 / -1;
-    padding: 7px 0;
+    min-height: 38px;
+    padding: 10px 12px;
+    border: 1px dashed rgba(166, 180, 190, 0.24);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.03);
 }
 
 select option {
@@ -5445,6 +5452,7 @@ body[data-theme="light"] .theme-toggle strong {
     }
 
     .candidate-match-control,
+    .candidate-match-grid,
     .candidate-suggestions {
         grid-template-columns: 1fr;
     }
@@ -5520,6 +5528,7 @@ body[data-theme="light"] .theme-toggle strong {
 @media (max-width: 900px) {
     .digital-timesheet-grid.digital-timesheet-grid--links,
     .candidate-match-control,
+    .candidate-match-grid,
     .candidate-suggestions {
         grid-template-columns: 1fr;
     }

@@ -18,7 +18,7 @@
         </title>
         <link rel="icon" href="/dashboard/static/favicon.ico" sizes="any">
         <link rel="shortcut icon" href="/dashboard/static/favicon.ico">
-        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260605-08">
+        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260605-09">
     </head>
     <body class="page-{{ active_page }}">
         {% macro confidence_light(field) -%}
@@ -1645,19 +1645,29 @@
                                                 </summary>
                                                 <div class="digital-timesheet-grid digital-timesheet-grid--primary digital-timesheet-grid--links">
                                                 <div class="candidate-match-control">
-                                                    <span class="field-title">Kandidaat koppelen <small>Geparst: {{ parsed_employee_name or 'geen naam gevonden' }}</small></span>
-                                                    <div class="candidate-suggestions" data-candidate-suggestions aria-label="Kandidaatsuggesties"></div>
-                                                    <input type="search" placeholder="Zoek kandidaat op naam of telefoon..." data-candidate-match-search autocomplete="off">
-                                                    <select name="matched_relation_id" size="6" data-candidate-match-select data-candidate-search-url="/api/candidates/search">
-                                                        <option value="">Geen kandidaat gekoppeld</option>
-                                                        {% for candidate in timesheet_candidate_options %}
-                                                        {% set candidate_name_match = parsed_employee_name and candidate.name and parsed_employee_name|lower == candidate.name|lower %}
-                                                        {% set candidate_phone_match = parsed_employee_phone and candidate.phone and (parsed_employee_phone|string|replace(' ', '')|replace('-', '') == candidate.phone|string|replace(' ', '')|replace('-', '')) %}
-                                                        <option value="{{ candidate.id }}" data-name="{{ candidate.name }}" data-phone="{{ candidate.phone if candidate.phone != '-' else '' }}" data-city="{{ candidate.city }}" data-source="Dashboard" {% if selected_message.matched_relation_id == candidate.id %}selected{% endif %}>
-                                                            {% if candidate_phone_match or candidate_name_match %}Beste match - {% endif %}{{ candidate.name }}{% if candidate.phone and candidate.phone != '-' %} | {{ candidate.phone }}{% endif %}{% if candidate.city and candidate.city != '-' %} | {{ candidate.city }}{% endif %}
-                                                        </option>
-                                                        {% endfor %}
-                                                    </select>
+                                                    <span class="field-title">Kandidaat</span>
+                                                    <div class="candidate-match-grid">
+                                                        <div class="candidate-match-parsed">
+                                                            <small>Pars resultaat</small>
+                                                            <strong>{{ parsed_employee_name or 'Geen naam gevonden' }}</strong>
+                                                            <span>{{ parsed_employee_phone or 'Geen telefoon gevonden' }}</span>
+                                                        </div>
+                                                        <div class="candidate-match-picker">
+                                                            <small>Databasekoppeling</small>
+                                                            <input type="search" placeholder="Zoek kandidaat op naam of telefoon..." data-candidate-match-search autocomplete="off">
+                                                            <div class="candidate-suggestions" data-candidate-suggestions aria-label="Kandidaatsuggesties"></div>
+                                                            <select name="matched_relation_id" size="4" data-candidate-match-select data-candidate-search-url="/api/candidates/search">
+                                                                <option value="">Geen kandidaat gekoppeld</option>
+                                                                {% for candidate in timesheet_candidate_options %}
+                                                                {% set candidate_name_match = parsed_employee_name and candidate.name and parsed_employee_name|lower == candidate.name|lower %}
+                                                                {% set candidate_phone_match = parsed_employee_phone and candidate.phone and (parsed_employee_phone|string|replace(' ', '')|replace('-', '') == candidate.phone|string|replace(' ', '')|replace('-', '')) %}
+                                                                <option value="{{ candidate.id }}" data-name="{{ candidate.name }}" data-phone="{{ candidate.phone if candidate.phone != '-' else '' }}" data-city="{{ candidate.city }}" data-source="Dashboard" {% if selected_message.matched_relation_id == candidate.id %}selected{% endif %}>
+                                                                    {% if candidate_phone_match or candidate_name_match %}Suggestie - {% endif %}{{ candidate.name }}{% if candidate.phone and candidate.phone != '-' %} | {{ candidate.phone }}{% endif %}{% if candidate.city and candidate.city != '-' %} | {{ candidate.city }}{% endif %}
+                                                                </option>
+                                                                {% endfor %}
+                                                            </select>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                                 <label><span class="field-title">Naam ondertekenaar {{ confidence_light(selected_message.parsed_map.signer_name) }}</span><input name="field_signer_name" value="{{ selected_message.parsed_map.signer_name.value if selected_message.parsed_map.signer_name is defined else '' }}"></label>
                                                 <label><span class="field-title">Telefoon ondertekenaar {{ confidence_light(selected_message.parsed_map.signer_phone) }}</span><input name="field_signer_phone" value="{{ selected_message.parsed_map.signer_phone.value if selected_message.parsed_map.signer_phone is defined else '' }}"></label>
@@ -1981,6 +1991,6 @@
                 </section>
             </main>
         </div>
-        <script src="/dashboard/static/dashboard.js?v=20260605-08"></script>
+        <script src="/dashboard/static/dashboard.js?v=20260605-09"></script>
     </body>
 </html>
