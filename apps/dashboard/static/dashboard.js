@@ -608,9 +608,6 @@
             if (!values.length) {
                 calculatedField.value = "";
                 checkField.value = "";
-                if (updateTotal && totalField) {
-                    totalField.value = "";
-                }
                 setSummaryMetric(totalField?.name?.replace("field_", ""), "", "red");
                 setSummaryMetric(checkField.name.replace("field_", ""), "", "red");
                 setSummaryMetric(calculatedField.name.replace("field_", ""), "", "red");
@@ -723,7 +720,7 @@
             scheduleAutosave();
         });
         applyAbsenceCode();
-        syncTotalCheck();
+        syncTotalCheck("hours");
     });
 
     document.addEventListener("click", (event) => {
