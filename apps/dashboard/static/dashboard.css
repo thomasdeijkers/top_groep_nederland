@@ -1669,6 +1669,11 @@ select.select-has-value {
     background: rgba(127, 209, 160, 0.06);
 }
 
+.candidate-match-control--basis {
+    margin-top: 2px;
+    background: rgba(255, 255, 255, 0.035);
+}
+
 .candidate-match-control > .field-title {
     color: #e9f3f6;
     font-size: 0.95rem;
