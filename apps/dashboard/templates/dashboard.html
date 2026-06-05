@@ -18,7 +18,7 @@
         </title>
         <link rel="icon" href="/dashboard/static/favicon.ico" sizes="any">
         <link rel="shortcut icon" href="/dashboard/static/favicon.ico">
-        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260605-06">
+        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260605-07">
     </head>
     <body class="page-{{ active_page }}">
         {% macro confidence_light(field) -%}
@@ -1356,11 +1356,6 @@
                                 <p>Alle urenbriefjes staan hier als taak met status, herkomst en zekerheid.</p>
                                 <nav class="timesheet-tabs" id="timesheet-tabs" aria-label="Urenbriefjes tabs">
                                     <a class="timesheet-tab {% if active_timesheet_tab == 'overview' %}timesheet-tab--active{% endif %}" href="/dashboard/timesheets?tab=overview#timesheet-tabs">Overzicht</a>
-                                    {% if selected_timesheet %}
-                                    <a class="timesheet-tab {% if active_timesheet_tab == 'task' %}timesheet-tab--active{% endif %}" href="/dashboard/timesheets?tab=task&stage={{ selected_timesheet.workflow_stage }}&timesheet={{ selected_timesheet.id }}#timesheet-tabs">Actuele taak</a>
-                                    {% else %}
-                                    <span class="timesheet-tab timesheet-tab--disabled">Actuele taak</span>
-                                    {% endif %}
                                 </nav>
                             </div>
                             {% if active_timesheet_tab == 'overview' %}
@@ -1970,6 +1965,6 @@
                 </section>
             </main>
         </div>
-        <script src="/dashboard/static/dashboard.js?v=20260605-06"></script>
+        <script src="/dashboard/static/dashboard.js?v=20260605-07"></script>
     </body>
 </html>

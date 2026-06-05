@@ -471,7 +471,10 @@
             });
         };
 
-        select.addEventListener("change", applySelectedCandidate);
+        select.addEventListener("change", () => {
+            applySelectedCandidate();
+            form?.dispatchEvent(new Event("change", { bubbles: true }));
+        });
         searchInput?.addEventListener("input", () => filterCandidates());
         searchInput?.addEventListener("keydown", async (event) => {
             if (event.key !== "Enter") {
