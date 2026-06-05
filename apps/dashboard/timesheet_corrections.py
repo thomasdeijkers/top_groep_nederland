@@ -18,6 +18,10 @@ def save_field_corrections(timesheet_id: int, corrections: dict[str, str], match
                 return
 
             parsed_fields = row[0] or {}
+            original_totals = {
+                "total_hours": (parsed_fields.get("total_hours") or {}).get("value"),
+                "total_km": (parsed_fields.get("total_km") or {}).get("value"),
+            }
             for field_key, corrected_value in corrections.items():
                 corrected_value = (corrected_value or "").strip()
 
@@ -75,7 +79,7 @@ def save_field_corrections(timesheet_id: int, corrections: dict[str, str], match
                         }
 
             _apply_absence_code_to_day_codes(parsed_fields)
-            _recalculate_total_checks(parsed_fields)
+            _recalculate_total_checks(parsed_fields, original_totals)
             cursor.execute(
                 """
                 UPDATE whatsapp_timesheet_inbox
@@ -235,7 +239,8 @@ def _format_decimal(value: Decimal) -> str:
     return text.rstrip("0").rstrip(".") if "." in text else text
 
 
-def _recalculate_total_checks(parsed_fields: dict) -> None:
+def _recalculate_total_checks(parsed_fields: dict, original_totals: dict | None = None) -> None:
+    original_totals = original_totals or {}
     _recalculate_sum_check(
         parsed_fields,
         ("monday_hours", "tuesday_hours", "wednesday_hours", "thursday_hours", "friday_hours", "saturday_hours", "sunday_hours"),
@@ -244,6 +249,7 @@ def _recalculate_total_checks(parsed_fields: dict) -> None:
         "total_hours_check",
         "uur",
         "totaal ontbreekt",
+        original_totals.get("total_hours"),
     )
     _recalculate_sum_check(
         parsed_fields,
@@ -253,6 +259,7 @@ def _recalculate_total_checks(parsed_fields: dict) -> None:
         "total_km_check",
         "km",
         "totaal km ontbreekt",
+        original_totals.get("total_km"),
     )
 
 
@@ -264,6 +271,7 @@ def _recalculate_sum_check(
     check_key: str,
     unit: str,
     missing_message: str,
+    original_total_value=None,
 ) -> None:
     values = [_decimal_or_none((parsed_fields.get(key) or {}).get("value")) for key in day_keys]
     known_values = [value for value in values if value is not None]
@@ -275,12 +283,16 @@ def _recalculate_sum_check(
     calculated = sum(known_values, Decimal("0"))
     calculated_text = _format_decimal(calculated)
     parsed_fields[calculated_key] = {"value": calculated_text, "confidence": 98, "corrected": True}
-    parsed_fields[total_key] = {"value": calculated_text, "confidence": 98, "corrected": True}
-    stated_total = _decimal_or_none((parsed_fields.get(total_key) or {}).get("value"))
+    original_total = _decimal_or_none(original_total_value)
+    stated_total = original_total if original_total is not None else _decimal_or_none((parsed_fields.get(total_key) or {}).get("value"))
+    parsed_fields[total_key] = {"value": calculated_text, "confidence": 90 if stated_total != calculated else 98, "corrected": True}
     if stated_total is None:
         parsed_fields[check_key] = {"value": missing_message, "confidence": 98, "corrected": True}
     elif stated_total == calculated:
         parsed_fields[check_key] = {"value": "klopt", "confidence": 98, "corrected": True}
     else:
-        difference = abs(calculated - stated_total)
-        parsed_fields[check_key] = {"value": f"verschil {_format_decimal(difference)} {unit}", "confidence": 90, "corrected": True}
+        parsed_fields[check_key] = {
+            "value": f"bijlage {_format_decimal(stated_total)}, som {_format_decimal(calculated)}",
+            "confidence": 60,
+            "corrected": True,
+        }

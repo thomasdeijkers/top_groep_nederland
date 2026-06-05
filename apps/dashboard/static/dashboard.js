@@ -615,10 +615,11 @@
             }
             const calculated = values.reduce((sum, value) => sum + value, 0);
             calculatedField.value = formatHours(calculated);
+            const parsedTotal = parseHours(totalField?.value);
             if (updateTotal && totalField) {
                 totalField.value = calculatedField.value;
             }
-            const stated = parseHours(totalField?.value);
+            const stated = updateTotal ? parsedTotal : parseHours(totalField?.value);
             if (stated === null) {
                 checkField.value = missingMessage;
                 setSummaryMetric(totalField?.name?.replace("field_", ""), "", "red");
@@ -627,9 +628,14 @@
                 return;
             }
             const difference = Math.abs(calculated - stated);
-            checkField.value = difference < 0.005 ? "klopt" : `verschil ${formatHours(difference)} ${unit}`;
+            if (updateTotal && difference >= 0.005) {
+                checkField.value = `bijlage ${formatHours(stated)}, som ${formatHours(calculated)}`;
+            } else {
+                checkField.value = difference < 0.005 ? "klopt" : `verschil ${formatHours(difference)} ${unit}`;
+            }
+            const checkState = difference < 0.005 ? "green" : updateTotal ? "red" : "orange";
             setSummaryMetric(totalField?.name?.replace("field_", ""), totalField?.value || "", difference < 0.005 ? "green" : "orange");
-            setSummaryMetric(checkField.name.replace("field_", ""), checkField.value, difference < 0.005 ? "green" : "orange");
+            setSummaryMetric(checkField.name.replace("field_", ""), checkField.value, checkState);
             setSummaryMetric(calculatedField.name.replace("field_", ""), calculatedField.value, "green");
         };
 
