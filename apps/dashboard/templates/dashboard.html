@@ -1007,7 +1007,7 @@
                         <div class="table-wrap period-table">
                             <table>
                                 <thead>
-                                    <tr class="{% if period.booking_count|int > 0 %}period-row--filled{% endif %}">
+                                    <tr>
                                         <th>Periode</th>
                                         <th>Samenvatting</th>
                                         <th>Status</th>
@@ -1016,7 +1016,7 @@
                                 </thead>
                                 <tbody>
                                     {% for period in payroll_periods %}
-                                    <tr>
+                                    <tr class="{% if period.booking_count|int > 0 %}period-row--filled{% endif %}">
                                         <td>
                                             <strong>{{ period.name }}</strong>
                                             <span>{{ period.year }} / periode {{ period.display_period_number or period.period_number }}</span>
@@ -1051,7 +1051,7 @@
                                         </td>
                                     </tr>
                                     {% else %}
-                                    <tr class="{% if period.booking_count|int > 0 %}period-row--filled{% endif %}">
+                                    <tr>
                                         <td colspan="4">
                                             <div class="empty-state">
                                                 <strong>Nog geen loonperiodes</strong>
