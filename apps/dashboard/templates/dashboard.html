@@ -18,7 +18,7 @@
         </title>
         <link rel="icon" href="/dashboard/static/favicon.ico" sizes="any">
         <link rel="shortcut icon" href="/dashboard/static/favicon.ico">
-        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260608-04">
+        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260608-05">
     </head>
     <body class="page-{{ active_page }}">
         {% macro confidence_light(field) -%}
@@ -953,31 +953,6 @@
                                             </div>
                                         </td>
                                     </tr>
-                                    <tr class="period-weeks-row">
-                                        <td colspan="4">
-                                            <div class="period-week-grid">
-                                                {% for week in period.weeks %}
-                                                <div>
-                                                    <span>Week {{ week.week_index }}</span>
-                                                    <strong>WK{{ week.week_number }}</strong>
-                                                    <small>{{ week.start_date }} t/m {{ week.end_date }}</small>
-                                                    <div class="period-week-counts">
-                                                        <span>Geboekt</span>
-                                                        <b>{{ week.total_hours }} uur</b>
-                                                        <b>{{ week.project_count }} projecten</b>
-                                                        <b>{{ week.booking_count }} boekingen</b>
-                                                    </div>
-                                                </div>
-                                                {% else %}
-                                                <div>
-                                                    <span>Geen weken</span>
-                                                    <strong>-</strong>
-                                                    <small>Maak de periode opnieuw aan.</small>
-                                                </div>
-                                                {% endfor %}
-                                            </div>
-                                        </td>
-                                    </tr>
                                     {% else %}
                                     <tr>
                                         <td colspan="4">
@@ -1086,31 +1061,20 @@
                                 {% for tab in selected_payroll_period.workbook_tabs %}
                                 <button class="payroll-workbook-tab {% if loop.first %}payroll-workbook-tab--active{% endif %}" type="button" role="tab" data-payroll-tab="{{ tab.label }}" aria-selected="{{ 'true' if loop.first else 'false' }}">
                                     <strong>{{ tab.label }}</strong>
-                                    {% if tab.summary %}
-                                    <span>{{ tab.summary.hours }} uur · {{ tab.summary.employees }} regels</span>
-                                    {% endif %}
                                 </button>
                                 {% endfor %}
                             </div>
 
                             {% for tab in selected_payroll_period.workbook_tabs %}
                             <section class="payroll-workbook-panel payroll-workbook-panel--{{ tab.kind }} {% if loop.first %}payroll-workbook-panel--active{% endif %}" role="tabpanel" data-payroll-panel="{{ tab.label }}">
-                                <div class="period-section-heading">
-                                    <div>
-                                        <p class="section-label">Tabblad {{ tab.label }}</p>
-                                        <h3>{% if tab.kind == 'week' %}Weekstaat met dummy urenregels{% elif tab.kind == 'period' %}Medewerker- en looninstellingen{% else %}Periode-totalen en netto te ontvangen{% endif %}</h3>
-                                    </div>
-                                    <span class="status-tag">Alle kolommen zichtbaar</span>
-                                </div>
                                 <div class="table-wrap period-payroll-table payroll-excel-table">
                                     <table data-workbook-table>
                                         <thead>
                                             <tr>
-                                                {% for column in tab.columns %}
+                                                {% for column in tab.columns if not column.hidden_in_excel %}
                                                 {% set column_index = loop.index0 %}
                                                 <th class="payroll-col-{{ column.key|replace('_', '-') }} {% if column.hidden_in_excel %}excel-hidden-column{% endif %}">
                                                     <button class="sort-header payroll-sort-header" type="button" data-workbook-sort-column="{{ column_index }}">{{ column.label }}</button>
-                                                    {% if column.hidden_in_excel %}<span>verborgen in Excel</span>{% endif %}
                                                 </th>
                                                 {% endfor %}
                                             </tr>
@@ -1118,7 +1082,7 @@
                                         <tbody>
                                             {% for row in tab.rows %}
                                             <tr>
-                                                {% for column in tab.columns %}
+                                                {% for column in tab.columns if not column.hidden_in_excel %}
                                                 {% set cell_mutation = row._mutations[column.key] if row._mutations is defined and column.key in row._mutations else none %}
                                                 {% set cell_value = row[column.key] %}
                                                 <td class="payroll-col-{{ column.key|replace('_', '-') }} {% if column.hidden_in_excel %}excel-hidden-column{% endif %}" data-sort-value="{{ cell_value }}">
@@ -2086,6 +2050,6 @@
                 </section>
             </main>
         </div>
-        <script src="/dashboard/static/dashboard.js?v=20260608-04"></script>
+        <script src="/dashboard/static/dashboard.js?v=20260608-05"></script>
     </body>
 </html>

@@ -39,6 +39,7 @@ def ensure_dashboard_tables():
         Path("migrations/025_dashboard_performance_indexes.sql"),
         Path("migrations/026_payroll_excel_reference.sql"),
         Path("migrations/027_payroll_workbook_cell_overrides.sql"),
+        Path("migrations/028_payroll_period_02_test_timesheets.sql"),
     ]
 
     with get_connection() as conn:

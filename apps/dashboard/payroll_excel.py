@@ -176,6 +176,10 @@ def build_payroll_output_workbook(path: str | Path, period: dict) -> Path:
             cell.font = Font(bold=True, color="FFFFFF")
             cell.fill = PatternFill("solid", fgColor="1F4E78")
             cell.alignment = Alignment(horizontal="center")
+        tab = next((item for item in tabs if str(item.get("label") or "Tabblad")[:31] == worksheet.title), {})
+        for index, column in enumerate(tab.get("columns", []), start=1):
+            if column.get("hidden_in_excel"):
+                worksheet.column_dimensions[get_column_letter(index)].hidden = True
         for column in worksheet.columns:
             width = max(len(str(cell.value or "")) for cell in column)
             worksheet.column_dimensions[get_column_letter(column[0].column)].width = min(max(width + 2, 12), 34)

@@ -701,18 +701,6 @@ h2 {
     white-space: nowrap;
 }
 
-.payroll-workbook-tab strong,
-.payroll-workbook-tab span {
-    display: block;
-}
-
-.payroll-workbook-tab span {
-    margin-top: 2px;
-    color: #30404b;
-    font-size: 0.64rem;
-    font-weight: 800;
-}
-
 .payroll-workbook-tab--active {
     background: #ffd9df;
     color: #15212a;
