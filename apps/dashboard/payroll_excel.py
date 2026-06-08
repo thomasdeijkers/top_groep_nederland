@@ -147,3 +147,81 @@ def _collect_formulas(worksheet, sheet_name: str) -> list[dict]:
             if isinstance(value, str) and value.startswith("="):
                 formulas.append({"sheet": sheet_name, "cell": cell.coordinate, "formula": value})
     return formulas
+
+
+def build_payroll_output_workbook(path: str | Path, period: dict) -> Path:
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Alignment, Font, PatternFill
+        from openpyxl.utils import get_column_letter
+    except ImportError as exc:
+        raise RuntimeError("openpyxl is nodig om Excel-output te maken.") from exc
+
+    output_path = Path(path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    workbook = Workbook()
+    period_sheet = workbook.active
+    period_sheet.title = "Periode"
+    _write_sheet(
+        period_sheet,
+        [
+            ("Werknemer", "employee_name"),
+            ("Kenteken", "license_plate"),
+            ("Keuzebudget", "choice_budget"),
+            ("Fase", "phase"),
+            ("Pensioen", "pension_scheme"),
+            ("Contracturen", "contract_hours"),
+            ("CAO", "cao_name"),
+            ("Recht op dagen", "days_right"),
+            ("Inregeling", "configuration"),
+            ("Functie", "function_name"),
+            ("Bruto uurloon", "gross_hourly_wage"),
+            ("Bruto totaal", "gross_total"),
+            ("Reserveringen", "reservations"),
+            ("Netto-/periodegrondslag", "net_period_basis"),
+            ("Periodegrondslag", "period_basis"),
+            ("Status", "status"),
+        ],
+        period.get("period_sheet_rows", []),
+    )
+    payslip_sheet = workbook.create_sheet("Loonstrook")
+    _write_sheet(
+        payslip_sheet,
+        [
+            ("Werknemer", "employee_name"),
+            ("CAO", "cao_name"),
+            ("Totale dagen gewerkt", "total_worked_days"),
+            ("Totale uren gewerkt", "total_worked_hours"),
+            ("Totaal VAK", "total_vacation_hours"),
+            ("Totaal Ziek", "total_sickness_hours"),
+            ("Totaal RV", "total_rv_hours"),
+            ("Totaal KV", "total_kv_hours"),
+            ("Totaal FD", "total_holiday_hours"),
+            ("Totaal kilometers", "total_km"),
+            ("Extra declaraties/vergoeding", "extra_reimbursements"),
+            ("Reeds ontvangen netto", "already_received_net"),
+            ("Nog te ontvangen netto loon", "net_to_receive"),
+            ("Totaal 4 weken", "period_total"),
+            ("WKR vergoedingen", "wkr_reimbursements"),
+            ("Loonvoorschot strook", "payslip_advance"),
+            ("Status", "status"),
+        ],
+        period.get("payslip_sheet_rows", []),
+    )
+    for worksheet in workbook.worksheets:
+        worksheet.freeze_panes = "A2"
+        for cell in worksheet[1]:
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill("solid", fgColor="1F4E78")
+            cell.alignment = Alignment(horizontal="center")
+        for column in worksheet.columns:
+            width = max(len(str(cell.value or "")) for cell in column)
+            worksheet.column_dimensions[get_column_letter(column[0].column)].width = min(max(width + 2, 12), 34)
+    workbook.save(output_path)
+    return output_path
+
+
+def _write_sheet(worksheet, columns: list[tuple[str, str]], rows: list[dict]) -> None:
+    worksheet.append([label for label, _ in columns])
+    for row in rows:
+        worksheet.append([row.get(key, "") for _, key in columns])

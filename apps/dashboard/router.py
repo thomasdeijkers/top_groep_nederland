@@ -16,7 +16,7 @@ from apps.dashboard.placeholders import (
 )
 from apps.dashboard.organizations import create_organization, list_organizations
 from apps.dashboard.openai_usage import get_openai_usage_summary
-from apps.dashboard.payroll_excel import analyze_payroll_workbook
+from apps.dashboard.payroll_excel import build_payroll_output_workbook
 from apps.dashboard.records import (
     archive_payroll_period,
     create_cao_setting,
@@ -47,7 +47,6 @@ from apps.dashboard.records import (
     list_vacancy_statuses,
     list_whatsapp_timesheets,
     log_audit_event,
-    record_payroll_excel_analysis,
     search_candidate_matches,
     update_cao_setting,
 )
@@ -763,24 +762,26 @@ def save_payroll_period(
     return RedirectResponse(f"/dashboard/periods?created={period_id}#periodes", status_code=303)
 
 
-@router.post("/api/periods/{period_id}/excel/analyze")
-async def analyze_payroll_period_excel(period_id: int, file: UploadFile = File(...)):
-    upload_dir = Path("runtime/uploads/payroll_excel")
-    upload_dir.mkdir(parents=True, exist_ok=True)
-    safe_name = Path(file.filename or "payroll-reference.xlsx").name
-    upload_path = upload_dir / f"periode-{period_id}-{safe_name}"
-    upload_path.write_bytes(await file.read())
-    analysis = analyze_payroll_workbook(upload_path)
-    record_payroll_excel_analysis(period_id, analysis, imported_from=safe_name)
+@router.get("/api/periods/{period_id}/excel/export")
+def export_payroll_period_excel(period_id: int):
+    period = get_payroll_period(period_id)
+    if not period:
+        return RedirectResponse("/dashboard/periods#periodes", status_code=303)
+    output_path = Path("runtime/exports/payroll") / f"periode-{period_id}-verloning.xlsx"
+    build_payroll_output_workbook(output_path, period)
     _audit(
-        "Excel verloning geanalyseerd",
+        "Excel verloning geexporteerd",
         "periode",
         period_id,
-        safe_name,
-        f"{len(analysis.get('week_tabs', []))} weektabs en {analysis.get('formula_count', 0)} formules gevonden.",
-        "controle_nodig" if analysis.get("warnings") else "geanalyseerd",
+        period.get("name", f"Periode {period_id}"),
+        "Excel-output gemaakt met tabbladen Periode en Loonstrook.",
+        "export",
     )
-    return RedirectResponse(f"/dashboard/periods?period={period_id}#periode-verloning", status_code=303)
+    return FileResponse(
+        output_path,
+        filename=f"{period.get('name', f'Periode {period_id}')}-verloning.xlsx",
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
 
 
 @router.post("/api/periods/{period_id}/archive")

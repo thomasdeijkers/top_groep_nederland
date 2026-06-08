@@ -1057,10 +1057,7 @@
                                 <p>{{ selected_payroll_period.start_date }} t/m {{ selected_payroll_period.end_date }}. Uren, Excel-controle en periodeberekening in één controleflow.</p>
                             </div>
                             <div class="period-actions">
-                                <form class="period-excel-upload" action="/api/periods/{{ selected_payroll_period.id }}/excel/analyze" method="post" enctype="multipart/form-data">
-                                    <input type="file" name="file" accept=".xlsx,.xlsm" required>
-                                    <button class="ghost-button" type="submit">Excel analyseren</button>
-                                </form>
+                                <a class="ghost-button" href="/api/periods/{{ selected_payroll_period.id }}/excel/export">Excel downloaden</a>
                                 <a class="ghost-button" href="/dashboard/periods#periodes">Sluiten</a>
                             </div>
                         </div>
@@ -1358,41 +1355,24 @@
                         </details>
 
                         <details class="period-import-log">
-                            <summary>Importlog en Excel-herkenning</summary>
+                            <summary>Excel-output</summary>
                             <div class="table-wrap period-payroll-table">
                                 <table>
                                     <thead>
                                         <tr>
-                                            <th>Bestand</th>
+                                            <th>Output</th>
+                                            <th>Tabbladen</th>
+                                            <th>Basis</th>
                                             <th>Status</th>
-                                            <th>Tabs</th>
-                                            <th>Velden</th>
-                                            <th>Formules</th>
-                                            <th>Meldingen</th>
-                                            <th>Moment</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {% for import_log in selected_payroll_period.payroll_import_logs %}
                                         <tr>
-                                            <td><strong>{{ import_log.filename }}</strong></td>
-                                            <td><span class="status-tag">{{ import_log.status }}</span></td>
-                                            <td>{{ import_log.sheet_names.week_tabs|length if import_log.sheet_names.week_tabs is defined else import_log.sheet_names|length }} weektabs</td>
-                                            <td>{{ import_log.mapped_fields|length }} sheets</td>
-                                            <td>{{ import_log.formulas.count if import_log.formulas.count is defined else 0 }}</td>
-                                            <td>{{ import_log.warnings|join(', ') if import_log.warnings else 'Geen' }}</td>
-                                            <td>{{ import_log.created_at }}</td>
+                                            <td><strong>{{ selected_payroll_period.name }} verloning</strong></td>
+                                            <td>Periode, Loonstrook</td>
+                                            <td>Echte kandidaten, dummy/concept loonwaarden waar data ontbreekt</td>
+                                            <td><span class="status-tag">concept</span></td>
                                         </tr>
-                                        {% else %}
-                                        <tr>
-                                            <td colspan="7">
-                                                <div class="empty-state empty-state--compact">
-                                                    <strong>Nog geen Excel-import</strong>
-                                                    <span>Gebruik Excel analyseren om WK-tabs, Periode, Loonstrook en cao-grondslagen vast te leggen.</span>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
                                     </tbody>
                                 </table>
                             </div>

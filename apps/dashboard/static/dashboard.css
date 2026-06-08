@@ -496,24 +496,6 @@ h2 {
     margin: 0;
 }
 
-.period-excel-upload {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 8px;
-}
-
-.period-excel-upload input[type="file"] {
-    max-width: 260px;
-    padding: 8px 10px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 8px;
-    background: rgba(11, 22, 29, 0.55);
-    color: #dce7ef;
-    font-size: 0.78rem;
-}
-
 .table-link--button {
     padding: 0;
     border: 0;
