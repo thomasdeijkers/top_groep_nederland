@@ -262,13 +262,22 @@ def log_audit_event(
         return
 
 
-def list_audit_events(limit: int = 25) -> list[dict]:
+def list_audit_events(limit: int = 25, entity_type: str = "", entity_id: int | None = None) -> list[dict]:
     try:
         ensure_dashboard_tables()
         with get_connection() as conn:
             with conn.cursor() as cursor:
+                filters = []
+                params: list = []
+                if entity_type:
+                    filters.append("entity_type = %s")
+                    params.append(entity_type)
+                if entity_id:
+                    filters.append("entity_id = %s")
+                    params.append(entity_id)
+                where_sql = f"WHERE {' AND '.join(filters)}" if filters else ""
                 cursor.execute(
-                    """
+                    f"""
                     SELECT id,
                            actor_name,
                            action,
@@ -280,10 +289,11 @@ def list_audit_events(limit: int = 25) -> list[dict]:
                            metadata,
                            created_at
                     FROM audit_events
+                    {where_sql}
                     ORDER BY created_at DESC, id DESC
                     LIMIT %s;
                     """,
-                    (limit,),
+                    (*params, limit),
                 )
                 rows = [
                     {

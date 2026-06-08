@@ -366,6 +366,28 @@ h2 {
         rgba(10, 22, 19, 0.3);
 }
 
+.period-create-dialog {
+    display: grid;
+    gap: 14px;
+    width: min(920px, calc(100vw - 40px));
+    max-height: calc(100vh - 48px);
+    overflow: auto;
+    padding: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    border-radius: 8px;
+    background: #182028;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
+}
+
+.period-create-dialog .period-create-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.period-create-dialog .period-create-form__notes,
+.period-create-dialog .period-create-form .ghost-button {
+    grid-column: auto;
+}
+
 .period-create-proposal {
     display: grid;
     align-content: center;
@@ -541,9 +563,18 @@ h2 {
     font-size: 0.76rem;
 }
 
+.period-table table {
+    min-width: 1180px;
+}
+
+.period-table th:nth-child(2),
+.period-table td:nth-child(2) {
+    min-width: 620px;
+}
+
 .period-week-open-list {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(132px, 132px));
+    grid-template-columns: repeat(4, 132px);
     align-items: stretch;
     gap: 6px;
 }
@@ -566,6 +597,26 @@ h2 {
     background: rgba(11, 27, 34, 0.72);
     color: #f6fbff;
     text-decoration: none;
+}
+
+.relation-audit-panel {
+    grid-column: 1 / -1;
+    display: grid;
+    gap: 10px;
+    margin-top: 4px;
+    padding: 12px;
+    border: 1px solid rgba(127, 209, 160, 0.18);
+    border-radius: 8px;
+    background: rgba(9, 20, 24, 0.38);
+}
+
+.panel-header--compact {
+    margin-bottom: 0;
+}
+
+.audit-sheet--compact {
+    max-height: 250px;
+    overflow: auto;
 }
 
 .period-week-open:hover {
@@ -3279,6 +3330,7 @@ body[data-theme="light"] .payroll-settings-form--compact {
 }
 
 body[data-theme="light"] .period-create-shell,
+body[data-theme="light"] .period-create-dialog,
 body[data-theme="light"] .period-create-proposal,
 body[data-theme="light"] .period-summary-strip,
 body[data-theme="light"] .period-week-open,
@@ -3771,7 +3823,7 @@ body[data-theme="light"] .theme-toggle strong {
 
 .timesheet-status-grid {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 10px;
 }
 
@@ -3811,6 +3863,11 @@ body[data-theme="light"] .theme-toggle strong {
     border-color: rgba(127, 209, 160, 0.36);
     background: rgba(127, 209, 160, 0.12);
     color: #dcffe8;
+}
+
+.timesheet-status-tile--link {
+    border-color: rgba(127, 209, 160, 0.26);
+    background: rgba(127, 209, 160, 0.08);
 }
 
 .timesheet-search {
@@ -5825,7 +5882,7 @@ body[data-theme="light"] .theme-toggle strong {
     }
 
     .timesheet-status-grid {
-        grid-template-columns: repeat(5, minmax(130px, 1fr));
+        grid-template-columns: repeat(6, minmax(130px, 1fr));
     }
 
     .digital-timesheet-grid {

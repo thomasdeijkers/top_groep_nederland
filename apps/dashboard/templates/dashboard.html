@@ -618,6 +618,37 @@
                                 <label class="form-span-2">Notities <textarea name="notes">{{ selected_relation.notes|default('', true) if selected_relation else '' }}</textarea></label>
                                 <button class="ghost-button create-form__submit" type="submit">Relatie opslaan</button>
                             </form>
+                            {% if selected_relation %}
+                            <section class="relation-audit-panel">
+                                <div class="panel-header panel-header--compact">
+                                    <div>
+                                        <p class="section-label">Auditspoor</p>
+                                        <h3>Wijzigingen bij deze relatie</h3>
+                                    </div>
+                                    <a class="ghost-button" href="/dashboard/audit#auditspoor">Volledig auditspoor</a>
+                                </div>
+                                <div class="audit-sheet audit-sheet--compact">
+                                    {% for item in selected_relation_audit_events %}
+                                    <article class="audit-row">
+                                        <div class="audit-row__primary">
+                                            <strong>{{ item.title }}</strong>
+                                            <span>{{ item.entity_display }}</span>
+                                            <small>Audit #{{ item.id }} · {{ item.time }}</small>
+                                        </div>
+                                        <div class="audit-row__detail">
+                                            <p>{{ item.detail or 'Geen omschrijving vastgelegd.' }}</p>
+                                            <small>{{ item.metadata_summary }}</small>
+                                        </div>
+                                    </article>
+                                    {% else %}
+                                    <div class="empty-state empty-state--compact">
+                                        <strong>Nog geen mutaties</strong>
+                                        <span>Nieuwe wijzigingen op deze kandidaat of opdrachtgever worden hier zichtbaar.</span>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </section>
+                            {% endif %}
                         </article>
                     </div>
                     {% endif %}
@@ -881,36 +912,46 @@
                                 <h2>Loonperiodes</h2>
                                 <p>Het systeem kiest automatisch de volgende vierweekse periode. Pas alleen de startdatum of het aantal blokken aan als de kalender afwijkt.</p>
                             </div>
+                            <button class="ghost-button" type="button" data-period-create-open>Periode aanmaken</button>
                         </div>
 
-                        <div class="period-create-shell">
-                            <div class="period-create-proposal">
-                                <span>Volgende voorstel</span>
-                                <strong>{{ payroll_period_defaults.name }}</strong>
-                                <small>{{ payroll_period_defaults.start_date }} t/m {{ payroll_period_defaults.end_date }} · volgende periode {{ payroll_period_defaults.period_number }} {{ payroll_period_defaults.year }}</small>
-                            </div>
-                        <form class="period-create-form" action="/api/periods" method="post">
-                            <input type="hidden" name="year" value="{{ payroll_period_defaults.year }}">
-                            <input type="hidden" name="period_number" value="{{ payroll_period_defaults.period_number }}">
-                            <input type="hidden" name="display_period_number" value="{{ payroll_period_defaults.display_period_number }}">
-                            <label>Aantal periodes
-                                <select name="period_count">
-                                    <option value="1">1 x 4 weken</option>
-                                    <option value="2">2 x 4 weken</option>
-                                </select>
-                            </label>
-                            <label>Startdatum <input type="date" name="start_date" value="{{ payroll_period_defaults.start_date }}" required></label>
-                            <label>Status
-                                <select name="status">
-                                    <option value="open">Open</option>
-                                    <option value="concept">Concept</option>
-                                    <option value="controle">Controle</option>
-                                    <option value="afgesloten">Afgesloten</option>
-                                </select>
-                            </label>
-                            <label class="period-create-form__notes">Notitie <input type="text" name="notes" placeholder="Bijvoorbeeld: afwijkende bouwkalender"></label>
-                            <button class="ghost-button" type="submit">Periodes aanmaken</button>
-                        </form>
+                        <div class="period-create-modal modal-backdrop" data-period-create-modal hidden>
+                            <form class="period-create-dialog" action="/api/periods" method="post" role="dialog" aria-modal="true" aria-labelledby="period-create-title">
+                                <div class="relation-modal__header">
+                                    <div>
+                                        <p class="section-label">Nieuwe periode</p>
+                                        <h2 id="period-create-title">Periode aanmaken</h2>
+                                    </div>
+                                    <button class="modal-close" type="button" data-period-create-close aria-label="Sluiten">x</button>
+                                </div>
+                                <div class="period-create-proposal">
+                                    <span>Volgende voorstel</span>
+                                    <strong>{{ payroll_period_defaults.name }}</strong>
+                                    <small>{{ payroll_period_defaults.start_date }} t/m {{ payroll_period_defaults.end_date }} · volgende periode {{ payroll_period_defaults.period_number }} {{ payroll_period_defaults.year }}</small>
+                                </div>
+                                <div class="period-create-form">
+                                    <input type="hidden" name="year" value="{{ payroll_period_defaults.year }}">
+                                    <input type="hidden" name="period_number" value="{{ payroll_period_defaults.period_number }}">
+                                    <input type="hidden" name="display_period_number" value="{{ payroll_period_defaults.display_period_number }}">
+                                    <label>Aantal periodes
+                                        <select name="period_count">
+                                            <option value="1">1 x 4 weken</option>
+                                            <option value="2">2 x 4 weken</option>
+                                        </select>
+                                    </label>
+                                    <label>Startdatum <input type="date" name="start_date" value="{{ payroll_period_defaults.start_date }}" required></label>
+                                    <label>Status
+                                        <select name="status">
+                                            <option value="open">Open</option>
+                                            <option value="concept">Concept</option>
+                                            <option value="controle">Controle</option>
+                                            <option value="afgesloten">Afgesloten</option>
+                                        </select>
+                                    </label>
+                                    <label class="period-create-form__notes">Notitie <input type="text" name="notes" placeholder="Bijvoorbeeld: afwijkende bouwkalender"></label>
+                                    <button class="ghost-button" type="submit">Periodes aanmaken</button>
+                                </div>
+                            </form>
                         </div>
 
                         <div class="period-tabs" aria-label="Periode overzicht">
@@ -1462,6 +1503,11 @@
                                     <small>{{ tab.description }}</small>
                                 </a>
                                 {% endfor %}
+                                <a href="/dashboard/periods#periodes" class="timesheet-status-tile timesheet-status-tile--link">
+                                    <span>Loonperiodes</span>
+                                    <strong>Open</strong>
+                                    <small>Laatste controle en accorderen in loonperiodes.</small>
+                                </a>
                             </div>
 
                             <form class="timesheet-search" action="/dashboard/timesheets" method="get">
@@ -2052,6 +2098,6 @@
                 </section>
             </main>
         </div>
-        <script src="/dashboard/static/dashboard.js?v=20260608-08"></script>
+        <script src="/dashboard/static/dashboard.js?v=20260608-09"></script>
     </body>
 </html>

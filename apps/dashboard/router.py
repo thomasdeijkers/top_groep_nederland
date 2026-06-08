@@ -343,7 +343,7 @@ def _dashboard_context(
         "whatsapp_workflow": [],
         "weekly_hours_yoy": [],
     }
-    audit_events = list_audit_events(120 if data_page == "audit" else 14) if data_page in {"overview", "audit", "settings"} else []
+    audit_events = list_audit_events(120 if data_page == "audit" else 14) if data_page in {"overview", "audit", "settings", "periods"} else []
     openai_usage = get_openai_usage_summary()
     project_options = list_project_options() if data_page in {"timesheets", "projects", "periods"} else []
     projects = list_projects(query=query) if data_page == "projects" else []
@@ -355,6 +355,14 @@ def _dashboard_context(
     cao_settings = list_cao_settings() if data_page in {"settings", "periods"} else []
     selected_cao_setting = get_cao_setting(cao_id) if data_page == "settings" and cao_id else None
     selected_relation = get_relation(edit_id) if data_page == "relations" and edit_id else None
+    selected_relation_audit_events = []
+    if selected_relation:
+        relation_audit_types = {"relatie", "candidate", "principal", selected_relation.get("relation_type") or ""}
+        selected_relation_audit_events = [
+            item
+            for item in list_audit_events(200)
+            if item.get("entity_id") == selected_relation.get("id") and item.get("entity_type") in relation_audit_types
+        ][:40]
     selected_vacancy = get_vacancy(edit_id) if data_page == "vacancies" and edit_id else None
     relation_tab = relation_tab if relation_tab in {"candidates", "principals"} else "candidates"
     show_relation_form = show_relation_form or bool(selected_relation)
@@ -414,6 +422,7 @@ def _dashboard_context(
         "tickets": imported_tickets,
         "vacancies": imported_vacancies,
         "selected_relation": selected_relation,
+        "selected_relation_audit_events": selected_relation_audit_events,
         "selected_vacancy": selected_vacancy,
         "query": query,
         "overview_data": overview_data,
@@ -768,7 +777,20 @@ def export_payroll_period_excel(period_id: int):
     if not period:
         return RedirectResponse("/dashboard/periods#periodes", status_code=303)
     output_path = Path("runtime/exports/payroll") / f"periode-{period_id}-verloning.xlsx"
-    build_payroll_output_workbook(output_path, period)
+    try:
+        build_payroll_output_workbook(output_path, period)
+    except Exception as exc:
+        fallback_period = {
+            **period,
+            "workbook_tabs": [
+                {
+                    "label": "Export",
+                    "columns": [{"label": "Melding", "key": "message"}],
+                    "rows": [{"message": f"Export kon niet volledig worden opgebouwd: {type(exc).__name__}"}],
+                }
+            ],
+        }
+        build_payroll_output_workbook(output_path, fallback_period)
     filename = _safe_download_filename(period.get("name", f"Periode {period_id}"))
     _audit(
         "Excel verloning geexporteerd",

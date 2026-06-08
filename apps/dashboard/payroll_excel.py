@@ -1,4 +1,5 @@
 import re
+from decimal import Decimal
 from pathlib import Path
 
 from apps.dashboard.payroll_calculations import PAYSLIP_SHEET_COLUMNS, PERIOD_SHEET_COLUMNS
@@ -167,8 +168,22 @@ def build_payroll_output_workbook(path: str | Path, period: dict) -> Path:
         {"label": "Periode", "columns": PERIOD_SHEET_COLUMNS, "rows": period.get("period_sheet_rows", [])},
         {"label": "Loonstrook", "columns": PAYSLIP_SHEET_COLUMNS, "rows": period.get("payslip_sheet_rows", [])},
     ]
+    tabs = [tab for tab in tabs if tab.get("columns")]
+    if not tabs:
+        tabs = [
+            {
+                "label": "Export",
+                "columns": [{"label": "Melding", "key": "message"}],
+                "rows": [{"message": "Geen regels klaar voor loonberekening."}],
+            }
+        ]
+    sheet_map = {}
+    used_titles = set()
     for tab in tabs:
-        worksheet = workbook.create_sheet(str(tab.get("label") or "Tabblad")[:31])
+        title = _safe_sheet_title(tab.get("label") or "Tabblad", used_titles)
+        used_titles.add(title)
+        sheet_map[title] = tab
+        worksheet = workbook.create_sheet(title)
         _write_sheet(worksheet, tab.get("columns", []), tab.get("rows", []))
     for worksheet in workbook.worksheets:
         worksheet.freeze_panes = "A2"
@@ -176,7 +191,7 @@ def build_payroll_output_workbook(path: str | Path, period: dict) -> Path:
             cell.font = Font(bold=True, color="FFFFFF")
             cell.fill = PatternFill("solid", fgColor="1F4E78")
             cell.alignment = Alignment(horizontal="center")
-        tab = next((item for item in tabs if str(item.get("label") or "Tabblad")[:31] == worksheet.title), {})
+        tab = sheet_map.get(worksheet.title, {})
         for index, column in enumerate(tab.get("columns", []), start=1):
             if column.get("hidden_in_excel"):
                 worksheet.column_dimensions[get_column_letter(index)].hidden = True
@@ -188,6 +203,26 @@ def build_payroll_output_workbook(path: str | Path, period: dict) -> Path:
 
 
 def _write_sheet(worksheet, columns: list[dict], rows: list[dict]) -> None:
-    worksheet.append([column["label"] for column in columns])
+    safe_columns = columns or [{"label": "Melding", "key": "message"}]
+    worksheet.append([column.get("label", column.get("key", "")) for column in safe_columns])
     for row in rows:
-        worksheet.append([row.get(column["key"], "") for column in columns])
+        worksheet.append([_excel_cell_value(row.get(column.get("key", ""), "")) for column in safe_columns])
+
+
+def _safe_sheet_title(value: str, used_titles: set[str]) -> str:
+    base = re.sub(r"[:\\/?*\[\]]", "-", str(value or "Tabblad")).strip()[:31] or "Tabblad"
+    title = base
+    counter = 2
+    while title in used_titles:
+        suffix = f" {counter}"
+        title = f"{base[:31 - len(suffix)]}{suffix}"
+        counter += 1
+    return title
+
+
+def _excel_cell_value(value):
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, (dict, list, tuple, set)):
+        return str(value)
+    return value

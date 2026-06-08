@@ -415,6 +415,32 @@
         });
     });
 
+    const periodCreateModal = document.querySelector("[data-period-create-modal]");
+    const openPeriodCreateModal = () => {
+        if (!periodCreateModal) {
+            return;
+        }
+        periodCreateModal.hidden = false;
+        periodCreateModal.querySelector("input, select, button")?.focus();
+    };
+    const closePeriodCreateModal = () => {
+        if (periodCreateModal) {
+            periodCreateModal.hidden = true;
+        }
+    };
+    document.querySelector("[data-period-create-open]")?.addEventListener("click", openPeriodCreateModal);
+    document.querySelector("[data-period-create-close]")?.addEventListener("click", closePeriodCreateModal);
+    periodCreateModal?.addEventListener("click", (event) => {
+        if (event.target === periodCreateModal) {
+            closePeriodCreateModal();
+        }
+    });
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && periodCreateModal && !periodCreateModal.hidden) {
+            closePeriodCreateModal();
+        }
+    });
+
     document.querySelectorAll("[data-candidate-match-select]").forEach((select) => {
         const form = select.closest("form");
         const searchInput = form?.querySelector("[data-candidate-match-search]");
