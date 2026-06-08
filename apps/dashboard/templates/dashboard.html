@@ -18,7 +18,7 @@
         </title>
         <link rel="icon" href="/dashboard/static/favicon.ico" sizes="any">
         <link rel="shortcut icon" href="/dashboard/static/favicon.ico">
-        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260608-05">
+        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260608-06">
     </head>
     <body class="page-{{ active_page }}">
         {% macro confidence_light(field) -%}
@@ -936,11 +936,19 @@
                                             <span>{{ period.year }} / periode {{ period.display_period_number or period.period_number }}</span>
                                         </td>
                                         <td>
-                                            <div class="period-summary-strip">
+                                            <div class="period-week-open-list">
                                                 <span>{{ period.start_date }} t/m {{ period.end_date }}</span>
-                                                <strong>{{ period.week_count }} weken</strong>
-                                                <strong>{{ period.total_hours }} uur</strong>
-                                                <strong>{{ period.booking_count }} boekingen</strong>
+                                                {% for week in period.weeks %}
+                                                <a class="period-week-open" href="/dashboard/periods?period={{ period.id }}&week=WK{{ week.week_number }}#periode-verloning">
+                                                    <strong>WK{{ week.week_number }}</strong>
+                                                    <small>{{ week.total_hours }} uur · {{ week.booking_count }} regels</small>
+                                                </a>
+                                                {% else %}
+                                                <a class="period-week-open" href="/dashboard/periods?period={{ period.id }}#periode-verloning">
+                                                    <strong>Open periode</strong>
+                                                    <small>{{ period.total_hours }} uur · {{ period.booking_count }} regels</small>
+                                                </a>
+                                                {% endfor %}
                                             </div>
                                         </td>
                                         <td><span class="status-tag">{{ period.status }}</span></td>
@@ -991,10 +999,19 @@
                                             <span>{{ period.year }} / periode {{ period.display_period_number or period.period_number }}</span>
                                         </td>
                                         <td>
-                                            <div class="period-summary-strip">
+                                            <div class="period-week-open-list">
                                                 <span>{{ period.start_date }} t/m {{ period.end_date }}</span>
-                                                <strong>{{ period.total_hours }} uur</strong>
-                                                <strong>{{ period.booking_count }} boekingen</strong>
+                                                {% for week in period.weeks %}
+                                                <a class="period-week-open" href="/dashboard/periods?period={{ period.id }}&week=WK{{ week.week_number }}#periode-verloning">
+                                                    <strong>WK{{ week.week_number }}</strong>
+                                                    <small>{{ week.total_hours }} uur · {{ week.booking_count }} regels</small>
+                                                </a>
+                                                {% else %}
+                                                <a class="period-week-open" href="/dashboard/periods?period={{ period.id }}#periode-verloning">
+                                                    <strong>Open periode</strong>
+                                                    <small>{{ period.total_hours }} uur · {{ period.booking_count }} regels</small>
+                                                </a>
+                                                {% endfor %}
                                             </div>
                                         </td>
                                         <td><span class="status-tag">{{ period.status }}</span></td>
@@ -1034,25 +1051,6 @@
                             <div class="period-actions">
                                 <a class="ghost-button" href="/api/periods/{{ selected_payroll_period.id }}/excel/export">Excel downloaden</a>
                                 <a class="ghost-button" href="/dashboard/periods#periodes">Sluiten</a>
-                            </div>
-                        </div>
-
-                        <div class="period-payroll-summary">
-                            <div>
-                                <span>Kandidaten</span>
-                                <strong>{{ selected_payroll_period.payroll_totals.employees }}</strong>
-                            </div>
-                            <div>
-                                <span>Boekingen</span>
-                                <strong>{{ selected_payroll_period.payroll_totals.bookings }}</strong>
-                            </div>
-                            <div>
-                                <span>Dagen</span>
-                                <strong>{{ selected_payroll_period.payroll_totals.days }}</strong>
-                            </div>
-                            <div>
-                                <span>Uren</span>
-                                <strong>{{ selected_payroll_period.payroll_totals.hours }}</strong>
                             </div>
                         </div>
 
@@ -2050,6 +2048,6 @@
                 </section>
             </main>
         </div>
-        <script src="/dashboard/static/dashboard.js?v=20260608-05"></script>
+        <script src="/dashboard/static/dashboard.js?v=20260608-06"></script>
     </body>
 </html>

@@ -541,6 +541,47 @@ h2 {
     font-size: 0.76rem;
 }
 
+.period-week-open-list {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.period-week-open-list > span {
+    flex-basis: 100%;
+    color: #d8e1e7;
+    font-size: 0.86rem;
+}
+
+.period-week-open {
+    display: inline-grid;
+    min-width: 92px;
+    gap: 2px;
+    padding: 7px 9px;
+    border: 1px solid rgba(110, 231, 183, 0.24);
+    border-radius: 7px;
+    background: rgba(11, 27, 34, 0.72);
+    color: #f6fbff;
+    text-decoration: none;
+}
+
+.period-week-open:hover {
+    border-color: rgba(110, 231, 183, 0.56);
+    background: rgba(26, 61, 54, 0.7);
+}
+
+.period-week-open strong {
+    color: #ffffff;
+    font-size: 0.85rem;
+}
+
+.period-week-open small {
+    color: #afbfca;
+    font-size: 0.72rem;
+    font-weight: 800;
+}
+
 .period-weeks-row td {
     padding-top: 0;
     background: rgba(255, 255, 255, 0.025);
@@ -619,34 +660,6 @@ h2 {
 
 .period-archive {
     margin-top: 18px;
-}
-
-.period-payroll-summary {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 8px;
-    margin: 10px 0 12px;
-}
-
-.period-payroll-summary div {
-    display: grid;
-    gap: 5px;
-    min-height: 58px;
-    padding: 10px 12px;
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    border-radius: 8px;
-    background: rgba(12, 31, 50, 0.5);
-}
-
-.period-payroll-summary span {
-    color: #aebbc8;
-    font-size: 0.74rem;
-    font-weight: 800;
-}
-
-.period-payroll-summary strong {
-    color: #ffffff;
-    font-size: 1.08rem;
 }
 
 .period-payroll-table table {
@@ -3217,6 +3230,7 @@ body[data-theme="light"] .payroll-settings-form--compact {
 body[data-theme="light"] .period-create-shell,
 body[data-theme="light"] .period-create-proposal,
 body[data-theme="light"] .period-summary-strip,
+body[data-theme="light"] .period-week-open,
 body[data-theme="light"] .period-week-counts {
     border-color: rgba(28, 42, 50, 0.12);
     background-color: rgba(247, 251, 248, 0.88);
@@ -3225,28 +3239,28 @@ body[data-theme="light"] .period-week-counts {
 body[data-theme="light"] .period-create-proposal strong,
 body[data-theme="light"] .period-summary-strip span,
 body[data-theme="light"] .period-summary-strip strong,
+body[data-theme="light"] .period-week-open strong,
 body[data-theme="light"] .period-week-counts b {
     color: #172027;
 }
 
 body[data-theme="light"] .period-create-proposal span,
 body[data-theme="light"] .period-create-proposal small,
+body[data-theme="light"] .period-week-open-list > span,
+body[data-theme="light"] .period-week-open small,
 body[data-theme="light"] .period-week-counts span {
     color: #60717d;
 }
 
-body[data-theme="light"] .period-payroll-summary div,
 body[data-theme="light"] .project-detail-summary div {
     border-color: rgba(28, 42, 50, 0.1);
     background: rgba(247, 251, 248, 0.88);
 }
 
-body[data-theme="light"] .period-payroll-summary span,
 body[data-theme="light"] .project-detail-summary span {
     color: #60717d;
 }
 
-body[data-theme="light"] .period-payroll-summary strong,
 body[data-theme="light"] .project-detail-summary strong {
     color: #172027;
 }
@@ -5385,7 +5399,6 @@ body[data-theme="light"] .theme-toggle strong {
     .period-create-shell,
     .period-create-form,
     .period-week-grid,
-    .period-payroll-summary,
     .project-detail-summary,
     .project-bookings-list a,
     .workflow-grid,
@@ -5486,7 +5499,6 @@ body[data-theme="light"] .theme-toggle strong {
     .period-create-shell,
     .period-create-form,
     .period-week-grid,
-    .period-payroll-summary,
     .project-detail-summary,
     .project-bookings-list a,
     .search-bar,

@@ -1221,7 +1221,7 @@ def list_payroll_periods(limit: int = 25, archived: bool = False) -> list[dict]:
                         (%s = TRUE AND LOWER(COALESCE(p.status, '')) = 'archief')
                         OR (%s = FALSE AND LOWER(COALESCE(p.status, '')) <> 'archief')
                     )
-                    ORDER BY p.start_date DESC NULLS LAST, p.end_date DESC NULLS LAST, p.year DESC, p.period_number DESC
+                    ORDER BY p.start_date ASC NULLS LAST, p.end_date ASC NULLS LAST, p.year ASC, p.period_number ASC
                     LIMIT %s;
                     """,
                     (archived, archived, limit),

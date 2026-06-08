@@ -135,19 +135,25 @@
     document.querySelectorAll("[data-payroll-workbook]").forEach((workbook) => {
         const tabs = workbook.querySelectorAll("[data-payroll-tab]");
         const panels = workbook.querySelectorAll("[data-payroll-panel]");
+        const requestedTab = new URL(window.location.href).searchParams.get("week") || new URL(window.location.href).searchParams.get("tab");
+        const activatePayrollTab = (target) => {
+            tabs.forEach((item) => {
+                const active = item.dataset.payrollTab === target;
+                item.classList.toggle("payroll-workbook-tab--active", active);
+                item.setAttribute("aria-selected", active ? "true" : "false");
+            });
+            panels.forEach((panel) => {
+                panel.classList.toggle("payroll-workbook-panel--active", panel.dataset.payrollPanel === target);
+            });
+        };
         tabs.forEach((tab) => {
             tab.addEventListener("click", () => {
-                const target = tab.dataset.payrollTab;
-                tabs.forEach((item) => {
-                    const active = item === tab;
-                    item.classList.toggle("payroll-workbook-tab--active", active);
-                    item.setAttribute("aria-selected", active ? "true" : "false");
-                });
-                panels.forEach((panel) => {
-                    panel.classList.toggle("payroll-workbook-panel--active", panel.dataset.payrollPanel === target);
-                });
+                activatePayrollTab(tab.dataset.payrollTab);
             });
         });
+        if (requestedTab && [...tabs].some((tab) => tab.dataset.payrollTab === requestedTab)) {
+            activatePayrollTab(requestedTab);
+        }
 
         workbook.querySelectorAll("[data-workbook-table]").forEach((table) => {
             const tbody = table.tBodies[0];
