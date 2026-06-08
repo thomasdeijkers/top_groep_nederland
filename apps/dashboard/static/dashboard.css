@@ -666,6 +666,96 @@ h2 {
     font-size: 0.72rem;
 }
 
+.payroll-workbook {
+    margin-top: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    background: rgba(7, 18, 24, 0.62);
+    overflow: hidden;
+}
+
+.payroll-workbook-tabs {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    padding: 10px 10px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.13);
+    background: rgba(4, 12, 17, 0.72);
+    overflow-x: auto;
+}
+
+.payroll-workbook-tab {
+    min-width: 72px;
+    padding: 8px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-bottom: 0;
+    border-radius: 7px 7px 0 0;
+    background: #f3f5f7;
+    color: #111827;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.payroll-workbook-tab--active {
+    background: #ffd9df;
+    color: #15212a;
+    box-shadow: inset 0 -3px 0 #0a8f66;
+}
+
+.payroll-workbook-panel {
+    display: none;
+    padding: 0 12px 12px;
+}
+
+.payroll-workbook-panel--active {
+    display: block;
+}
+
+.payroll-excel-table {
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.payroll-excel-table table {
+    min-width: 2200px;
+    border-collapse: collapse;
+}
+
+.payroll-excel-table th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    border: 1px solid rgba(17, 24, 39, 0.26);
+    background: #d9ead3;
+    color: #172027;
+    font-size: 0.72rem;
+    line-height: 1.1;
+    vertical-align: bottom;
+}
+
+.payroll-excel-table td {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.02);
+    white-space: nowrap;
+}
+
+.payroll-excel-table tr:nth-child(even) td {
+    background: rgba(255, 255, 255, 0.045);
+}
+
+.excel-hidden-column {
+    background: rgba(250, 204, 21, 0.12) !important;
+}
+
+.payroll-excel-table th.excel-hidden-column span {
+    display: block;
+    margin-top: 3px;
+    color: #7a4f00;
+    font-size: 0.62rem;
+}
+
 .period-section-heading {
     display: flex;
     align-items: end;

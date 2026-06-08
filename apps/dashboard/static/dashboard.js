@@ -132,6 +132,24 @@
         });
     });
 
+    document.querySelectorAll("[data-payroll-workbook]").forEach((workbook) => {
+        const tabs = workbook.querySelectorAll("[data-payroll-tab]");
+        const panels = workbook.querySelectorAll("[data-payroll-panel]");
+        tabs.forEach((tab) => {
+            tab.addEventListener("click", () => {
+                const target = tab.dataset.payrollTab;
+                tabs.forEach((item) => {
+                    const active = item === tab;
+                    item.classList.toggle("payroll-workbook-tab--active", active);
+                    item.setAttribute("aria-selected", active ? "true" : "false");
+                });
+                panels.forEach((panel) => {
+                    panel.classList.toggle("payroll-workbook-panel--active", panel.dataset.payrollPanel === target);
+                });
+            });
+        });
+    });
+
     document.querySelectorAll("[data-clear-persist]").forEach((clearLink) => {
         clearLink.addEventListener("click", () => {
             clearLink.dataset.clearPersist.split(",").forEach((key) => {

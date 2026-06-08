@@ -9,6 +9,7 @@ from apps.dashboard.data_store import ensure_dashboard_tables
 from apps.dashboard.payroll_calculations import (
     build_payslip_sheet_rows,
     build_period_sheet_rows,
+    build_workbook_tabs,
     default_calculation_rules,
     derived_period_total_rows,
 )
@@ -1376,6 +1377,12 @@ def get_payroll_period(period_id: int | None) -> dict | None:
         sheet_candidates = list_payroll_sheet_candidates()
         period["period_sheet_rows"] = build_period_sheet_rows(sheet_candidates, period["payroll_rows"])
         period["payslip_sheet_rows"] = build_payslip_sheet_rows(period["period_sheet_rows"], period["period_calculation_rows"])
+        period["workbook_tabs"] = build_workbook_tabs(
+            period["weeks"],
+            sheet_candidates,
+            period["payroll_rows"],
+            period["period_calculation_rows"],
+        )
         period["payroll_import_logs"] = list_payroll_import_logs(period_id)
         period["payroll_calculation_rules"] = list_payroll_calculation_rules()
         period["payroll_validation_results"] = list_payroll_validation_results(period_id)

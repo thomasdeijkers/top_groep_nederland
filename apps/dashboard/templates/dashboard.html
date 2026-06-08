@@ -18,7 +18,7 @@
         </title>
         <link rel="icon" href="/dashboard/static/favicon.ico" sizes="any">
         <link rel="shortcut icon" href="/dashboard/static/favicon.ico">
-        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260608-01">
+        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260608-02">
     </head>
     <body class="page-{{ active_page }}">
         {% macro confidence_light(field) -%}
@@ -1097,225 +1097,51 @@
                             {% endfor %}
                         </div>
 
-                        <div class="period-section-heading">
-                            <div>
-                                <p class="section-label">Weekuren</p>
-                                <h3>Geboekte uren uit de bestaande urenverwerking</h3>
+                        <div class="payroll-workbook" data-payroll-workbook>
+                            <div class="payroll-workbook-tabs" role="tablist" aria-label="Verloning werkmap">
+                                {% for tab in selected_payroll_period.workbook_tabs %}
+                                <button class="payroll-workbook-tab {% if loop.first %}payroll-workbook-tab--active{% endif %}" type="button" role="tab" data-payroll-tab="{{ tab.label }}" aria-selected="{{ 'true' if loop.first else 'false' }}">
+                                    {{ tab.label }}
+                                </button>
+                                {% endfor %}
                             </div>
-                        </div>
 
-                        <div class="table-wrap period-payroll-table">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Kandidaat</th>
-                                        <th>CAO</th>
-                                        <th>Projecten</th>
-                                        <th>Dagen</th>
-                                        <th>WK1</th>
-                                        <th>WK2</th>
-                                        <th>WK3</th>
-                                        <th>WK4</th>
-                                        <th>Totaal</th>
-                                        <th>Normaal</th>
-                                        <th>Overwerk</th>
-                                        <th>Uurtarief</th>
-                                        <th>Bruto indicatie</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for row in selected_payroll_period.payroll_rows %}
-                                    <tr>
-                                        <td><strong>{{ row.employee_name }}</strong></td>
-                                        <td>{{ row.cao_name }}</td>
-                                        <td>{{ row.projects }}</td>
-                                        <td>{{ row.worked_days }}</td>
-                                        <td>{{ row.week_hours[0] }}</td>
-                                        <td>{{ row.week_hours[1] }}</td>
-                                        <td>{{ row.week_hours[2] }}</td>
-                                        <td>{{ row.week_hours[3] }}</td>
-                                        <td><strong>{{ row.total_hours }}</strong></td>
-                                        <td>{{ row.normal_hours }}</td>
-                                        <td>{{ row.overtime_hours }}</td>
-                                        <td>
-                                            <strong>{{ row.hourly_wage }}</strong>
-                                            <span>{{ row.hourly_wage_source }}</span>
-                                        </td>
-                                        <td><strong>{{ row.gross_amount }}</strong></td>
-                                        <td><span class="status-tag">{{ row.status }}</span></td>
-                                    </tr>
-                                    {% else %}
-                                    <tr>
-                                        <td colspan="14">
-                                            <div class="empty-state">
-                                                <strong>Nog geen uren in deze periode</strong>
-                                                <span>Boek uren op projecten binnen de periode om hier kandidaat-totalen te zien.</span>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div class="period-section-heading">
-                            <div>
-                                <p class="section-label">Tabblad Periode</p>
-                                <h3>Medewerker- en looninstellingen</h3>
-                            </div>
-                        </div>
-                        <div class="table-wrap period-payroll-table">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Werknemer</th>
-                                        <th>Kenteken</th>
-                                        <th>Keuzebudget</th>
-                                        <th>Fase</th>
-                                        <th>Pensioen</th>
-                                        <th>Contracturen</th>
-                                        <th>CAO</th>
-                                        <th>Recht op dagen</th>
-                                        <th>Inregeling</th>
-                                        <th>Functie</th>
-                                        <th>Bruto uurloon</th>
-                                        <th>Bruto totaal</th>
-                                        <th>Reserveringen</th>
-                                        <th>Netto-/periodegrondslag</th>
-                                        <th>Periodegrondslag</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for row in selected_payroll_period.period_sheet_rows %}
-                                    <tr>
-                                        <td><strong>{{ row.employee_name }}</strong><span>{{ row.source }}</span></td>
-                                        <td>{{ row.license_plate }}</td>
-                                        <td>{{ row.choice_budget }}</td>
-                                        <td>{{ row.phase }}</td>
-                                        <td>{{ row.pension_scheme }}</td>
-                                        <td>{{ row.contract_hours }}</td>
-                                        <td>{{ row.cao_name }}</td>
-                                        <td>{{ row.days_right }}</td>
-                                        <td>{{ row.configuration }}</td>
-                                        <td>{{ row.function_name }}</td>
-                                        <td><strong>{{ row.gross_hourly_wage }}</strong></td>
-                                        <td>{{ row.gross_total }}</td>
-                                        <td>{{ row.reservations }}</td>
-                                        <td>{{ row.net_period_basis }}</td>
-                                        <td>{{ row.period_basis }}</td>
-                                        <td><span class="status-tag">{{ row.status }}</span></td>
-                                    </tr>
-                                    {% else %}
-                                    <tr>
-                                        <td colspan="16">
-                                            <div class="empty-state">
-                                                <strong>Nog geen kandidaten</strong>
-                                                <span>Voeg kandidaten toe om het tabblad Periode na te bouwen.</span>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div class="period-control-grid">
-                            <section>
+                            {% for tab in selected_payroll_period.workbook_tabs %}
+                            <section class="payroll-workbook-panel {% if loop.first %}payroll-workbook-panel--active{% endif %}" role="tabpanel" data-payroll-panel="{{ tab.label }}">
                                 <div class="period-section-heading">
                                     <div>
-                                        <p class="section-label">Tabblad Loonstrook</p>
-                                        <h3>Periode-totalen en netto te ontvangen</h3>
+                                        <p class="section-label">Tabblad {{ tab.label }}</p>
+                                        <h3>{% if tab.kind == 'week' %}Weekstaat met dummy urenregels{% elif tab.kind == 'period' %}Medewerker- en looninstellingen{% else %}Periode-totalen en netto te ontvangen{% endif %}</h3>
                                     </div>
+                                    <span class="status-tag">Alle kolommen zichtbaar</span>
                                 </div>
-                                <div class="table-wrap period-payroll-table">
+                                <div class="table-wrap period-payroll-table payroll-excel-table">
                                     <table>
                                         <thead>
                                             <tr>
-                                                <th>Werknemer</th>
-                                                <th>CAO</th>
-                                                <th>Dagen gewerkt</th>
-                                                <th>Uren gewerkt</th>
-                                                <th>VAK</th>
-                                                <th>Ziek</th>
-                                                <th>RV</th>
-                                                <th>KV</th>
-                                                <th>FD</th>
-                                                <th>Kilometers</th>
-                                                <th>Extra declaraties</th>
-                                                <th>Reeds ontvangen netto</th>
-                                                <th>Nog te ontvangen netto loon</th>
-                                                <th>Totaal 4 weken</th>
-                                                <th>WKR vergoedingen</th>
-                                                <th>Loonvoorschot strook</th>
-                                                <th>Status</th>
+                                                {% for column in tab.columns %}
+                                                <th class="{% if column.hidden_in_excel %}excel-hidden-column{% endif %}">
+                                                    {{ column.label }}
+                                                    {% if column.hidden_in_excel %}<span>verborgen in Excel</span>{% endif %}
+                                                </th>
+                                                {% endfor %}
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {% for row in selected_payroll_period.payslip_sheet_rows %}
+                                            {% for row in tab.rows %}
                                             <tr>
-                                                <td><strong>{{ row.employee_name }}</strong></td>
-                                                <td>{{ row.cao_name }}</td>
-                                                <td>{{ row.total_worked_days }}</td>
-                                                <td><strong>{{ row.total_worked_hours }}</strong></td>
-                                                <td>{{ row.total_vacation_hours }}</td>
-                                                <td>{{ row.total_sickness_hours }}</td>
-                                                <td>{{ row.total_rv_hours }}</td>
-                                                <td>{{ row.total_kv_hours }}</td>
-                                                <td>{{ row.total_holiday_hours }}</td>
-                                                <td>{{ row.total_km }}</td>
-                                                <td>{{ row.extra_reimbursements }}</td>
-                                                <td>{{ row.already_received_net }}</td>
-                                                <td><strong>{{ row.net_to_receive }}</strong></td>
-                                                <td>{{ row.period_total }}</td>
-                                                <td>{{ row.wkr_reimbursements }}</td>
-                                                <td>{{ row.payslip_advance }}</td>
-                                                <td><span class="status-tag">{{ row.status }}</span></td>
-                                            </tr>
-                                            {% else %}
-                                            <tr><td colspan="17">Nog geen loonstrookregels.</td></tr>
-                                            {% endfor %}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </section>
-
-                            <section>
-                                <div class="period-section-heading">
-                                    <div>
-                                        <p class="section-label">Controleverschillen</p>
-                                        <h3>Excelwaarde naast dashboardwaarde</h3>
-                                    </div>
-                                </div>
-                                <div class="table-wrap period-payroll-table">
-                                    <table>
-                                        <thead>
-                                            <tr>
-                                                <th>Werknemer</th>
-                                                <th>Veld</th>
-                                                <th>Excel</th>
-                                                <th>Dashboard</th>
-                                                <th>Verschil</th>
-                                                <th>Status</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for check in selected_payroll_period.payroll_validation_results %}
-                                            <tr>
-                                                <td>{{ check.employee_name }}</td>
-                                                <td>{{ check.result_key }}</td>
-                                                <td>{{ check.excel_value }}</td>
-                                                <td>{{ check.dashboard_value }}</td>
-                                                <td><strong>{{ check.difference }}</strong></td>
-                                                <td><span class="status-tag">{{ check.status }}</span></td>
+                                                {% for column in tab.columns %}
+                                                <td class="{% if column.hidden_in_excel %}excel-hidden-column{% endif %}">
+                                                    {% if loop.first %}<strong>{{ row[column.key] }}</strong>{% else %}{{ row[column.key] }}{% endif %}
+                                                </td>
+                                                {% endfor %}
                                             </tr>
                                             {% else %}
                                             <tr>
-                                                <td colspan="6">
+                                                <td colspan="{{ tab.columns|length }}">
                                                     <div class="empty-state empty-state--compact">
-                                                        <strong>Nog geen verschillen berekend</strong>
-                                                        <span>Upload de Excel-referentie om verschillen groter dan 0,05 zichtbaar te maken.</span>
+                                                        <strong>Nog geen regels</strong>
+                                                        <span>Dit tabblad wordt gevuld met echte kandidaten en dummydata zodra de periode openstaat.</span>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -1324,7 +1150,47 @@
                                     </table>
                                 </div>
                             </section>
+                            {% endfor %}
                         </div>
+
+                        <details class="period-import-log">
+                            <summary>Controleverschillen</summary>
+                            <div class="table-wrap period-payroll-table">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Werknemer</th>
+                                            <th>Veld</th>
+                                            <th>Excel</th>
+                                            <th>Dashboard</th>
+                                            <th>Verschil</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for check in selected_payroll_period.payroll_validation_results %}
+                                        <tr>
+                                            <td>{{ check.employee_name }}</td>
+                                            <td>{{ check.result_key }}</td>
+                                            <td>{{ check.excel_value }}</td>
+                                            <td>{{ check.dashboard_value }}</td>
+                                            <td><strong>{{ check.difference }}</strong></td>
+                                            <td><span class="status-tag">{{ check.status }}</span></td>
+                                        </tr>
+                                        {% else %}
+                                        <tr>
+                                            <td colspan="6">
+                                                <div class="empty-state empty-state--compact">
+                                                    <strong>Nog geen verschillen berekend</strong>
+                                                    <span>De Excel-output is nu leidend als eerste dashboardspiegel; referentievalidatie volgt zodra de exacte formules zijn vastgelegd.</span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </details>
 
                         <details class="period-import-log">
                             <summary>Berekeningsregels en conceptstatus</summary>
@@ -2213,6 +2079,6 @@
                 </section>
             </main>
         </div>
-        <script src="/dashboard/static/dashboard.js?v=20260605-14"></script>
+        <script src="/dashboard/static/dashboard.js?v=20260608-02"></script>
     </body>
 </html>

@@ -3,11 +3,11 @@ import unittest
 from pathlib import Path
 
 from apps.dashboard.payroll_calculations import derived_period_total_rows
-from apps.dashboard.payroll_excel import analyze_payroll_workbook
+from apps.dashboard.payroll_excel import analyze_payroll_workbook, build_payroll_output_workbook
 
 
 try:
-    from openpyxl import Workbook
+    from openpyxl import Workbook, load_workbook
 except ImportError:  # pragma: no cover
     Workbook = None
 
@@ -65,6 +65,34 @@ class PayrollCalculationTests(unittest.TestCase):
         self.assertEqual(rows[0]["total_worked_hours"], "32")
         self.assertEqual(rows[0]["total_period_amount"], "€ 800,00")
         self.assertEqual(rows[0]["status"], "concept")
+
+    @unittest.skipIf(Workbook is None, "openpyxl is niet beschikbaar")
+    def test_exports_workbook_tabs(self):
+        period = {
+            "workbook_tabs": [
+                {
+                    "label": "WK17",
+                    "columns": [{"label": "Werknemer", "key": "employee_name"}],
+                    "rows": [{"employee_name": "Thomas"}],
+                },
+                {
+                    "label": "Periode",
+                    "columns": [{"label": "Werknemer", "key": "employee_name"}],
+                    "rows": [{"employee_name": "Thomas"}],
+                },
+                {
+                    "label": "Loonstrook",
+                    "columns": [{"label": "Werknemer", "key": "employee_name"}],
+                    "rows": [{"employee_name": "Thomas"}],
+                },
+            ]
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            path = Path(tmp_dir) / "output.xlsx"
+            build_payroll_output_workbook(path, period)
+            workbook = load_workbook(path)
+
+        self.assertEqual(workbook.sheetnames, ["WK17", "Periode", "Loonstrook"])
 
 
 if __name__ == "__main__":

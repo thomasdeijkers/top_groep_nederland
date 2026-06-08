@@ -1,6 +1,8 @@
 import re
 from pathlib import Path
 
+from apps.dashboard.payroll_calculations import PAYSLIP_SHEET_COLUMNS, PERIOD_SHEET_COLUMNS
+
 
 WEEK_SHEET_RE = re.compile(r"^WK\s*(\d{1,2})$", re.IGNORECASE)
 PERIOD_SHEET = "periode"
@@ -160,54 +162,14 @@ def build_payroll_output_workbook(path: str | Path, period: dict) -> Path:
     output_path = Path(path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     workbook = Workbook()
-    period_sheet = workbook.active
-    period_sheet.title = "Periode"
-    _write_sheet(
-        period_sheet,
-        [
-            ("Werknemer", "employee_name"),
-            ("Kenteken", "license_plate"),
-            ("Keuzebudget", "choice_budget"),
-            ("Fase", "phase"),
-            ("Pensioen", "pension_scheme"),
-            ("Contracturen", "contract_hours"),
-            ("CAO", "cao_name"),
-            ("Recht op dagen", "days_right"),
-            ("Inregeling", "configuration"),
-            ("Functie", "function_name"),
-            ("Bruto uurloon", "gross_hourly_wage"),
-            ("Bruto totaal", "gross_total"),
-            ("Reserveringen", "reservations"),
-            ("Netto-/periodegrondslag", "net_period_basis"),
-            ("Periodegrondslag", "period_basis"),
-            ("Status", "status"),
-        ],
-        period.get("period_sheet_rows", []),
-    )
-    payslip_sheet = workbook.create_sheet("Loonstrook")
-    _write_sheet(
-        payslip_sheet,
-        [
-            ("Werknemer", "employee_name"),
-            ("CAO", "cao_name"),
-            ("Totale dagen gewerkt", "total_worked_days"),
-            ("Totale uren gewerkt", "total_worked_hours"),
-            ("Totaal VAK", "total_vacation_hours"),
-            ("Totaal Ziek", "total_sickness_hours"),
-            ("Totaal RV", "total_rv_hours"),
-            ("Totaal KV", "total_kv_hours"),
-            ("Totaal FD", "total_holiday_hours"),
-            ("Totaal kilometers", "total_km"),
-            ("Extra declaraties/vergoeding", "extra_reimbursements"),
-            ("Reeds ontvangen netto", "already_received_net"),
-            ("Nog te ontvangen netto loon", "net_to_receive"),
-            ("Totaal 4 weken", "period_total"),
-            ("WKR vergoedingen", "wkr_reimbursements"),
-            ("Loonvoorschot strook", "payslip_advance"),
-            ("Status", "status"),
-        ],
-        period.get("payslip_sheet_rows", []),
-    )
+    workbook.remove(workbook.active)
+    tabs = period.get("workbook_tabs") or [
+        {"label": "Periode", "columns": PERIOD_SHEET_COLUMNS, "rows": period.get("period_sheet_rows", [])},
+        {"label": "Loonstrook", "columns": PAYSLIP_SHEET_COLUMNS, "rows": period.get("payslip_sheet_rows", [])},
+    ]
+    for tab in tabs:
+        worksheet = workbook.create_sheet(str(tab.get("label") or "Tabblad")[:31])
+        _write_sheet(worksheet, tab.get("columns", []), tab.get("rows", []))
     for worksheet in workbook.worksheets:
         worksheet.freeze_panes = "A2"
         for cell in worksheet[1]:
@@ -221,7 +183,7 @@ def build_payroll_output_workbook(path: str | Path, period: dict) -> Path:
     return output_path
 
 
-def _write_sheet(worksheet, columns: list[tuple[str, str]], rows: list[dict]) -> None:
-    worksheet.append([label for label, _ in columns])
+def _write_sheet(worksheet, columns: list[dict], rows: list[dict]) -> None:
+    worksheet.append([column["label"] for column in columns])
     for row in rows:
-        worksheet.append([row.get(key, "") for _, key in columns])
+        worksheet.append([row.get(column["key"], "") for column in columns])
