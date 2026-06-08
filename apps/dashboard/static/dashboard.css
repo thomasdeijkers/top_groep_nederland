@@ -667,7 +667,7 @@ h2 {
 }
 
 .payroll-workbook {
-    margin-top: 14px;
+    margin-top: 8px;
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 8px;
     background: rgba(7, 18, 24, 0.62);
@@ -675,6 +675,9 @@ h2 {
 }
 
 .payroll-workbook-tabs {
+    position: sticky;
+    top: 0;
+    z-index: 6;
     display: flex;
     align-items: flex-end;
     gap: 4px;
@@ -685,8 +688,8 @@ h2 {
 }
 
 .payroll-workbook-tab {
-    min-width: 72px;
-    padding: 8px 12px;
+    min-width: 82px;
+    padding: 8px 12px 7px;
     border: 1px solid rgba(255, 255, 255, 0.16);
     border-bottom: 0;
     border-radius: 7px 7px 0 0;
@@ -696,6 +699,18 @@ h2 {
     font-size: 0.82rem;
     font-weight: 800;
     white-space: nowrap;
+}
+
+.payroll-workbook-tab strong,
+.payroll-workbook-tab span {
+    display: block;
+}
+
+.payroll-workbook-tab span {
+    margin-top: 2px;
+    color: #30404b;
+    font-size: 0.64rem;
+    font-weight: 800;
 }
 
 .payroll-workbook-tab--active {
@@ -735,6 +750,45 @@ h2 {
     vertical-align: bottom;
 }
 
+.payroll-excel-table .payroll-col-employee-name,
+.payroll-excel-table .payroll-col-license-plate,
+.payroll-excel-table .payroll-col-choice-budget {
+    background: #c6efce;
+    color: #102a18;
+}
+
+.payroll-excel-table td.payroll-col-employee-name,
+.payroll-excel-table td.payroll-col-license-plate,
+.payroll-excel-table td.payroll-col-choice-budget {
+    background: rgba(104, 211, 145, 0.18);
+}
+
+.payroll-workbook-panel--week .payroll-col-remarks,
+.payroll-workbook-panel--week .payroll-col-project-info {
+    background: #c00000;
+    color: #ffffff;
+}
+
+.payroll-workbook-panel--week td.payroll-col-remarks,
+.payroll-workbook-panel--week td.payroll-col-project-info {
+    min-width: 280px;
+    background: rgba(192, 0, 0, 0.72);
+}
+
+.payroll-workbook-panel--payslip .payroll-col-net-to-receive,
+.payroll-workbook-panel--payslip .payroll-col-period-total,
+.payroll-workbook-panel--payslip .payroll-col-net-total {
+    background: #c6efce;
+    color: #102a18;
+}
+
+.payroll-workbook-panel--period .payroll-col-holiday-allowance,
+.payroll-workbook-panel--period .payroll-col-rv-flex,
+.payroll-workbook-panel--period .payroll-col-pension-component {
+    background: #ffe699;
+    color: #172027;
+}
+
 .payroll-excel-table td {
     border: 1px solid rgba(255, 255, 255, 0.08);
     background: rgba(255, 255, 255, 0.02);
@@ -760,11 +814,17 @@ h2 {
 .page-periods .dashboard-shell {
     width: 100%;
     max-width: none;
-    padding-right: 12px;
+    padding-right: 10px;
+    padding-left: 10px;
+}
+
+.page-periods .dashboard-header {
+    max-width: none;
 }
 
 .page-periods .content-grid,
 .page-periods .panel--full {
+    width: 100%;
     max-width: none;
 }
 
@@ -778,6 +838,10 @@ h2 {
     color: #f5fbff;
     font: inherit;
     font-size: 0.78rem;
+}
+
+.payroll-cell-input option {
+    color: #172027;
 }
 
 .payroll-cell-input:focus {

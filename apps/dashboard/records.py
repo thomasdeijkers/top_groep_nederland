@@ -12,6 +12,8 @@ from apps.dashboard.payroll_calculations import (
     build_workbook_tabs,
     default_calculation_rules,
     derived_period_total_rows,
+    summarize_week_rows,
+    summarize_workbook_tabs,
 )
 from shared.db.connection import get_connection
 
@@ -1384,6 +1386,10 @@ def get_payroll_period(period_id: int | None) -> dict | None:
             period["period_calculation_rows"],
         )
         apply_payroll_workbook_overrides(period_id, period["workbook_tabs"])
+        for tab in period["workbook_tabs"]:
+            if tab.get("kind") == "week":
+                tab["summary"] = summarize_week_rows(tab.get("rows", []))
+        period["payroll_totals"] = summarize_workbook_tabs(period["workbook_tabs"])
         period["payroll_import_logs"] = list_payroll_import_logs(period_id)
         period["payroll_calculation_rules"] = list_payroll_calculation_rules()
         period["payroll_validation_results"] = list_payroll_validation_results(period_id)

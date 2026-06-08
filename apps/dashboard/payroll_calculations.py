@@ -30,11 +30,11 @@ PERIOD_SHEET_COLUMNS = [
     {"label": "Werknemer", "key": "employee_name"},
     {"label": "Kenteken", "key": "license_plate"},
     {"label": "Keuzebudget", "key": "choice_budget"},
-    {"label": "Fase", "key": "phase"},
-    {"label": "Pensioen", "key": "pension_scheme"},
+    {"label": "Fase", "key": "phase", "options": ["Fase A", "Fase B", "Fase C", "Fase 1-2", "Fase 3"]},
+    {"label": "Pensioen", "key": "pension_scheme", "options": ["BPF UTA", "BPF Bouw", "StiPP Basis", "StiPP Plus", "Geen"]},
     {"label": "Uren CAO", "key": "contract_hours"},
     {"label": "Recht op dagen", "key": "days_right"},
-    {"label": "Inregeling", "key": "configuration"},
+    {"label": "Inregeling", "key": "configuration", "options": ["B.02.1 Aannemingschaal 2", "T4.2 F/G A", "T4.58 Particulier halfjaar", "Concept"]},
     {"label": "Functie", "key": "function_name"},
     {"label": "Bruto uurloon", "key": "gross_hourly_wage"},
     {"label": "Bruto totaal", "key": "gross_total"},
@@ -55,14 +55,14 @@ PERIOD_SHEET_COLUMNS = [
     {"label": "Netto-/periodegrondslag", "key": "net_period_basis"},
     {"label": "Periodegrondslag", "key": "period_basis"},
     {"label": "Reserveringsgrondslag", "key": "reservation_basis"},
-    {"label": "Status", "key": "status"},
+    {"label": "Status", "key": "status", "options": ["dummy", "concept", "gecontroleerd", "akkoord"]},
     {"label": "Controlekolom Excel", "key": "excel_control", "hidden_in_excel": True},
     {"label": "Bron", "key": "source", "hidden_in_excel": True},
 ]
 
 PAYSLIP_SHEET_COLUMNS = [
     {"label": "Werknemer", "key": "employee_name"},
-    {"label": "CAO", "key": "cao_name"},
+    {"label": "CAO", "key": "cao_name", "options": ["UTA", "SAVG", "Bouw & Infra", "Bouw", "Geen"]},
     {"label": "Totale dagen gewerkt", "key": "total_worked_days"},
     {"label": "Totale uren gewerkt", "key": "total_worked_hours"},
     {"label": "Totaal VAK", "key": "total_vacation_hours"},
@@ -92,7 +92,7 @@ PAYSLIP_SHEET_COLUMNS = [
     {"label": "Ziekte", "key": "sickness_value"},
     {"label": "Personeelskosten", "key": "personnel_costs"},
     {"label": "Notitie", "key": "notes"},
-    {"label": "Status", "key": "status"},
+    {"label": "Status", "key": "status", "options": ["concept", "gecontroleerd", "akkoord"]},
     {"label": "Controlekolom Excel", "key": "excel_control", "hidden_in_excel": True},
 ]
 
@@ -130,19 +130,23 @@ def default_calculation_rules() -> list[dict]:
 
 
 def build_workbook_tabs(period_weeks: list[dict], candidates: list[dict], payroll_rows: list[dict], total_rows: list[dict]) -> list[dict]:
-    period_rows = build_period_sheet_rows(candidates, payroll_rows)
-    payslip_rows = build_payslip_sheet_rows(period_rows, total_rows)
+    workbook_candidates = candidates[:15]
     week_tabs = []
     for week in period_weeks:
         label = f"WK{week.get('week_number') or week.get('week_index')}"
+        week_rows = build_week_sheet_rows(label, workbook_candidates, payroll_rows, week)
         week_tabs.append(
             {
                 "label": label,
                 "kind": "week",
                 "columns": WEEK_SHEET_COLUMNS,
-                "rows": build_week_sheet_rows(label, candidates, payroll_rows, week),
+                "rows": week_rows,
+                "summary": summarize_week_rows(week_rows),
             }
         )
+    aggregated_totals = aggregate_week_sheet_totals(week_tabs)
+    period_rows = build_period_sheet_rows(workbook_candidates, payroll_rows)
+    payslip_rows = build_payslip_sheet_rows(period_rows, aggregated_totals)
     return [
         *week_tabs,
         {"label": "Periode", "kind": "period", "columns": PERIOD_SHEET_COLUMNS, "rows": period_rows},
@@ -193,6 +197,82 @@ def build_week_sheet_rows(sheet_label: str, candidates: list[dict], payroll_rows
     return rows
 
 
+def aggregate_week_sheet_totals(week_tabs: list[dict]) -> list[dict]:
+    totals: dict[str, dict] = {}
+    for tab in week_tabs:
+        for row in tab.get("rows", []):
+            key = _key(row.get("employee_name"))
+            if not key:
+                continue
+            item = totals.setdefault(
+                key,
+                {
+                    "employee_name": row.get("employee_name"),
+                    "total_worked_days": Decimal("0"),
+                    "total_worked_hours": Decimal("0"),
+                    "total_vacation_hours": Decimal("0"),
+                    "total_sickness_hours": Decimal("0"),
+                    "total_rv_hours": Decimal("0"),
+                    "total_kv_hours": Decimal("0"),
+                    "total_holiday_hours": Decimal("0"),
+                    "total_km": Decimal("0"),
+                    "total_declarations": Decimal("0"),
+                    "total_net_advance": Decimal("0"),
+                },
+            )
+            item["total_worked_days"] += _decimal(row.get("worked_days"))
+            item["total_worked_hours"] += _decimal(row.get("worked_hours"))
+            item["total_vacation_hours"] += _decimal(row.get("vacation_hours"))
+            item["total_sickness_hours"] += _decimal(row.get("sickness_hours"))
+            item["total_rv_hours"] += _decimal(row.get("rv_hours"))
+            item["total_kv_hours"] += _decimal(row.get("kv_hours"))
+            item["total_holiday_hours"] += _decimal(row.get("holiday_hours"))
+            item["total_km"] += _decimal(row.get("total_km"))
+            item["total_declarations"] += _decimal(row.get("extra_reimbursement"))
+            item["total_net_advance"] += _decimal(row.get("net_advance"))
+    return [
+        {
+            **item,
+            "total_worked_days": _format_number(item["total_worked_days"]),
+            "total_worked_hours": _format_number(item["total_worked_hours"]),
+            "total_vacation_hours": _format_number(item["total_vacation_hours"]),
+            "total_sickness_hours": _format_number(item["total_sickness_hours"]),
+            "total_rv_hours": _format_number(item["total_rv_hours"]),
+            "total_kv_hours": _format_number(item["total_kv_hours"]),
+            "total_holiday_hours": _format_number(item["total_holiday_hours"]),
+            "total_km": _format_number(item["total_km"]),
+            "total_declarations": _format_money(item["total_declarations"]),
+            "total_net_advance": _format_money(item["total_net_advance"]),
+        }
+        for item in totals.values()
+    ]
+
+
+def summarize_week_rows(rows: list[dict]) -> dict:
+    return {
+        "employees": len(rows),
+        "hours": _format_number(sum((_decimal(row.get("worked_hours")) for row in rows), Decimal("0"))),
+        "days": _format_number(sum((_decimal(row.get("worked_days")) for row in rows), Decimal("0"))),
+        "km": _format_number(sum((_decimal(row.get("total_km")) for row in rows), Decimal("0"))),
+    }
+
+
+def summarize_workbook_tabs(tabs: list[dict]) -> dict:
+    week_tabs = [tab for tab in tabs if tab.get("kind") == "week"]
+    employee_names = {
+        row.get("employee_name")
+        for tab in week_tabs
+        for row in tab.get("rows", [])
+        if row.get("employee_name")
+    }
+    return {
+        "employees": len(employee_names),
+        "bookings": sum(len(tab.get("rows", [])) for tab in week_tabs),
+        "days": _format_number(sum((_decimal(row.get("worked_days")) for tab in week_tabs for row in tab.get("rows", [])), Decimal("0"))),
+        "hours": _format_number(sum((_decimal(row.get("worked_hours")) for tab in week_tabs for row in tab.get("rows", [])), Decimal("0"))),
+    }
+
+
 def build_period_sheet_rows(candidates: list[dict], payroll_rows: list[dict]) -> list[dict]:
     payroll_by_name = {
         _key(row.get("employee_name")): row
@@ -204,8 +284,8 @@ def build_period_sheet_rows(candidates: list[dict], payroll_rows: list[dict]) ->
         payroll_row = payroll_by_name.get(_key(candidate.get("name")), {})
         hourly_wage = _decimal(candidate.get("hourly_rate")) or _decimal(payroll_row.get("hourly_wage")) or Decimal("21.50")
         contract_hours = Decimal("40") if index % 3 else Decimal("32")
-        cao_name = payroll_row.get("cao_name") or ("Bouw & Infra" if index % 2 else "SAVG")
-        phase = "B" if index % 2 else "A"
+        cao_name = payroll_row.get("cao_name") or ("UTA" if index % 3 == 0 else "SAVG" if index % 2 == 0 else "Bouw & Infra")
+        phase = "Fase B" if index % 2 else "Fase A"
         reservation_percent = Decimal("18.5") if cao_name.lower().startswith("bouw") else Decimal("16.0")
         bruto_total = hourly_wage * contract_hours
         staffing_factor = Decimal("1.83") if cao_name.lower().startswith("bouw") else Decimal("1.72")
@@ -214,13 +294,13 @@ def build_period_sheet_rows(candidates: list[dict], payroll_rows: list[dict]) ->
                 "employee_name": candidate.get("name") or "-",
                 "relation_id": candidate.get("id"),
                 "license_plate": _dummy_license_plate(index),
-                "choice_budget": "Ja" if index % 2 else "Nee",
+                "choice_budget": _format_money(Decimal("1100") + Decimal(index * 62)),
                 "phase": phase,
                 "pension_scheme": "StiPP Basis" if phase == "A" else "StiPP Plus",
                 "contract_hours": _format_number(contract_hours),
                 "cao_name": cao_name,
                 "days_right": "20",
-                "configuration": "Concept",
+                "configuration": "B.02.1 Aannemingschaal 2" if cao_name == "SAVG" else "T4.2 F/G A",
                 "function_name": candidate.get("notes") or "Medewerker bouw",
                 "gross_hourly_wage": _format_money(hourly_wage),
                 "gross_total": _format_money(bruto_total),

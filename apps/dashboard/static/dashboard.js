@@ -222,6 +222,11 @@
                 window.clearTimeout(saveTimer);
                 saveTimer = window.setTimeout(save, 650);
             });
+            input.addEventListener("change", () => {
+                input.classList.add("payroll-cell-input--dirty");
+                window.clearTimeout(saveTimer);
+                save();
+            });
             input.addEventListener("blur", () => {
                 window.clearTimeout(saveTimer);
                 save();
