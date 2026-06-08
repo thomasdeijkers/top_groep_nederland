@@ -1007,7 +1007,7 @@
                         <div class="table-wrap period-table">
                             <table>
                                 <thead>
-                                    <tr>
+                                    <tr class="{% if period.booking_count|int > 0 %}period-row--filled{% endif %}">
                                         <th>Periode</th>
                                         <th>Samenvatting</th>
                                         <th>Status</th>
@@ -1025,12 +1025,12 @@
                                             <div class="period-week-open-list">
                                                 <span>{{ period.start_date }} t/m {{ period.end_date }}</span>
                                                 {% for week in period.weeks %}
-                                                <a class="period-week-open" href="/dashboard/periods?period={{ period.id }}&week=WK{{ week.week_number }}#periode-verloning">
+                                                <a class="period-week-open {% if week.booking_count|int > 0 %}period-week-open--filled{% endif %}" href="/dashboard/periods?period={{ period.id }}&week=WK{{ week.week_number }}#periode-verloning">
                                                     <strong>WK{{ week.week_number }}</strong>
                                                     <small>{{ week.total_hours }} uur · {{ week.booking_count }} regels</small>
                                                 </a>
                                                 {% else %}
-                                                <a class="period-week-open" href="/dashboard/periods?period={{ period.id }}#periode-verloning">
+                                                <a class="period-week-open {% if period.booking_count|int > 0 %}period-week-open--filled{% endif %}" href="/dashboard/periods?period={{ period.id }}#periode-verloning">
                                                     <strong>Open periode</strong>
                                                     <small>{{ period.total_hours }} uur · {{ period.booking_count }} regels</small>
                                                 </a>
@@ -1051,7 +1051,7 @@
                                         </td>
                                     </tr>
                                     {% else %}
-                                    <tr>
+                                    <tr class="{% if period.booking_count|int > 0 %}period-row--filled{% endif %}">
                                         <td colspan="4">
                                             <div class="empty-state">
                                                 <strong>Nog geen loonperiodes</strong>
@@ -1091,12 +1091,12 @@
                                             <div class="period-week-open-list">
                                                 <span>{{ period.start_date }} t/m {{ period.end_date }}</span>
                                                 {% for week in period.weeks %}
-                                                <a class="period-week-open" href="/dashboard/periods?period={{ period.id }}&week=WK{{ week.week_number }}#periode-verloning">
+                                                <a class="period-week-open {% if week.booking_count|int > 0 %}period-week-open--filled{% endif %}" href="/dashboard/periods?period={{ period.id }}&week=WK{{ week.week_number }}#periode-verloning">
                                                     <strong>WK{{ week.week_number }}</strong>
                                                     <small>{{ week.total_hours }} uur · {{ week.booking_count }} regels</small>
                                                 </a>
                                                 {% else %}
-                                                <a class="period-week-open" href="/dashboard/periods?period={{ period.id }}#periode-verloning">
+                                                <a class="period-week-open {% if period.booking_count|int > 0 %}period-week-open--filled{% endif %}" href="/dashboard/periods?period={{ period.id }}#periode-verloning">
                                                     <strong>Open periode</strong>
                                                     <small>{{ period.total_hours }} uur · {{ period.booking_count }} regels</small>
                                                 </a>

@@ -1236,13 +1236,13 @@ def list_payroll_periods(limit: int = 25, archived: bool = False) -> list[dict]:
                                ) AS total_hours
                         FROM payroll_periods p2
                         LEFT JOIN whatsapp_timesheet_inbox wi
-                            ON LOWER(COALESCE(wi.status, '')) = 'loon_te_berekenen'
+                            ON LOWER(REPLACE(COALESCE(wi.status, ''), ' ', '_')) IN ('loon_te_berekenen', 'loon_berekenen', 'loon', 'doorgestuurd_naar_loonadministratie', 'verwerkt', 'processed')
                            AND wi.deleted_at IS NULL
                            AND wi.archived_at IS NULL
                            AND COALESCE(wi.work_date, wi.received_at::date) BETWEEN p2.start_date AND p2.end_date
                         LEFT JOIN project_time_bookings b
                             ON b.timesheet_inbox_id = wi.id
-                           AND LOWER(COALESCE(b.status, '')) = 'loon_te_berekenen'
+                           AND LOWER(REPLACE(COALESCE(b.status, ''), ' ', '_')) IN ('loon_te_berekenen', 'loon_berekenen', 'loon', 'doorgestuurd_naar_loonadministratie', 'verwerkt', 'processed')
                         WHERE wi.id IS NOT NULL
                         GROUP BY p2.id
                     ) b ON b.payroll_period_id = p.id
@@ -1382,13 +1382,13 @@ def get_payroll_period(period_id: int | None) -> dict | None:
                                ) AS total_hours
                         FROM payroll_periods p2
                         LEFT JOIN whatsapp_timesheet_inbox wi
-                            ON LOWER(COALESCE(wi.status, '')) = 'loon_te_berekenen'
+                            ON LOWER(REPLACE(COALESCE(wi.status, ''), ' ', '_')) IN ('loon_te_berekenen', 'loon_berekenen', 'loon', 'doorgestuurd_naar_loonadministratie', 'verwerkt', 'processed')
                            AND wi.deleted_at IS NULL
                            AND wi.archived_at IS NULL
                            AND COALESCE(wi.work_date, wi.received_at::date) BETWEEN p2.start_date AND p2.end_date
                         LEFT JOIN project_time_bookings b
                             ON b.timesheet_inbox_id = wi.id
-                           AND LOWER(COALESCE(b.status, '')) = 'loon_te_berekenen'
+                           AND LOWER(REPLACE(COALESCE(b.status, ''), ' ', '_')) IN ('loon_te_berekenen', 'loon_berekenen', 'loon', 'doorgestuurd_naar_loonadministratie', 'verwerkt', 'processed')
                         WHERE p2.id = %s
                           AND wi.id IS NOT NULL
                         GROUP BY p2.id
@@ -1481,7 +1481,7 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                                SUM(hours) AS booking_hours,
                                STRING_AGG(DISTINCT status, ', ') AS booking_status
                         FROM project_time_bookings
-                        WHERE LOWER(COALESCE(status, '')) = 'loon_te_berekenen'
+                        WHERE LOWER(REPLACE(COALESCE(status, ''), ' ', '_')) IN ('loon_te_berekenen', 'loon_berekenen', 'loon', 'doorgestuurd_naar_loonadministratie', 'verwerkt', 'processed')
                         GROUP BY timesheet_inbox_id
                     )
                     SELECT w.id,
@@ -1525,7 +1525,7 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                         ON v.id = COALESCE(w.selected_project_id, b.project_id)
                     LEFT JOIN payroll_cao_settings c
                         ON c.id = COALESCE(b.payroll_cao_setting_id, v.payroll_cao_setting_id)
-                    WHERE LOWER(COALESCE(w.status, '')) = 'loon_te_berekenen'
+                    WHERE LOWER(REPLACE(COALESCE(w.status, ''), ' ', '_')) IN ('loon_te_berekenen', 'loon_berekenen', 'loon', 'doorgestuurd_naar_loonadministratie', 'verwerkt', 'processed')
                       AND w.deleted_at IS NULL
                       AND w.archived_at IS NULL
                       AND COALESCE(w.work_date, w.received_at::date) BETWEEN %s AND %s
@@ -2389,13 +2389,13 @@ def _attach_period_weeks(cursor, periods: list[dict]) -> None:
                ) AS total_hours
         FROM payroll_period_weeks pw
         LEFT JOIN whatsapp_timesheet_inbox wi
-            ON LOWER(COALESCE(wi.status, '')) = 'loon_te_berekenen'
+            ON LOWER(REPLACE(COALESCE(wi.status, ''), ' ', '_')) IN ('loon_te_berekenen', 'loon_berekenen', 'loon', 'doorgestuurd_naar_loonadministratie', 'verwerkt', 'processed')
            AND wi.deleted_at IS NULL
            AND wi.archived_at IS NULL
            AND COALESCE(wi.work_date, wi.received_at::date) BETWEEN pw.start_date AND pw.end_date
         LEFT JOIN project_time_bookings b
             ON b.timesheet_inbox_id = wi.id
-           AND LOWER(COALESCE(b.status, '')) = 'loon_te_berekenen'
+           AND LOWER(REPLACE(COALESCE(b.status, ''), ' ', '_')) IN ('loon_te_berekenen', 'loon_berekenen', 'loon', 'doorgestuurd_naar_loonadministratie', 'verwerkt', 'processed')
         WHERE pw.payroll_period_id = ANY(%s)
         GROUP BY pw.payroll_period_id, pw.week_index
         ORDER BY pw.payroll_period_id, pw.week_index;

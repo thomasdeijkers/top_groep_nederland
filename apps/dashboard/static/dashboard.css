@@ -537,6 +537,14 @@ h2 {
     font-size: 0.78rem;
 }
 
+.period-table tr.period-row--filled td {
+    background: rgba(127, 209, 160, 0.045);
+}
+
+.period-table tr.period-row--filled:hover td {
+    background: rgba(127, 209, 160, 0.075);
+}
+
 .period-summary-strip {
     display: flex;
     flex-wrap: wrap;
@@ -603,6 +611,15 @@ h2 {
     text-decoration: none;
 }
 
+.period-week-open--filled {
+    border-color: rgba(127, 209, 160, 0.56);
+    background: rgba(127, 209, 160, 0.16);
+}
+
+.period-week-open--filled small {
+    color: #d7f8e4;
+}
+
 .relation-audit-panel {
     grid-column: 1 / -1;
     display: grid;
@@ -658,6 +675,11 @@ h2 {
 .period-week-open:hover {
     border-color: rgba(110, 231, 183, 0.56);
     background: rgba(26, 61, 54, 0.7);
+}
+
+.period-week-open--filled:hover {
+    border-color: rgba(157, 240, 190, 0.78);
+    background: rgba(127, 209, 160, 0.24);
 }
 
 .period-week-open strong {

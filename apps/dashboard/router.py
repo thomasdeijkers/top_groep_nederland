@@ -165,10 +165,10 @@ def _audit_relation_fields(data: dict) -> str:
 
 
 def _timesheet_stage(status: str) -> str:
-    normalized = (status or "").strip().lower()
+    normalized = (status or "").strip().lower().replace(" ", "_")
     if normalized in {"goed_te_keuren", "approval", "akkoord_nodig"}:
         return "valideren"
-    if normalized in {"loon_te_berekenen"}:
+    if normalized in {"loon_te_berekenen", "loon_berekenen", "loon"}:
         return "loon"
     if normalized in {"doorgestuurd_naar_loonadministratie", "verwerkt", "processed"}:
         return "loon"
