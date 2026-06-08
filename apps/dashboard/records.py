@@ -2550,7 +2550,7 @@ def _unique_options(values: list[str]) -> list[str]:
     return options
 
 
-def list_whatsapp_timesheets(limit: int = 25) -> list[dict]:
+def list_whatsapp_timesheets(limit: int = 100) -> list[dict]:
     try:
         ensure_dashboard_tables()
         with get_connection() as conn:
@@ -2591,7 +2591,7 @@ def list_whatsapp_timesheets(limit: int = 25) -> list[dict]:
                         ON c.id = w.matched_candidate_id
                     WHERE w.deleted_at IS NULL
                       AND w.archived_at IS NULL
-                    ORDER BY w.received_at DESC, w.id DESC
+                    ORDER BY COALESCE(w.work_date, w.received_at::date) ASC NULLS LAST, w.received_at ASC NULLS LAST, w.id ASC
                     LIMIT %s;
                     """,
                     (limit,),

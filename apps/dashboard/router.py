@@ -343,7 +343,7 @@ def _dashboard_context(
         "whatsapp_workflow": [],
         "weekly_hours_yoy": [],
     }
-    audit_events = list_audit_events(120 if data_page == "audit" else 14) if data_page in {"audit", "settings"} else []
+    audit_events = list_audit_events(120 if data_page == "audit" else 14) if data_page in {"overview", "audit", "settings"} else []
     openai_usage = get_openai_usage_summary()
     project_options = list_project_options() if data_page in {"timesheets", "projects", "periods"} else []
     projects = list_projects(query=query) if data_page == "projects" else []
@@ -770,6 +770,7 @@ def export_payroll_period_excel(period_id: int):
         return RedirectResponse("/dashboard/periods#periodes", status_code=303)
     output_path = Path("runtime/exports/payroll") / f"periode-{period_id}-verloning.xlsx"
     build_payroll_output_workbook(output_path, period)
+    filename = _safe_download_filename(period.get("name", f"Periode {period_id}"))
     _audit(
         "Excel verloning geexporteerd",
         "periode",
@@ -780,9 +781,15 @@ def export_payroll_period_excel(period_id: int):
     )
     return FileResponse(
         output_path,
-        filename=f"{period.get('name', f'Periode {period_id}')}-verloning.xlsx",
+        filename=f"{filename}-verloning.xlsx",
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
+
+
+def _safe_download_filename(value: str) -> str:
+    safe = "".join(character if character.isalnum() or character in (" ", "-", "_") else "-" for character in value)
+    safe = " ".join(safe.split()).strip(" -_")
+    return safe or "periode"
 
 
 @router.post("/api/periods/{period_id}/workbook-cell")

@@ -18,7 +18,7 @@
         </title>
         <link rel="icon" href="/dashboard/static/favicon.ico" sizes="any">
         <link rel="shortcut icon" href="/dashboard/static/favicon.ico">
-        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260608-06">
+        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260608-07">
     </head>
     <body class="page-{{ active_page }}">
         {% macro confidence_light(field) -%}
@@ -1048,10 +1048,6 @@
                                 <h2>{{ selected_payroll_period.name }}</h2>
                                 <p>{{ selected_payroll_period.start_date }} t/m {{ selected_payroll_period.end_date }}. Uren, Excel-controle en periodeberekening in één controleflow.</p>
                             </div>
-                            <div class="period-actions">
-                                <a class="ghost-button" href="/api/periods/{{ selected_payroll_period.id }}/excel/export">Excel downloaden</a>
-                                <a class="ghost-button" href="/dashboard/periods#periodes">Sluiten</a>
-                            </div>
                         </div>
 
                         <div class="payroll-workbook" data-payroll-workbook data-period-id="{{ selected_payroll_period.id }}">
@@ -1061,6 +1057,11 @@
                                     <strong>{{ tab.label }}</strong>
                                 </button>
                                 {% endfor %}
+                                <div class="payroll-workbook-actions">
+                                    <a class="payroll-workbook-action" href="/api/periods/{{ selected_payroll_period.id }}/excel/export">Excel downloaden</a>
+                                    <a class="payroll-workbook-action" href="/dashboard/audit#auditspoor">Auditspoor</a>
+                                    <a class="payroll-workbook-action" href="/dashboard/periods#periodes">Sluiten</a>
+                                </div>
                             </div>
 
                             {% for tab in selected_payroll_period.workbook_tabs %}
@@ -2048,6 +2049,6 @@
                 </section>
             </main>
         </div>
-        <script src="/dashboard/static/dashboard.js?v=20260608-06"></script>
+        <script src="/dashboard/static/dashboard.js?v=20260608-07"></script>
     </body>
 </html>

@@ -152,7 +152,7 @@ inserted_timesheets AS (
         '',
         'testdata',
         'testdata',
-        'loon_te_berekenen',
+        'controle',
         relation_id,
         employee_name,
         employee_name,
@@ -163,7 +163,7 @@ inserted_timesheets AS (
         0,
         principal_id,
         project_id,
-        NOW(),
+        NULL,
         jsonb_build_object(
             'employee_name', jsonb_build_object('value', employee_name, 'confidence', 98),
             'week_number', jsonb_build_object('value', week_number::text, 'confidence', 98),
@@ -173,7 +173,7 @@ inserted_timesheets AS (
             'project_name', jsonb_build_object('value', project_name, 'confidence', 95)
         ),
         98,
-        NOW() - (week_index || ' days')::interval,
+        (work_date::timestamp + make_interval(hours => 8 + (candidate_index % 8), mins => (candidate_index * 7) % 60)),
         NOW(),
         NOW()
     FROM timesheet_seed s
@@ -206,7 +206,7 @@ SELECT
     s.payroll_period_id,
     s.work_date::date,
     s.hours,
-    'loon_te_berekenen',
+    'controle',
     NOW(),
     NOW()
 FROM whatsapp_timesheet_inbox w
@@ -217,3 +217,28 @@ WHERE NOT EXISTS (
     FROM project_time_bookings existing
     WHERE existing.timesheet_inbox_id = w.id
 );
+
+WITH ordered_test_timesheets AS (
+    SELECT id,
+           ROW_NUMBER() OVER (ORDER BY work_date, media_filename, id) AS row_number
+    FROM whatsapp_timesheet_inbox
+    WHERE media_filename LIKE 'test-period-02-wk%-relation-%.jpg'
+      AND parse_source = 'testdata'
+)
+UPDATE whatsapp_timesheet_inbox w
+SET status = 'controle',
+    validated_at = NULL,
+    payroll_sent_at = NULL,
+    received_at = COALESCE(w.work_date, DATE '2026-06-01')::timestamp
+        + make_interval(hours => 8 + ((ordered_test_timesheets.row_number - 1) % 8), mins => ((ordered_test_timesheets.row_number - 1) * 7) % 60),
+    updated_at = NOW()
+FROM ordered_test_timesheets
+WHERE w.id = ordered_test_timesheets.id;
+
+UPDATE project_time_bookings b
+SET status = 'controle',
+    updated_at = NOW()
+FROM whatsapp_timesheet_inbox w
+WHERE b.timesheet_inbox_id = w.id
+  AND w.media_filename LIKE 'test-period-02-wk%-relation-%.jpg'
+  AND w.parse_source = 'testdata';
