@@ -487,10 +487,41 @@ def _render_dashboard(
     cao_id: int | None = None,
     show_cao_form: bool = False,
 ):
+    try:
+        context = _dashboard_context(active_page, edit_id, query, timesheet_id, workflow_stage, timesheet_tab, relation_tab, status_filter, show_relation_form, project_id, period_id, cao_id, show_cao_form)
+    except Exception as exc:
+        print(f"DASHBOARD_CONTEXT_ERROR {active_page}: {type(exc).__name__}: {exc}")
+        return HTMLResponse(
+            """
+            <!doctype html>
+            <html lang="nl">
+            <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+                <title>Dashboard tijdelijk niet geladen</title>
+                <style>
+                    body { margin: 0; font-family: Arial, sans-serif; background: #0d171d; color: #f4f7f8; }
+                    main { max-width: 760px; margin: 12vh auto; padding: 32px; background: #1d282f; border: 1px solid #3b4a52; border-radius: 8px; }
+                    h1 { margin: 0 0 12px; font-size: 28px; }
+                    p { color: #c8d6dd; line-height: 1.5; }
+                    a { color: #99f0bf; font-weight: 700; }
+                </style>
+            </head>
+            <body>
+                <main>
+                    <h1>Dashboard tijdelijk niet geladen</h1>
+                    <p>De app is bereikbaar, maar het dashboard kon de data niet volledig laden. De fout is in de serverlog gezet zodat we hem gericht kunnen oplossen.</p>
+                    <p><a href="/dashboard">Opnieuw proberen</a></p>
+                </main>
+            </body>
+            </html>
+            """,
+            status_code=200,
+        )
     return templates.TemplateResponse(
         request,
         "dashboard.html",
-        _dashboard_context(active_page, edit_id, query, timesheet_id, workflow_stage, timesheet_tab, relation_tab, status_filter, show_relation_form, project_id, period_id, cao_id, show_cao_form),
+        context,
     )
 
 

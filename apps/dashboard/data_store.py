@@ -43,9 +43,21 @@ def ensure_dashboard_tables():
         Path("migrations/029_relation_payroll_settings.sql"),
     ]
 
+    optional_migrations = {
+        "019_demo_seed_data.sql",
+        "020_demo_payroll_period.sql",
+        "028_payroll_period_02_test_timesheets.sql",
+    }
+
     with get_connection() as conn:
-        with conn.cursor() as cursor:
-            for migration in migrations:
-                cursor.execute(migration.read_text(encoding="utf-8"))
-        conn.commit()
+        for migration in migrations:
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute(migration.read_text(encoding="utf-8"))
+                conn.commit()
+            except Exception as exc:
+                conn.rollback()
+                print(f"DASHBOARD_MIGRATION_ERROR {migration}: {type(exc).__name__}: {exc}")
+                if migration.name not in optional_migrations:
+                    raise
     _TABLES_READY = True
