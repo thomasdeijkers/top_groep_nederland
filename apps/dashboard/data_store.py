@@ -37,6 +37,7 @@ def ensure_dashboard_tables():
         Path("migrations/023_otys_api_usage.sql"),
         Path("migrations/024_otys_relations_backfill.sql"),
         Path("migrations/025_dashboard_performance_indexes.sql"),
+        Path("migrations/026_payroll_excel_reference.sql"),
     ]
 
     with get_connection() as conn:

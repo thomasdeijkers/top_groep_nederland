@@ -6,6 +6,12 @@ from psycopg2.extras import Json
 
 from apps.dashboard.addressing import split_street_house_number
 from apps.dashboard.data_store import ensure_dashboard_tables
+from apps.dashboard.payroll_calculations import (
+    build_payslip_sheet_rows,
+    build_period_sheet_rows,
+    default_calculation_rules,
+    derived_period_total_rows,
+)
 from shared.db.connection import get_connection
 
 
@@ -1365,6 +1371,14 @@ def get_payroll_period(period_id: int | None) -> dict | None:
                 _attach_period_weeks(cursor, [period])
         period["payroll_rows"] = list_payroll_period_payroll(period_id)
         period["payroll_totals"] = _payroll_period_totals(period["payroll_rows"])
+        stored_totals = list_payroll_period_totals(period_id)
+        period["period_calculation_rows"] = stored_totals or derived_period_total_rows(period["payroll_rows"])
+        sheet_candidates = list_payroll_sheet_candidates()
+        period["period_sheet_rows"] = build_period_sheet_rows(sheet_candidates, period["payroll_rows"])
+        period["payslip_sheet_rows"] = build_payslip_sheet_rows(period["period_sheet_rows"], period["period_calculation_rows"])
+        period["payroll_import_logs"] = list_payroll_import_logs(period_id)
+        period["payroll_calculation_rules"] = list_payroll_calculation_rules()
+        period["payroll_validation_results"] = list_payroll_validation_results(period_id)
         return period
     except Exception:
         return None
@@ -1504,6 +1518,251 @@ def _payroll_period_totals(rows: list[dict]) -> dict:
         "days": total_days,
         "hours": _format_number(total_hours),
     }
+
+
+def list_payroll_period_totals(period_id: int) -> list[dict]:
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT employee_name,
+                           total_worked_days,
+                           total_worked_hours,
+                           total_vacation_hours,
+                           total_sickness_hours,
+                           total_rv_hours,
+                           total_kv_hours,
+                           total_holiday_hours,
+                           total_km,
+                           total_declarations,
+                           total_net_advance,
+                           already_received_net,
+                           net_to_receive,
+                           total_period_amount,
+                           wkr_reimbursements,
+                           status,
+                           source
+                    FROM payroll_period_totals
+                    WHERE payroll_period_id = %s
+                    ORDER BY employee_name;
+                    """,
+                    (period_id,),
+                )
+                return [
+                    {
+                        "employee_name": row[0],
+                        "total_worked_days": _format_number(row[1]),
+                        "total_worked_hours": _format_number(row[2]),
+                        "total_vacation_hours": _format_number(row[3]),
+                        "total_sickness_hours": _format_number(row[4]),
+                        "total_rv_hours": _format_number(row[5]),
+                        "total_kv_hours": _format_number(row[6]),
+                        "total_holiday_hours": _format_number(row[7]),
+                        "total_km": _format_number(row[8]),
+                        "total_declarations": _format_money(row[9]),
+                        "total_net_advance": _format_money(row[10]),
+                        "already_received_net": _format_money(row[11]),
+                        "net_to_receive": _format_money(row[12]),
+                        "total_period_amount": _format_money(row[13]),
+                        "wkr_reimbursements": _format_money(row[14]),
+                        "status": row[15] or "concept",
+                        "source": row[16] or "dashboard",
+                    }
+                    for row in cursor.fetchall()
+                ]
+    except Exception:
+        return []
+
+
+def list_payroll_sheet_candidates(limit: int = 250) -> list[dict]:
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT id, name, phone, city, hourly_rate, notes, status
+                    FROM relations
+                    WHERE relation_type = 'candidate'
+                      AND LOWER(COALESCE(status, '')) NOT IN ('archief', 'verwijderd')
+                    ORDER BY name
+                    LIMIT %s;
+                    """,
+                    (limit,),
+                )
+                return [
+                    {
+                        "id": row[0],
+                        "name": row[1],
+                        "phone": row[2] or "",
+                        "city": row[3] or "",
+                        "hourly_rate": row[4] or "",
+                        "notes": row[5] or "",
+                        "status": row[6] or "",
+                    }
+                    for row in cursor.fetchall()
+                ]
+    except Exception:
+        return []
+
+
+def list_payroll_import_logs(period_id: int, limit: int = 20) -> list[dict]:
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT filename, status, sheet_names, mapped_fields, formulas, warnings, created_at
+                    FROM payroll_import_logs
+                    WHERE payroll_period_id = %s
+                    ORDER BY created_at DESC
+                    LIMIT %s;
+                    """,
+                    (period_id, limit),
+                )
+                return [
+                    {
+                        "filename": row[0],
+                        "status": row[1],
+                        "sheet_names": row[2] or [],
+                        "mapped_fields": row[3] or {},
+                        "formulas": row[4] or [],
+                        "warnings": row[5] or [],
+                        "created_at": row[6].strftime("%d-%m-%Y %H:%M") if row[6] else "-",
+                    }
+                    for row in cursor.fetchall()
+                ]
+    except Exception:
+        return []
+
+
+def list_payroll_calculation_rules(limit: int = 50) -> list[dict]:
+    ensure_default_payroll_rules()
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT rule_key, name, category, expression, status, notes
+                    FROM payroll_calculation_rules
+                    ORDER BY category, name
+                    LIMIT %s;
+                    """,
+                    (limit,),
+                )
+                return [
+                    {
+                        "rule_key": row[0],
+                        "name": row[1],
+                        "category": row[2],
+                        "expression": row[3] or "",
+                        "status": row[4],
+                        "notes": row[5] or "",
+                    }
+                    for row in cursor.fetchall()
+                ]
+    except Exception:
+        return []
+
+
+def list_payroll_validation_results(period_id: int, limit: int = 100) -> list[dict]:
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT employee_name, result_key, dashboard_value, excel_value, difference, status, details
+                    FROM payroll_calculation_results
+                    WHERE payroll_period_id = %s
+                    ORDER BY employee_name, result_key
+                    LIMIT %s;
+                    """,
+                    (period_id, limit),
+                )
+                return [
+                    {
+                        "employee_name": row[0],
+                        "result_key": row[1],
+                        "dashboard_value": _format_number(row[2]),
+                        "excel_value": _format_number(row[3]),
+                        "difference": _format_number(row[4]),
+                        "status": row[5],
+                        "details": row[6] or {},
+                    }
+                    for row in cursor.fetchall()
+                ]
+    except Exception:
+        return []
+
+
+def ensure_default_payroll_rules() -> None:
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                for rule in default_calculation_rules():
+                    cursor.execute(
+                        """
+                        INSERT INTO payroll_calculation_rules
+                            (rule_key, name, category, expression, status, source, notes)
+                        VALUES (%s, %s, %s, %s, %s, 'dashboard', %s)
+                        ON CONFLICT (rule_key) DO UPDATE SET
+                            name = EXCLUDED.name,
+                            category = EXCLUDED.category,
+                            expression = EXCLUDED.expression,
+                            status = EXCLUDED.status,
+                            notes = EXCLUDED.notes,
+                            updated_at = NOW();
+                        """,
+                        (
+                            rule["rule_key"],
+                            rule["name"],
+                            rule["category"],
+                            rule["expression"],
+                            rule["status"],
+                            rule["notes"],
+                        ),
+                    )
+            conn.commit()
+    except Exception:
+        return
+
+
+def record_payroll_excel_analysis(period_id: int, analysis: dict, imported_from: str = "dashboard_upload") -> None:
+    ensure_dashboard_tables()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO payroll_import_logs
+                    (payroll_period_id, filename, imported_from, status, sheet_names, mapped_fields, formulas, warnings)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s);
+                """,
+                (
+                    period_id,
+                    analysis.get("filename") or "Excel import",
+                    imported_from,
+                    "geanalyseerd" if not analysis.get("warnings") else "controle_nodig",
+                    Json(
+                        {
+                            "all": analysis.get("sheet_names", []),
+                            "week_tabs": analysis.get("week_tabs", []),
+                            "period_sheet": analysis.get("period_sheet"),
+                            "payslip_sheet": analysis.get("payslip_sheet"),
+                            "foundation_sheets": analysis.get("foundation_sheets", []),
+                        }
+                    ),
+                    Json(analysis.get("mapped_fields", {})),
+                    Json({"count": analysis.get("formula_count", 0), "samples": analysis.get("formulas", [])}),
+                    Json(analysis.get("warnings", [])),
+                ),
+            )
+        conn.commit()
 
 
 def create_payroll_period(data: dict) -> int:

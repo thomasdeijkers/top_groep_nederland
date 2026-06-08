@@ -16,6 +16,7 @@ from apps.dashboard.placeholders import (
 )
 from apps.dashboard.organizations import create_organization, list_organizations
 from apps.dashboard.openai_usage import get_openai_usage_summary
+from apps.dashboard.payroll_excel import analyze_payroll_workbook
 from apps.dashboard.records import (
     archive_payroll_period,
     create_cao_setting,
@@ -46,6 +47,7 @@ from apps.dashboard.records import (
     list_vacancy_statuses,
     list_whatsapp_timesheets,
     log_audit_event,
+    record_payroll_excel_analysis,
     search_candidate_matches,
     update_cao_setting,
 )
@@ -759,6 +761,26 @@ def save_payroll_period(
         period_id = created_ids[-1] if created_ids else 0
     _audit("Periode aangemaakt", "periode", period_id, name or f"Periode {period_number}", f"{len(created_ids)} vierwekelijkse loonperiode(s) aangemaakt of bijgewerkt.", "Periodes")
     return RedirectResponse(f"/dashboard/periods?created={period_id}#periodes", status_code=303)
+
+
+@router.post("/api/periods/{period_id}/excel/analyze")
+async def analyze_payroll_period_excel(period_id: int, file: UploadFile = File(...)):
+    upload_dir = Path("runtime/uploads/payroll_excel")
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    safe_name = Path(file.filename or "payroll-reference.xlsx").name
+    upload_path = upload_dir / f"periode-{period_id}-{safe_name}"
+    upload_path.write_bytes(await file.read())
+    analysis = analyze_payroll_workbook(upload_path)
+    record_payroll_excel_analysis(period_id, analysis, imported_from=safe_name)
+    _audit(
+        "Excel verloning geanalyseerd",
+        "periode",
+        period_id,
+        safe_name,
+        f"{len(analysis.get('week_tabs', []))} weektabs en {analysis.get('formula_count', 0)} formules gevonden.",
+        "controle_nodig" if analysis.get("warnings") else "geanalyseerd",
+    )
+    return RedirectResponse(f"/dashboard/periods?period={period_id}#periode-verloning", status_code=303)
 
 
 @router.post("/api/periods/{period_id}/archive")

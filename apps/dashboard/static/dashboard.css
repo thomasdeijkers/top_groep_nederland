@@ -496,6 +496,24 @@ h2 {
     margin: 0;
 }
 
+.period-excel-upload {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.period-excel-upload input[type="file"] {
+    max-width: 260px;
+    padding: 8px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    background: rgba(11, 22, 29, 0.55);
+    color: #dce7ef;
+    font-size: 0.78rem;
+}
+
 .table-link--button {
     padding: 0;
     border: 0;
@@ -664,6 +682,44 @@ h2 {
     margin-top: 2px;
     color: #9fb0bd;
     font-size: 0.72rem;
+}
+
+.period-section-heading {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 16px 0 8px;
+}
+
+.period-section-heading h3 {
+    margin: 0;
+    color: #eef7fb;
+    font-size: 0.98rem;
+}
+
+.period-control-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+}
+
+.period-import-log {
+    margin-top: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background: rgba(12, 31, 50, 0.42);
+}
+
+.period-import-log summary {
+    cursor: pointer;
+    padding: 12px 14px;
+    color: #eef7fb;
+    font-weight: 800;
+}
+
+.period-import-log .table-wrap {
+    margin: 0 12px 12px;
 }
 
 .payroll-settings-table {

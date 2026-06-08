@@ -1,0 +1,71 @@
+import tempfile
+import unittest
+from pathlib import Path
+
+from apps.dashboard.payroll_calculations import derived_period_total_rows
+from apps.dashboard.payroll_excel import analyze_payroll_workbook
+
+
+try:
+    from openpyxl import Workbook
+except ImportError:  # pragma: no cover
+    Workbook = None
+
+
+@unittest.skipIf(Workbook is None, "openpyxl is niet beschikbaar")
+class PayrollExcelAnalysisTests(unittest.TestCase):
+    def test_analyzes_period_five_reference_structure(self):
+        workbook = Workbook()
+        workbook.active.title = "Periode"
+        workbook["Periode"]["A1"] = "Werknemer"
+        workbook["Periode"]["B1"] = "Contracturen"
+        workbook["Periode"]["C1"] = "Bruto uurloon"
+
+        for sheet_name in ["WK17", "WK18", "WK19", "WK20"]:
+            sheet = workbook.create_sheet(sheet_name)
+            sheet["A1"] = "Werknemer"
+            sheet["B1"] = "Uren gewerkt"
+            sheet["C1"] = "Netto voorschot"
+            sheet["D2"] = "=B2+C2"
+
+        payslip = workbook.create_sheet("Loonstrook")
+        payslip["A1"] = "werknemer"
+        payslip["B1"] = "totale uren gewerkt"
+        payslip["C1"] = "nog te ontvangen netto loon"
+        workbook.create_sheet("Grondslag bouw & infra")
+        workbook.create_sheet("SAVG")
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            path = Path(tmp_dir) / "TGN verloning 2026 Periode 5.xlsx"
+            workbook.save(path)
+            analysis = analyze_payroll_workbook(path)
+
+        self.assertEqual([week["week_number"] for week in analysis["week_tabs"]], [17, 18, 19, 20])
+        self.assertEqual(analysis["period_sheet"], "Periode")
+        self.assertEqual(analysis["payslip_sheet"], "Loonstrook")
+        self.assertIn("Grondslag bouw & infra", analysis["foundation_sheets"])
+        self.assertGreaterEqual(analysis["formula_count"], 4)
+        self.assertIn("worked_hours", analysis["mapped_fields"]["WK17"])
+
+
+class PayrollCalculationTests(unittest.TestCase):
+    def test_derives_period_totals_from_existing_payroll_rows(self):
+        rows = derived_period_total_rows(
+            [
+                {
+                    "employee_name": "Thomas",
+                    "worked_days": 4,
+                    "total_hours": "32",
+                    "gross_amount": "€ 800,00",
+                }
+            ]
+        )
+
+        self.assertEqual(rows[0]["employee_name"], "Thomas")
+        self.assertEqual(rows[0]["total_worked_hours"], "32")
+        self.assertEqual(rows[0]["total_period_amount"], "€ 800,00")
+        self.assertEqual(rows[0]["status"], "concept")
+
+
+if __name__ == "__main__":
+    unittest.main()
