@@ -1213,8 +1213,11 @@ def list_payroll_periods(limit: int = 25, archived: bool = False) -> list[dict]:
                                SUM(b.hours) AS total_hours
                         FROM payroll_periods p2
                         LEFT JOIN project_time_bookings b
-                            ON b.payroll_period_id = p2.id
-                            OR (b.payroll_period_id IS NULL AND b.work_date BETWEEN p2.start_date AND p2.end_date)
+                            ON (
+                                b.payroll_period_id = p2.id
+                                OR (b.payroll_period_id IS NULL AND b.work_date BETWEEN p2.start_date AND p2.end_date)
+                            )
+                           AND LOWER(COALESCE(b.status, '')) = 'loon_te_berekenen'
                         GROUP BY p2.id
                     ) b ON b.payroll_period_id = p.id
                     WHERE (
@@ -1343,8 +1346,11 @@ def get_payroll_period(period_id: int | None) -> dict | None:
                                SUM(b.hours) AS total_hours
                         FROM payroll_periods p2
                         LEFT JOIN project_time_bookings b
-                            ON b.payroll_period_id = p2.id
-                            OR (b.payroll_period_id IS NULL AND b.work_date BETWEEN p2.start_date AND p2.end_date)
+                            ON (
+                                b.payroll_period_id = p2.id
+                                OR (b.payroll_period_id IS NULL AND b.work_date BETWEEN p2.start_date AND p2.end_date)
+                            )
+                           AND LOWER(COALESCE(b.status, '')) = 'loon_te_berekenen'
                         WHERE p2.id = %s
                         GROUP BY p2.id
                     ) b ON b.payroll_period_id = p.id
@@ -1451,8 +1457,11 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                         ON c.id = b.payroll_cao_setting_id
                     LEFT JOIN whatsapp_timesheet_inbox w
                         ON w.id = b.timesheet_inbox_id
-                    WHERE b.payroll_period_id = %s
-                       OR (b.payroll_period_id IS NULL AND b.work_date BETWEEN %s AND %s)
+                    WHERE (
+                        b.payroll_period_id = %s
+                        OR (b.payroll_period_id IS NULL AND b.work_date BETWEEN %s AND %s)
+                    )
+                      AND LOWER(COALESCE(b.status, '')) = 'loon_te_berekenen'
                     ORDER BY employee_name, b.work_date, b.id;
                     """,
                     (period_id, start_date, end_date),
@@ -2042,6 +2051,23 @@ def archive_payroll_period(period_id: int, archived: bool = True) -> None:
         conn.commit()
 
 
+def update_payroll_period_status(period_id: int, status: str) -> None:
+    if not period_id:
+        return
+    ensure_dashboard_tables()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE payroll_periods
+                SET status = %s, updated_at = NOW()
+                WHERE id = %s;
+                """,
+                (status, period_id),
+            )
+        conn.commit()
+
+
 def _payroll_period_name(period_number: int, start_date: date, end_date: date) -> str:
     return f"Periode {period_number:02d} {start_date:%d/%m} - {end_date:%d/%m}"
 
@@ -2103,6 +2129,7 @@ def _attach_period_weeks(cursor, periods: list[dict]) -> None:
         LEFT JOIN project_time_bookings b
             ON b.work_date BETWEEN w.start_date AND w.end_date
            AND (b.payroll_period_id = w.payroll_period_id OR b.payroll_period_id IS NULL)
+           AND LOWER(COALESCE(b.status, '')) = 'loon_te_berekenen'
         WHERE w.payroll_period_id = ANY(%s)
         GROUP BY w.payroll_period_id, w.week_index
         ORDER BY w.payroll_period_id, w.week_index;

@@ -50,6 +50,7 @@ from apps.dashboard.records import (
     save_payroll_workbook_cell,
     search_candidate_matches,
     update_cao_setting,
+    update_payroll_period_status,
 )
 from apps.dashboard.relations import (
     create_candidate,
@@ -159,7 +160,7 @@ def _timesheet_stage(status: str) -> str:
     if normalized in {"loon_te_berekenen"}:
         return "loon"
     if normalized in {"doorgestuurd_naar_loonadministratie", "verwerkt", "processed"}:
-        return "accorderen"
+        return "loon"
     return "controle"
 
 
@@ -169,7 +170,6 @@ def _timesheet_workflow_tabs(items: list[dict], active_stage: str) -> list[dict]
         "controle": ("Controle", "Ingekomen urenstaten openen en corrigeren"),
         "valideren": ("Valideren", "Gecontroleerde uren boeken op opdrachtgever en project"),
         "loon": ("Loon berekenen", "Gevalideerde uren klaarzetten voor loonberekening"),
-        "accorderen": ("Accorderen", "Definitieve controle voor loonadministratie"),
     }
     return [
         {
@@ -367,10 +367,9 @@ def _dashboard_context(
             "controle": "Te controleren",
             "valideren": "Te valideren",
             "loon": "Loon berekenen",
-            "accorderen": "Accorderen",
         }.get(item["workflow_stage"], "Te controleren")
 
-    workflow_stage = workflow_stage if workflow_stage in {"all", "controle", "valideren", "loon", "accorderen"} else "all"
+    workflow_stage = workflow_stage if workflow_stage in {"all", "controle", "valideren", "loon"} else "all"
     timesheet_tab = timesheet_tab if timesheet_tab in {"overview", "task"} else "overview"
     timesheet_stage_items = _filter_timesheets(whatsapp_inbox, query, workflow_stage)
     selected_timesheet = next((item for item in whatsapp_inbox if item["id"] == timesheet_id), None) if timesheet_id else None
@@ -623,7 +622,7 @@ def validate_whatsapp_timesheet(
 def payroll_whatsapp_timesheet(timesheet_id: int):
     send_to_payroll(timesheet_id)
     _audit("Doorgestuurd naar loonadministratie", "urenbriefje", timesheet_id, f"Urenbriefje {timesheet_id}", "Urenbriefje is doorgestuurd voor loonadministratie.", "Accorderen")
-    return RedirectResponse(f"/dashboard/timesheets?stage=accorderen&timesheet={timesheet_id}", status_code=303)
+    return RedirectResponse("/dashboard/periods#periodes", status_code=303)
 
 
 @router.post("/api/whatsapp/timesheet/{timesheet_id}/archive")
@@ -805,6 +804,13 @@ def archive_period(period_id: int):
     archive_payroll_period(period_id, archived=True)
     _audit("Periode gearchiveerd", "periode", period_id, f"Periode {period_id}", "Loonperiode verplaatst naar het archief.", "Periodes")
     return RedirectResponse("/dashboard/periods#periode-archief", status_code=303)
+
+
+@router.post("/api/periods/{period_id}/approve")
+def approve_period(period_id: int):
+    update_payroll_period_status(period_id, "Akkoord")
+    _audit("Loonperiode geaccordeerd", "periode", period_id, f"Periode {period_id}", "Laatste controle in de loonperiode is akkoord gezet.", "Akkoord")
+    return RedirectResponse(f"/dashboard/periods?period={period_id}#periode-verloning", status_code=303)
 
 
 @router.post("/api/periods/{period_id}/restore")

@@ -542,21 +542,23 @@ h2 {
 }
 
 .period-week-open-list {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(132px, 132px));
+    align-items: stretch;
     gap: 6px;
 }
 
 .period-week-open-list > span {
-    flex-basis: 100%;
+    grid-column: 1 / -1;
     color: #d8e1e7;
     font-size: 0.86rem;
 }
 
 .period-week-open {
     display: inline-grid;
-    min-width: 92px;
+    width: 132px;
+    min-height: 52px;
+    align-content: center;
     gap: 2px;
     padding: 7px 9px;
     border: 1px solid rgba(110, 231, 183, 0.24);
@@ -701,7 +703,10 @@ h2 {
 }
 
 .payroll-workbook-tab {
+    display: grid;
+    gap: 2px;
     min-width: 82px;
+    min-height: 48px;
     padding: 8px 12px 7px;
     border: 1px solid rgba(127, 209, 160, 0.22);
     border-bottom: 0;
@@ -714,10 +719,20 @@ h2 {
     white-space: nowrap;
 }
 
+.payroll-workbook-tab small {
+    color: #b8c8d2;
+    font-size: 0.68rem;
+    font-weight: 800;
+}
+
 .payroll-workbook-tab--active {
     background: #29443d;
     color: #d9ffe8;
     box-shadow: inset 0 -3px 0 #0a8f66;
+}
+
+.payroll-workbook-tab--active small {
+    color: #d9ffe8;
 }
 
 .payroll-workbook-actions {
@@ -726,6 +741,10 @@ h2 {
     gap: 6px;
     margin-left: auto;
     padding-bottom: 6px;
+}
+
+.payroll-workbook-action-form {
+    margin: 0;
 }
 
 .payroll-workbook-action {

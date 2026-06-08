@@ -18,7 +18,7 @@
         </title>
         <link rel="icon" href="/dashboard/static/favicon.ico" sizes="any">
         <link rel="shortcut icon" href="/dashboard/static/favicon.ico">
-        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260608-07">
+        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260608-08">
     </head>
     <body class="page-{{ active_page }}">
         {% macro confidence_light(field) -%}
@@ -1055,11 +1055,17 @@
                                 {% for tab in selected_payroll_period.workbook_tabs %}
                                 <button class="payroll-workbook-tab {% if loop.first %}payroll-workbook-tab--active{% endif %}" type="button" role="tab" data-payroll-tab="{{ tab.label }}" aria-selected="{{ 'true' if loop.first else 'false' }}">
                                     <strong>{{ tab.label }}</strong>
+                                    {% if tab.kind == 'week' and tab.summary %}
+                                    <small>{{ tab.summary.total_hours }} uur · {{ tab.summary.booking_count }} regels</small>
+                                    {% endif %}
                                 </button>
                                 {% endfor %}
                                 <div class="payroll-workbook-actions">
                                     <a class="payroll-workbook-action" href="/api/periods/{{ selected_payroll_period.id }}/excel/export">Excel downloaden</a>
                                     <a class="payroll-workbook-action" href="/dashboard/audit#auditspoor">Auditspoor</a>
+                                    <form class="payroll-workbook-action-form" action="/api/periods/{{ selected_payroll_period.id }}/approve" method="post">
+                                        <button class="payroll-workbook-action" type="submit">Accorderen</button>
+                                    </form>
                                     <a class="payroll-workbook-action" href="/dashboard/periods#periodes">Sluiten</a>
                                 </div>
                             </div>
@@ -1857,9 +1863,6 @@
                                     <input type="hidden" name="project_id" value="{{ selected_message.selected_project_id or '' }}" data-workflow-project-id>
                                     <button class="ghost-button" type="submit">Valideren</button>
                                 </form>
-                                <form class="workflow-actions" action="/api/whatsapp/timesheet/{{ selected_message.id }}/payroll" method="post">
-                                    <button class="ghost-button" type="submit">Naar loonadministratie</button>
-                                </form>
                                 </div>
                                 </div>
                                 </div>
@@ -2049,6 +2052,6 @@
                 </section>
             </main>
         </div>
-        <script src="/dashboard/static/dashboard.js?v=20260608-07"></script>
+        <script src="/dashboard/static/dashboard.js?v=20260608-08"></script>
     </body>
 </html>
