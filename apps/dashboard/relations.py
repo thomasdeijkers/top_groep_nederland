@@ -59,7 +59,11 @@ def create_relation(data: dict, photo: dict | None = None) -> int:
                     email, phone, website, address, street, house_number,
                     house_number_addition, postal_code, city, country,
                     status, source, owner, availability, hourly_rate, kvk_number,
-                    vat_number, notes, photo_filename, photo_path, archived_at, updated_at
+                    vat_number, notes, photo_filename, photo_path, archived_at,
+                    payroll_license_plate, payroll_choice_budget, payroll_phase,
+                    payroll_pension, payroll_cao_hours, payroll_days_right,
+                    payroll_scale, payroll_function, payroll_hourly_wage,
+                    payroll_settings_updated_at, updated_at
                 )
                 VALUES (
                     %(relation_type)s, %(name)s, %(first_name)s, %(last_name)s,
@@ -68,7 +72,13 @@ def create_relation(data: dict, photo: dict | None = None) -> int:
                     %(house_number_addition)s, %(postal_code)s, %(city)s, %(country)s,
                     %(status)s, %(source)s, %(owner)s, %(availability)s,
                     %(hourly_rate)s, %(kvk_number)s, %(vat_number)s, %(notes)s,
-                    %(photo_filename)s, %(photo_path)s, %(archived_at)s, NOW()
+                    %(photo_filename)s, %(photo_path)s, %(archived_at)s,
+                    %(payroll_license_plate)s, %(payroll_choice_budget)s,
+                    %(payroll_phase)s, %(payroll_pension)s, %(payroll_cao_hours)s,
+                    %(payroll_days_right)s, %(payroll_scale)s, %(payroll_function)s,
+                    %(payroll_hourly_wage)s,
+                    CASE WHEN %(has_payroll_settings)s THEN NOW() ELSE NULL END,
+                    NOW()
                 )
                 RETURNING id;
                 """,
@@ -124,6 +134,19 @@ def update_relation(relation_id: int, data: dict, photo: dict | None = None) -> 
                     photo_filename = %(photo_filename)s,
                     photo_path = %(photo_path)s,
                     archived_at = %(archived_at)s,
+                    payroll_license_plate = %(payroll_license_plate)s,
+                    payroll_choice_budget = %(payroll_choice_budget)s,
+                    payroll_phase = %(payroll_phase)s,
+                    payroll_pension = %(payroll_pension)s,
+                    payroll_cao_hours = %(payroll_cao_hours)s,
+                    payroll_days_right = %(payroll_days_right)s,
+                    payroll_scale = %(payroll_scale)s,
+                    payroll_function = %(payroll_function)s,
+                    payroll_hourly_wage = %(payroll_hourly_wage)s,
+                    payroll_settings_updated_at = CASE
+                        WHEN %(has_payroll_settings)s THEN NOW()
+                        ELSE payroll_settings_updated_at
+                    END,
                     updated_at = NOW()
                 WHERE id = %(id)s;
                 """,
@@ -495,6 +518,29 @@ def _relation_payload(data: dict, relation_type: str) -> dict:
         "owner": data.get("owner"),
         "availability": data.get("availability"),
         "hourly_rate": data.get("hourly_rate"),
+        "payroll_license_plate": data.get("payroll_license_plate"),
+        "payroll_choice_budget": data.get("payroll_choice_budget"),
+        "payroll_phase": data.get("payroll_phase"),
+        "payroll_pension": data.get("payroll_pension"),
+        "payroll_cao_hours": data.get("payroll_cao_hours"),
+        "payroll_days_right": data.get("payroll_days_right"),
+        "payroll_scale": data.get("payroll_scale"),
+        "payroll_function": data.get("payroll_function"),
+        "payroll_hourly_wage": data.get("payroll_hourly_wage"),
+        "has_payroll_settings": any(
+            (data.get(key) or "").strip()
+            for key in (
+                "payroll_license_plate",
+                "payroll_choice_budget",
+                "payroll_phase",
+                "payroll_pension",
+                "payroll_cao_hours",
+                "payroll_days_right",
+                "payroll_scale",
+                "payroll_function",
+                "payroll_hourly_wage",
+            )
+        ),
         "kvk_number": data.get("kvk_number"),
         "vat_number": data.get("vat_number"),
         "notes": data.get("notes"),

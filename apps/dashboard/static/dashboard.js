@@ -441,6 +441,34 @@
         }
     });
 
+    const manualTimesheetModal = document.querySelector("[data-manual-timesheet-modal]");
+    const openManualTimesheetModal = () => {
+        if (!manualTimesheetModal) {
+            return;
+        }
+        manualTimesheetModal.hidden = false;
+        manualTimesheetModal.querySelector("input, select, button")?.focus();
+    };
+    const closeManualTimesheetModal = () => {
+        if (manualTimesheetModal) {
+            manualTimesheetModal.hidden = true;
+        }
+    };
+    document.querySelector("[data-manual-timesheet-open]")?.addEventListener("click", openManualTimesheetModal);
+    document.querySelectorAll("[data-manual-timesheet-close]").forEach((button) => {
+        button.addEventListener("click", closeManualTimesheetModal);
+    });
+    manualTimesheetModal?.addEventListener("click", (event) => {
+        if (event.target === manualTimesheetModal) {
+            closeManualTimesheetModal();
+        }
+    });
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && manualTimesheetModal && !manualTimesheetModal.hidden) {
+            closeManualTimesheetModal();
+        }
+    });
+
     document.querySelectorAll("[data-candidate-match-select]").forEach((select) => {
         const form = select.closest("form");
         const searchInput = form?.querySelector("[data-candidate-match-search]");

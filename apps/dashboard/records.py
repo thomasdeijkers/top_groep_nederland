@@ -315,7 +315,10 @@ def list_audit_events(limit: int = 25, entity_type: str = "", entity_id: int | N
                     }
                     for row in cursor.fetchall()
                 ]
-                _enrich_audit_events(cursor, rows)
+                try:
+                    _enrich_audit_events(cursor, rows)
+                except Exception:
+                    pass
                 return rows
     except Exception:
         return []
@@ -1219,18 +1222,27 @@ def list_payroll_periods(limit: int = 25, archived: bool = False) -> list[dict]:
                     ) w ON w.payroll_period_id = p.id
                     LEFT JOIN (
                         SELECT p2.id AS payroll_period_id,
-                               COUNT(b.id) AS booking_count,
-                               SUM(b.hours) AS total_hours
+                               COUNT(wi.id) AS booking_count,
+                               SUM(
+                                   COALESCE(
+                                       wi.hours,
+                                       b.hours,
+                                       CASE
+                                           WHEN COALESCE(wi.parsed_fields->'total_hours'->>'value', '') ~ '^[0-9]+([,.][0-9]+)?$'
+                                           THEN REPLACE(wi.parsed_fields->'total_hours'->>'value', ',', '.')::numeric
+                                           ELSE 0
+                                       END
+                                   )
+                               ) AS total_hours
                         FROM payroll_periods p2
-                        LEFT JOIN project_time_bookings b
-                            ON (
-                                b.payroll_period_id = p2.id
-                                OR (b.payroll_period_id IS NULL AND b.work_date BETWEEN p2.start_date AND p2.end_date)
-                            )
-                           AND LOWER(COALESCE(b.status, '')) = 'loon_te_berekenen'
                         LEFT JOIN whatsapp_timesheet_inbox wi
-                            ON wi.id = b.timesheet_inbox_id
-                           AND LOWER(COALESCE(wi.status, '')) = 'loon_te_berekenen'
+                            ON LOWER(COALESCE(wi.status, '')) = 'loon_te_berekenen'
+                           AND wi.deleted_at IS NULL
+                           AND wi.archived_at IS NULL
+                           AND COALESCE(wi.work_date, wi.received_at::date) BETWEEN p2.start_date AND p2.end_date
+                        LEFT JOIN project_time_bookings b
+                            ON b.timesheet_inbox_id = wi.id
+                           AND LOWER(COALESCE(b.status, '')) = 'loon_te_berekenen'
                         WHERE wi.id IS NOT NULL
                         GROUP BY p2.id
                     ) b ON b.payroll_period_id = p.id
@@ -1356,18 +1368,27 @@ def get_payroll_period(period_id: int | None) -> dict | None:
                     ) w ON w.payroll_period_id = p.id
                     LEFT JOIN (
                         SELECT p2.id AS payroll_period_id,
-                               COUNT(b.id) AS booking_count,
-                               SUM(b.hours) AS total_hours
+                               COUNT(wi.id) AS booking_count,
+                               SUM(
+                                   COALESCE(
+                                       wi.hours,
+                                       b.hours,
+                                       CASE
+                                           WHEN COALESCE(wi.parsed_fields->'total_hours'->>'value', '') ~ '^[0-9]+([,.][0-9]+)?$'
+                                           THEN REPLACE(wi.parsed_fields->'total_hours'->>'value', ',', '.')::numeric
+                                           ELSE 0
+                                       END
+                                   )
+                               ) AS total_hours
                         FROM payroll_periods p2
-                        LEFT JOIN project_time_bookings b
-                            ON (
-                                b.payroll_period_id = p2.id
-                                OR (b.payroll_period_id IS NULL AND b.work_date BETWEEN p2.start_date AND p2.end_date)
-                            )
-                           AND LOWER(COALESCE(b.status, '')) = 'loon_te_berekenen'
                         LEFT JOIN whatsapp_timesheet_inbox wi
-                            ON wi.id = b.timesheet_inbox_id
-                           AND LOWER(COALESCE(wi.status, '')) = 'loon_te_berekenen'
+                            ON LOWER(COALESCE(wi.status, '')) = 'loon_te_berekenen'
+                           AND wi.deleted_at IS NULL
+                           AND wi.archived_at IS NULL
+                           AND COALESCE(wi.work_date, wi.received_at::date) BETWEEN p2.start_date AND p2.end_date
+                        LEFT JOIN project_time_bookings b
+                            ON b.timesheet_inbox_id = wi.id
+                           AND LOWER(COALESCE(b.status, '')) = 'loon_te_berekenen'
                         WHERE p2.id = %s
                           AND wi.id IS NOT NULL
                         GROUP BY p2.id
@@ -1451,8 +1472,20 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                 weeks = cursor.fetchall()
                 cursor.execute(
                     """
-                    SELECT b.id,
-                           b.relation_id,
+                    WITH booking_context AS (
+                        SELECT timesheet_inbox_id,
+                               MAX(relation_id) AS relation_id,
+                               MAX(principal_id) AS principal_id,
+                               MAX(project_id) AS project_id,
+                               MAX(payroll_cao_setting_id) AS payroll_cao_setting_id,
+                               SUM(hours) AS booking_hours,
+                               STRING_AGG(DISTINCT status, ', ') AS booking_status
+                        FROM project_time_bookings
+                        WHERE LOWER(COALESCE(status, '')) = 'loon_te_berekenen'
+                        GROUP BY timesheet_inbox_id
+                    )
+                    SELECT w.id,
+                           COALESCE(w.matched_relation_id, b.relation_id) AS relation_id,
                            COALESCE(r.name, w.employee_name, w.matched_candidate_name, 'Onbekend') AS employee_name,
                            COALESCE(c.name, 'Geen CAO') AS cao_name,
                            COALESCE(c.standard_week_hours, 40) AS standard_week_hours,
@@ -1461,29 +1494,44 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                            COALESCE(c.default_hourly_wage, 0) AS cao_hourly_wage,
                            COALESCE(v.title, w.project_name, '-') AS project_name,
                            COALESCE(p.name, w.principal_name, '-') AS principal_name,
-                           b.work_date,
-                           COALESCE(b.hours, 0) AS hours,
-                           b.status
-                    FROM project_time_bookings b
+                           COALESCE(w.work_date, w.received_at::date) AS work_date,
+                           COALESCE(
+                               w.hours,
+                               b.booking_hours,
+                               CASE
+                                   WHEN COALESCE(w.parsed_fields->'total_hours'->>'value', '') ~ '^[0-9]+([,.][0-9]+)?$'
+                                   THEN REPLACE(w.parsed_fields->'total_hours'->>'value', ',', '.')::numeric
+                                   ELSE 0
+                               END
+                           ) AS hours,
+                           COALESCE(b.booking_status, w.status) AS status,
+                           r.payroll_license_plate,
+                           r.payroll_choice_budget,
+                           r.payroll_phase,
+                           r.payroll_pension,
+                           r.payroll_cao_hours,
+                           r.payroll_days_right,
+                           r.payroll_scale,
+                           r.payroll_function,
+                           r.payroll_hourly_wage
+                    FROM whatsapp_timesheet_inbox w
+                    LEFT JOIN booking_context b
+                        ON b.timesheet_inbox_id = w.id
                     LEFT JOIN relations r
-                        ON r.id = b.relation_id
+                        ON r.id = COALESCE(w.matched_relation_id, b.relation_id)
                     LEFT JOIN relations p
-                        ON p.id = b.principal_id
+                        ON p.id = COALESCE(w.selected_principal_id, b.principal_id)
                     LEFT JOIN vacancies v
-                        ON v.id = b.project_id
+                        ON v.id = COALESCE(w.selected_project_id, b.project_id)
                     LEFT JOIN payroll_cao_settings c
-                        ON c.id = b.payroll_cao_setting_id
-                    LEFT JOIN whatsapp_timesheet_inbox w
-                        ON w.id = b.timesheet_inbox_id
-                    WHERE (
-                        b.payroll_period_id = %s
-                        OR (b.payroll_period_id IS NULL AND b.work_date BETWEEN %s AND %s)
-                    )
-                      AND LOWER(COALESCE(b.status, '')) = 'loon_te_berekenen'
-                      AND LOWER(COALESCE(w.status, '')) = 'loon_te_berekenen'
-                    ORDER BY employee_name, b.work_date, b.id;
+                        ON c.id = COALESCE(b.payroll_cao_setting_id, v.payroll_cao_setting_id)
+                    WHERE LOWER(COALESCE(w.status, '')) = 'loon_te_berekenen'
+                      AND w.deleted_at IS NULL
+                      AND w.archived_at IS NULL
+                      AND COALESCE(w.work_date, w.received_at::date) BETWEEN %s AND %s
+                    ORDER BY employee_name, work_date, w.id;
                     """,
-                    (period_id, start_date, end_date),
+                    (start_date, end_date),
                 )
                 aggregates: dict[tuple, dict] = {}
                 for row in cursor.fetchall():
@@ -1504,6 +1552,16 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                             "booking_count": 0,
                             "total_hours_raw": Decimal("0"),
                             "week_hours_raw": [Decimal("0"), Decimal("0"), Decimal("0"), Decimal("0")],
+                            "relation_id": row[1],
+                            "payroll_license_plate": row[13] or "",
+                            "payroll_choice_budget": row[14] or "",
+                            "payroll_phase": row[15] or "",
+                            "payroll_pension": row[16] or "",
+                            "payroll_cao_hours": row[17] or "",
+                            "payroll_days_right": row[18] or "",
+                            "payroll_scale": row[19] or "",
+                            "payroll_function": row[20] or "",
+                            "payroll_hourly_wage": row[21] or "",
                         },
                     )
                     hours = Decimal(str(row[11] or 0))
@@ -1530,6 +1588,7 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                     rows.append(
                         {
                             "employee_name": item["employee_name"],
+                            "relation_id": item["relation_id"],
                             "cao_name": item["cao_name"],
                             "projects": ", ".join(sorted(item["projects"])),
                             "principals": ", ".join(sorted(item["principals"])),
@@ -1543,11 +1602,157 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                             "hourly_wage_source": "Kandidaat" if candidate_wage is not None else "CAO default",
                             "gross_amount": _format_money(gross_amount),
                             "status": ", ".join(sorted(item["statuses"])),
+                            "payroll_license_plate": item["payroll_license_plate"],
+                            "payroll_choice_budget": item["payroll_choice_budget"],
+                            "payroll_phase": item["payroll_phase"],
+                            "payroll_pension": item["payroll_pension"],
+                            "payroll_cao_hours": item["payroll_cao_hours"],
+                            "payroll_days_right": item["payroll_days_right"],
+                            "payroll_scale": item["payroll_scale"],
+                            "payroll_function": item["payroll_function"],
+                            "payroll_hourly_wage": item["payroll_hourly_wage"],
                         }
                     )
                 return sorted(rows, key=lambda item: item["employee_name"])
     except Exception:
         return []
+
+
+def create_manual_timesheet(data: dict) -> int:
+    ensure_dashboard_tables()
+    work_date = _date_or_none(data.get("work_date")) or date.today()
+    hours = _decimal_or_none(data.get("hours")) or Decimal("0")
+    relation_id = _int_or_none(data.get("relation_id"))
+    principal_id = _int_or_none(data.get("principal_id"))
+    project_id = _int_or_none(data.get("project_id"))
+    status = (data.get("status") or "controle").strip() or "controle"
+    if status not in {"controle", "goed_te_keuren", "loon_te_berekenen"}:
+        status = "controle"
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            candidate_name = (data.get("employee_name") or "").strip()
+            sender_phone = (data.get("sender_phone") or "").strip()
+            principal_name = (data.get("principal_name") or "").strip()
+            project_name = (data.get("project_name") or "").strip()
+            payroll_cao_setting_id = None
+            if relation_id:
+                cursor.execute("SELECT name, phone FROM relations WHERE id = %s;", (relation_id,))
+                row = cursor.fetchone()
+                if row:
+                    candidate_name = candidate_name or row[0] or ""
+                    sender_phone = sender_phone or row[1] or ""
+            if principal_id:
+                cursor.execute("SELECT name FROM relations WHERE id = %s;", (principal_id,))
+                row = cursor.fetchone()
+                if row:
+                    principal_name = principal_name or row[0] or ""
+            if project_id:
+                cursor.execute("SELECT title, payroll_cao_setting_id FROM vacancies WHERE id = %s;", (project_id,))
+                row = cursor.fetchone()
+                if row:
+                    project_name = project_name or row[0] or ""
+                    payroll_cao_setting_id = row[1]
+            week_number = work_date.isocalendar().week
+            day_keys = [
+                "monday_hours",
+                "tuesday_hours",
+                "wednesday_hours",
+                "thursday_hours",
+                "friday_hours",
+                "saturday_hours",
+                "sunday_hours",
+            ]
+            parsed_fields = {
+                "employee_name": {"value": candidate_name, "confidence": 100, "verified": True},
+                "employee_phone": {"value": sender_phone, "confidence": 100, "verified": True},
+                "date": {"value": work_date.strftime("%d-%m-%Y"), "confidence": 100, "verified": True},
+                "work_date": {"value": work_date.isoformat(), "confidence": 100, "verified": True},
+                "week_number": {"value": str(week_number), "confidence": 100, "verified": True},
+                "principal_name": {"value": principal_name, "confidence": 100, "verified": True},
+                "project_name": {"value": project_name, "confidence": 100, "verified": True},
+                "total_hours": {"value": _format_number(hours), "confidence": 100, "verified": True},
+                "remarks": {"value": (data.get("remarks") or "").strip(), "confidence": 100, "verified": True},
+            }
+            for index, key in enumerate(day_keys):
+                parsed_fields[key] = {"value": _format_number(hours) if index == work_date.weekday() else "", "confidence": 100, "verified": True}
+            cursor.execute(
+                """
+                INSERT INTO whatsapp_timesheet_inbox (
+                    sender_name,
+                    sender_phone,
+                    message_text,
+                    media_filename,
+                    media_path,
+                    parse_source,
+                    source_channel,
+                    status,
+                    matched_relation_id,
+                    matched_candidate_name,
+                    employee_name,
+                    principal_name,
+                    project_name,
+                    work_date,
+                    hours,
+                    break_minutes,
+                    selected_principal_id,
+                    selected_project_id,
+                    validated_at,
+                    parsed_fields,
+                    overall_confidence
+                )
+                VALUES (%s, %s, %s, %s, '', 'manual_entry', 'manual_entry', %s, %s, %s, %s, %s, %s, %s, %s, 0, %s, %s, CASE WHEN %s = 'loon_te_berekenen' THEN NOW() ELSE NULL END, %s, 100)
+                RETURNING id;
+                """,
+                (
+                    candidate_name or "Handmatige invoer",
+                    sender_phone or "onbekend",
+                    (data.get("remarks") or "Handmatig ingevoerde uren").strip(),
+                    f"handmatige-uren-{work_date.isoformat()}.manual",
+                    status,
+                    relation_id,
+                    candidate_name,
+                    candidate_name,
+                    principal_name,
+                    project_name,
+                    work_date,
+                    hours,
+                    principal_id,
+                    project_id,
+                    status,
+                    Json(parsed_fields),
+                ),
+            )
+            timesheet_id = cursor.fetchone()[0]
+            if status == "loon_te_berekenen":
+                cursor.execute(
+                    """
+                    INSERT INTO project_time_bookings (
+                        timesheet_inbox_id, relation_id, principal_id, project_id,
+                        payroll_cao_setting_id, work_date, hours, status, updated_at
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, 'loon_te_berekenen', NOW());
+                    """,
+                    (timesheet_id, relation_id, principal_id, project_id, payroll_cao_setting_id, work_date, hours),
+                )
+        conn.commit()
+    log_audit_event(
+        action="Handmatige uren ingevoerd",
+        entity_type="urenbriefje",
+        entity_id=timesheet_id,
+        entity_label=candidate_name or f"Urenbriefje {timesheet_id}",
+        description=f"{_format_number(hours)} uur handmatig ingevoerd voor {work_date:%d-%m-%Y}.",
+        status="Loon berekenen" if status == "loon_te_berekenen" else "Controle",
+        metadata={
+            "bron": "handmatige invoer",
+            "status": status,
+            "relation_id": relation_id,
+            "principal_id": principal_id,
+            "project_id": project_id,
+            "project": project_name,
+            "opdrachtgever": principal_name,
+        },
+    )
+    return timesheet_id
 
 
 def _payroll_period_totals(rows: list[dict]) -> dict:
@@ -2070,6 +2275,31 @@ def archive_payroll_period(period_id: int, archived: bool = True) -> None:
         conn.commit()
 
 
+def delete_payroll_period(period_id: int) -> None:
+    if not period_id:
+        return
+    ensure_dashboard_tables()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE project_time_bookings
+                SET payroll_period_id = NULL,
+                    updated_at = NOW()
+                WHERE payroll_period_id = %s;
+                """,
+                (period_id,),
+            )
+            cursor.execute(
+                """
+                DELETE FROM payroll_periods
+                WHERE id = %s;
+                """,
+                (period_id,),
+            )
+        conn.commit()
+
+
 def update_payroll_period_status(period_id: int, status: str) -> None:
     if not period_id:
         return
@@ -2139,23 +2369,36 @@ def _attach_period_weeks(cursor, periods: list[dict]) -> None:
         )
     cursor.execute(
         """
-        SELECT w.payroll_period_id,
-               w.week_index,
-               COUNT(b.id) AS booking_count,
-               COUNT(DISTINCT b.project_id) AS project_count,
-               COALESCE(SUM(b.hours), 0) AS total_hours
-        FROM payroll_period_weeks w
-        LEFT JOIN project_time_bookings b
-            ON b.work_date BETWEEN w.start_date AND w.end_date
-           AND (b.payroll_period_id = w.payroll_period_id OR b.payroll_period_id IS NULL)
-           AND LOWER(COALESCE(b.status, '')) = 'loon_te_berekenen'
+        SELECT pw.payroll_period_id,
+               pw.week_index,
+               COUNT(wi.id) AS booking_count,
+               COUNT(DISTINCT COALESCE(wi.selected_project_id, b.project_id)) AS project_count,
+               COALESCE(
+                   SUM(
+                       COALESCE(
+                           wi.hours,
+                           b.hours,
+                           CASE
+                               WHEN COALESCE(wi.parsed_fields->'total_hours'->>'value', '') ~ '^[0-9]+([,.][0-9]+)?$'
+                               THEN REPLACE(wi.parsed_fields->'total_hours'->>'value', ',', '.')::numeric
+                               ELSE 0
+                           END
+                       )
+                   ),
+                   0
+               ) AS total_hours
+        FROM payroll_period_weeks pw
         LEFT JOIN whatsapp_timesheet_inbox wi
-            ON wi.id = b.timesheet_inbox_id
-           AND LOWER(COALESCE(wi.status, '')) = 'loon_te_berekenen'
-        WHERE w.payroll_period_id = ANY(%s)
-          AND (b.id IS NULL OR wi.id IS NOT NULL)
-        GROUP BY w.payroll_period_id, w.week_index
-        ORDER BY w.payroll_period_id, w.week_index;
+            ON LOWER(COALESCE(wi.status, '')) = 'loon_te_berekenen'
+           AND wi.deleted_at IS NULL
+           AND wi.archived_at IS NULL
+           AND COALESCE(wi.work_date, wi.received_at::date) BETWEEN pw.start_date AND pw.end_date
+        LEFT JOIN project_time_bookings b
+            ON b.timesheet_inbox_id = wi.id
+           AND LOWER(COALESCE(b.status, '')) = 'loon_te_berekenen'
+        WHERE pw.payroll_period_id = ANY(%s)
+        GROUP BY pw.payroll_period_id, pw.week_index
+        ORDER BY pw.payroll_period_id, pw.week_index;
         """,
         (period_ids,),
     )

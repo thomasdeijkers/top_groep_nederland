@@ -526,6 +526,10 @@ h2 {
     font: inherit;
 }
 
+.table-link--danger {
+    color: #ffad9b;
+}
+
 .period-table td > span {
     display: block;
     margin-top: 3px;
@@ -608,6 +612,38 @@ h2 {
     border: 1px solid rgba(127, 209, 160, 0.18);
     border-radius: 8px;
     background: rgba(9, 20, 24, 0.38);
+}
+
+.relation-payroll-settings {
+    display: grid;
+    gap: 12px;
+    margin: 4px 0;
+    padding: 14px;
+    border: 1px solid rgba(127, 209, 160, 0.18);
+    border-radius: 8px;
+    background: rgba(9, 20, 24, 0.38);
+}
+
+.relation-payroll-settings__head {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.relation-payroll-settings__head h3 {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.relation-payroll-settings__head small {
+    color: #9fb0bd;
+}
+
+.relation-payroll-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
 }
 
 .panel-header--compact {
@@ -2589,6 +2625,10 @@ select option:checked {
     grid-column: span 2;
 }
 
+.form-span-3 {
+    grid-column: 1 / -1;
+}
+
 .danger-button {
     border-color: rgba(237, 125, 102, 0.45);
     color: #ffad9b;
@@ -3902,6 +3942,47 @@ body[data-theme="light"] .theme-toggle strong {
     min-height: 58px;
     padding: 9px 12px;
     border-style: solid;
+}
+
+.timesheet-entry-actions {
+    justify-self: end;
+    display: grid;
+    grid-template-columns: auto minmax(420px, 620px);
+    align-items: stretch;
+    gap: 10px;
+    width: min(100%, 780px);
+}
+
+.timesheet-manual-button {
+    min-height: 58px;
+    white-space: nowrap;
+}
+
+.manual-timesheet-dialog {
+    display: grid;
+    gap: 14px;
+    width: min(960px, calc(100vw - 40px));
+    max-height: calc(100vh - 48px);
+    overflow: auto;
+    padding: 18px;
+    border: 1px solid rgba(127, 209, 160, 0.24);
+    border-radius: 8px;
+    background: #182028;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
+}
+
+.manual-timesheet-form {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.manual-timesheet-form__wide {
+    grid-column: 1 / -1;
+}
+
+.manual-timesheet-form textarea {
+    min-height: 88px;
 }
 
 .timesheet-dropzone--compact .timesheet-dropzone__icon {
@@ -5547,6 +5628,21 @@ body[data-theme="light"] .theme-toggle strong {
     .payroll-settings-form__notes,
     .period-create-form__notes {
         grid-column: auto;
+    }
+
+    .relation-payroll-grid,
+    .manual-timesheet-form,
+    .timesheet-entry-actions {
+        grid-template-columns: 1fr;
+    }
+
+    .timesheet-entry-actions {
+        justify-self: stretch;
+        width: 100%;
+    }
+
+    .timesheet-dropzone--compact {
+        width: 100%;
     }
 
     .period-create-form .ghost-button {

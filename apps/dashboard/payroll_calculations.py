@@ -290,26 +290,31 @@ def build_period_sheet_rows(candidates: list[dict], payroll_rows: list[dict]) ->
     for index, payroll_row in enumerate(payroll_rows, start=1):
         employee_name = payroll_row.get("employee_name") or "-"
         candidate = candidates_by_name.get(_key(employee_name), {})
-        hourly_wage = _decimal(candidate.get("hourly_rate")) or _decimal(payroll_row.get("hourly_wage")) or Decimal("21.50")
-        contract_hours = _decimal(payroll_row.get("standard_week_hours")) or Decimal("40")
+        hourly_wage = (
+            _decimal(payroll_row.get("payroll_hourly_wage"))
+            or _decimal(candidate.get("hourly_rate"))
+            or _decimal(payroll_row.get("hourly_wage"))
+            or Decimal("21.50")
+        )
+        contract_hours = _decimal(payroll_row.get("payroll_cao_hours")) or _decimal(payroll_row.get("standard_week_hours")) or Decimal("40")
         cao_name = payroll_row.get("cao_name") or ("UTA" if index % 3 == 0 else "SAVG" if index % 2 == 0 else "Bouw & Infra")
-        phase = "Fase B" if index % 2 else "Fase A"
+        phase = payroll_row.get("payroll_phase") or ("Fase B" if index % 2 else "Fase A")
         reservation_percent = Decimal("18.5") if cao_name.lower().startswith("bouw") else Decimal("16.0")
         bruto_total = hourly_wage * contract_hours
         staffing_factor = Decimal("1.83") if cao_name.lower().startswith("bouw") else Decimal("1.72")
         rows.append(
             {
                 "employee_name": employee_name,
-                "relation_id": candidate.get("id"),
-                "license_plate": _dummy_license_plate(index),
-                "choice_budget": _format_money(Decimal("1100") + Decimal(index * 62)),
+                "relation_id": payroll_row.get("relation_id") or candidate.get("id"),
+                "license_plate": payroll_row.get("payroll_license_plate") or _dummy_license_plate(index),
+                "choice_budget": payroll_row.get("payroll_choice_budget") or _format_money(Decimal("1100") + Decimal(index * 62)),
                 "phase": phase,
-                "pension_scheme": "StiPP Basis" if phase == "A" else "StiPP Plus",
+                "pension_scheme": payroll_row.get("payroll_pension") or ("StiPP Basis" if phase == "A" else "StiPP Plus"),
                 "contract_hours": _format_number(contract_hours),
                 "cao_name": cao_name,
-                "days_right": "20",
-                "configuration": "B.02.1 Aannemingschaal 2" if cao_name == "SAVG" else "T4.2 F/G A",
-                "function_name": candidate.get("notes") or "Medewerker bouw",
+                "days_right": payroll_row.get("payroll_days_right") or "20",
+                "configuration": payroll_row.get("payroll_scale") or ("B.02.1 Aannemingschaal 2" if cao_name == "SAVG" else "T4.2 F/G A"),
+                "function_name": payroll_row.get("payroll_function") or candidate.get("notes") or "Medewerker bouw",
                 "gross_hourly_wage": _format_money(hourly_wage),
                 "gross_total": _format_money(bruto_total),
                 "reservations": f"{_format_number(reservation_percent)}%",

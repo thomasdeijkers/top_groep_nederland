@@ -542,6 +542,7 @@
                                 </div>
                                 <div class="relation-editor-modal__actions">
                                     {% if selected_relation %}
+                                    <a class="ghost-button" href="/dashboard/timesheets?q={{ selected_relation.name|urlencode }}#timesheet-inbox">Gewerkte uren openen</a>
                                     <form action="/api/relations/{{ selected_relation.id }}/archive" method="post">
                                         <button class="ghost-button danger-button" type="submit">Archiveren</button>
                                     </form>
@@ -613,6 +614,50 @@
                                         <input type="number" step="0.01" name="hourly_rate" value="{{ selected_relation.hourly_rate|default('', true) if selected_relation else '' }}" placeholder="0,00">
                                     </span>
                                 </label>
+                                <section class="relation-payroll-settings form-span-3" data-candidate-field>
+                                    <div class="relation-payroll-settings__head">
+                                        <div>
+                                            <p class="section-label">Verloning</p>
+                                            <h3>Vaste gegevens</h3>
+                                        </div>
+                                        <small>Deze waarden komen terug in tabblad Periode.</small>
+                                    </div>
+                                    <div class="relation-payroll-grid">
+                                        <label>Kenteken <input type="text" name="payroll_license_plate" value="{{ selected_relation.payroll_license_plate|default('', true) if selected_relation else '' }}" placeholder="TGN-001"></label>
+                                        <label>Keuzebudget <input type="text" name="payroll_choice_budget" value="{{ selected_relation.payroll_choice_budget|default('', true) if selected_relation else '' }}" placeholder="€ 1162,00"></label>
+                                        <label>Fase
+                                            {% set relation_payroll_phase = selected_relation.payroll_phase|default('', true) if selected_relation else '' %}
+                                            <select name="payroll_phase">
+                                                <option value="" {% if not relation_payroll_phase %}selected{% endif %}>Geen fase</option>
+                                                {% for option in ['Fase A', 'Fase B', 'Fase C', 'Fase 1-2', 'Fase 3'] %}
+                                                <option value="{{ option }}" {% if relation_payroll_phase == option %}selected{% endif %}>{{ option }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </label>
+                                        <label>Pensioen
+                                            {% set relation_payroll_pension = selected_relation.payroll_pension|default('', true) if selected_relation else '' %}
+                                            <select name="payroll_pension">
+                                                <option value="" {% if not relation_payroll_pension %}selected{% endif %}>Geen pensioen</option>
+                                                {% for option in ['BPF UTA', 'BPF Bouw', 'StiPP Basis', 'StiPP Plus', 'Geen'] %}
+                                                <option value="{{ option }}" {% if relation_payroll_pension == option %}selected{% endif %}>{{ option }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </label>
+                                        <label>Uren CAO <input type="text" name="payroll_cao_hours" value="{{ selected_relation.payroll_cao_hours|default('', true) if selected_relation else '' }}" placeholder="40"></label>
+                                        <label>Recht op dagen <input type="text" name="payroll_days_right" value="{{ selected_relation.payroll_days_right|default('', true) if selected_relation else '' }}" placeholder="20"></label>
+                                        <label>Inregeling
+                                            {% set relation_payroll_scale = selected_relation.payroll_scale|default('', true) if selected_relation else '' %}
+                                            <select name="payroll_scale">
+                                                <option value="" {% if not relation_payroll_scale %}selected{% endif %}>Geen inregeling</option>
+                                                {% for option in ['T4.2 F/G A', 'B.02.1 Aannemingsschaal 2', '4.58 Particulier halfjaar', 'Concept'] %}
+                                                <option value="{{ option }}" {% if relation_payroll_scale == option %}selected{% endif %}>{{ option }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </label>
+                                        <label>Functie <input type="text" name="payroll_function" value="{{ selected_relation.payroll_function|default('', true) if selected_relation else '' }}" placeholder="Medewerker bouw"></label>
+                                        <label>Bruto uurloon <input type="text" name="payroll_hourly_wage" value="{{ selected_relation.payroll_hourly_wage|default('', true) if selected_relation else '' }}" placeholder="€ 18,50"></label>
+                                    </div>
+                                </section>
                                 <label data-principal-field>KvK <input type="text" name="kvk_number" value="{{ selected_relation.kvk_number|default('', true) if selected_relation else '' }}"></label>
                                 <label data-principal-field>BTW <input type="text" name="vat_number" value="{{ selected_relation.vat_number|default('', true) if selected_relation else '' }}"></label>
                                 <label class="form-span-2">Notities <textarea name="notes">{{ selected_relation.notes|default('', true) if selected_relation else '' }}</textarea></label>
@@ -999,6 +1044,9 @@
                                                 <form action="/api/periods/{{ period.id }}/archive" method="post">
                                                     <button class="table-link table-link--button" type="submit">Archiveer</button>
                                                 </form>
+                                                <form action="/api/periods/{{ period.id }}/delete" method="post" onsubmit="return confirm('Weet je zeker dat je deze loonperiode definitief wilt verwijderen? Urenboekingen blijven bestaan, maar deze periode verdwijnt uit het overzicht.');">
+                                                    <button class="table-link table-link--button table-link--danger" type="submit">Verwijder definitief</button>
+                                                </form>
                                             </div>
                                         </td>
                                     </tr>
@@ -1061,6 +1109,9 @@
                                                 <a class="table-link" href="/dashboard/periods?period={{ period.id }}#periode-verloning">Open verloning</a>
                                                 <form action="/api/periods/{{ period.id }}/restore" method="post">
                                                     <button class="table-link table-link--button" type="submit">Terugzetten</button>
+                                                </form>
+                                                <form action="/api/periods/{{ period.id }}/delete" method="post" onsubmit="return confirm('Weet je zeker dat je deze gearchiveerde loonperiode definitief wilt verwijderen? Urenboekingen blijven bestaan, maar deze periode verdwijnt uit het overzicht.');">
+                                                    <button class="table-link table-link--button table-link--danger" type="submit">Verwijder definitief</button>
                                                 </form>
                                             </div>
                                         </td>
@@ -1471,19 +1522,78 @@
                                 </nav>
                             </div>
                             {% if active_timesheet_tab == 'overview' %}
-                            <form class="timesheet-dropzone timesheet-dropzone--compact" action="/api/whatsapp/timesheet-upload" method="post" enctype="multipart/form-data" data-timesheet-dropzone>
-                                <input type="hidden" name="sender_name" value="" data-timesheet-upload-sender-name>
-                                <input type="hidden" name="sender_phone" value="onbekend" data-timesheet-upload-sender-phone>
-                                <input type="file" name="file" accept="image/*,.pdf" data-timesheet-drop-input hidden>
-                                <span class="timesheet-dropzone__icon">
-                                    <img src="https://api.iconify.design/lucide:file-up.svg" alt="">
-                                </span>
-                                <strong>Sleep urenbriefje hierheen</strong>
-                                <small>Afbeelding of PDF wordt direct een taak.</small>
-                                <button class="ghost-button" type="button" data-timesheet-drop-button>Bestand kiezen</button>
-                            </form>
+                            <div class="timesheet-entry-actions">
+                                <button class="ghost-button timesheet-manual-button" type="button" data-manual-timesheet-open>Handmatig invoeren</button>
+                                <form class="timesheet-dropzone timesheet-dropzone--compact" action="/api/whatsapp/timesheet-upload" method="post" enctype="multipart/form-data" data-timesheet-dropzone>
+                                    <input type="hidden" name="sender_name" value="" data-timesheet-upload-sender-name>
+                                    <input type="hidden" name="sender_phone" value="onbekend" data-timesheet-upload-sender-phone>
+                                    <input type="file" name="file" accept="image/*,.pdf" data-timesheet-drop-input hidden>
+                                    <span class="timesheet-dropzone__icon">
+                                        <img src="https://api.iconify.design/lucide:file-up.svg" alt="">
+                                    </span>
+                                    <strong>Sleep urenbriefje hierheen</strong>
+                                    <small>Afbeelding of PDF wordt direct een taak.</small>
+                                    <button class="ghost-button" type="button" data-timesheet-drop-button>Bestand kiezen</button>
+                                </form>
+                            </div>
                             {% endif %}
                         </div>
+
+                        {% if active_timesheet_tab == 'overview' %}
+                        <div class="manual-timesheet-modal modal-backdrop" data-manual-timesheet-modal hidden>
+                            <form class="manual-timesheet-dialog" action="/api/timesheets/manual" method="post" role="dialog" aria-modal="true" aria-labelledby="manual-timesheet-title">
+                                <div class="panel-header panel-header--compact">
+                                    <div>
+                                        <p class="section-label">Urenverwerking</p>
+                                        <h3 id="manual-timesheet-title">Handmatige uren invoeren</h3>
+                                    </div>
+                                    <button class="modal-close" type="button" data-manual-timesheet-close aria-label="Sluiten">x</button>
+                                </div>
+                                <div class="manual-timesheet-form">
+                                    <label>Kandidaat
+                                        <select name="relation_id">
+                                            <option value="">Geen kandidaat gekoppeld</option>
+                                            {% for relation in timesheet_candidate_options %}
+                                            <option value="{{ relation.id }}">{{ relation.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </label>
+                                    <label>Naam werknemer <input type="text" name="employee_name" placeholder="Naam op urenbriefje"></label>
+                                    <label>Telefoon <input type="text" name="sender_phone" placeholder="+31 ..."></label>
+                                    <label>Werkdatum <input type="date" name="work_date" required></label>
+                                    <label>Uren <input type="number" step="0.25" min="0" name="hours" placeholder="8" required></label>
+                                    <label>Opdrachtgever
+                                        <select name="principal_id">
+                                            <option value="">Geen opdrachtgever gekoppeld</option>
+                                            {% for principal in principals %}
+                                            <option value="{{ principal.id }}">{{ principal.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </label>
+                                    <label>Project
+                                        <select name="project_id">
+                                            <option value="">Geen project gekoppeld</option>
+                                            {% for project in project_options %}
+                                            <option value="{{ project.id }}">{{ project.title }}{% if project.reference_number %} · {{ project.reference_number }}{% endif %}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </label>
+                                    <label>Status
+                                        <select name="status">
+                                            <option value="controle" selected>Te controleren</option>
+                                            <option value="goed_te_keuren">Valideren</option>
+                                            <option value="loon_te_berekenen">Loon berekenen</option>
+                                        </select>
+                                    </label>
+                                    <label class="manual-timesheet-form__wide">Opmerking <textarea name="remarks" placeholder="Bijvoorbeeld project, bijzonderheden of correctie"></textarea></label>
+                                </div>
+                                <div class="modal-actions">
+                                    <button class="ghost-button" type="button" data-manual-timesheet-close>Annuleren</button>
+                                    <button class="ghost-button ghost-button--primary" type="submit">Urenregel aanmaken</button>
+                                </div>
+                            </form>
+                        </div>
+                        {% endif %}
 
                         <div class="processing-status" data-processing-status hidden>
                             <div>
@@ -2098,6 +2208,6 @@
                 </section>
             </main>
         </div>
-        <script src="/dashboard/static/dashboard.js?v=20260608-09"></script>
+        <script src="/dashboard/static/dashboard.js?v=20260608-10"></script>
     </body>
 </html>

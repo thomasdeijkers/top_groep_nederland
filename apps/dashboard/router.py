@@ -20,9 +20,11 @@ from apps.dashboard.payroll_excel import build_payroll_output_workbook
 from apps.dashboard.records import (
     archive_payroll_period,
     create_cao_setting,
+    create_manual_timesheet,
     create_project,
     create_payroll_period,
     create_payroll_period_batch,
+    delete_payroll_period,
     get_cao_setting,
     get_payroll_period,
     get_project,
@@ -143,6 +145,15 @@ def _audit_relation_fields(data: dict) -> str:
         "country": "land",
         "kvk_number": "KvK",
         "vat_number": "BTW",
+        "payroll_license_plate": "kenteken",
+        "payroll_choice_budget": "keuzebudget",
+        "payroll_phase": "fase",
+        "payroll_pension": "pensioen",
+        "payroll_cao_hours": "uren CAO",
+        "payroll_days_right": "recht op dagen",
+        "payroll_scale": "inregeling",
+        "payroll_function": "functie",
+        "payroll_hourly_wage": "bruto uurloon",
         "notes": "notitie",
     }
     changed = [label for key, label in labels.items() if str(data.get(key) or "").strip()]
@@ -358,10 +369,15 @@ def _dashboard_context(
     selected_relation_audit_events = []
     if selected_relation:
         relation_audit_types = {"relatie", "candidate", "principal", selected_relation.get("relation_type") or ""}
+        relation_id_text = str(selected_relation.get("id"))
         selected_relation_audit_events = [
             item
             for item in list_audit_events(200)
-            if item.get("entity_id") == selected_relation.get("id") and item.get("entity_type") in relation_audit_types
+            if (
+                item.get("entity_id") == selected_relation.get("id")
+                and item.get("entity_type") in relation_audit_types
+            )
+            or str((item.get("metadata") or {}).get("relation_id") or "") == relation_id_text
         ][:40]
     selected_vacancy = get_vacancy(edit_id) if data_page == "vacancies" and edit_id else None
     relation_tab = relation_tab if relation_tab in {"candidates", "principals"} else "candidates"
@@ -648,6 +664,25 @@ def delete_whatsapp_message(timesheet_id: int):
     return RedirectResponse("/dashboard/timesheets", status_code=303)
 
 
+@router.post("/api/timesheets/manual")
+def create_manual_timesheet_entry(
+    relation_id: str = Form(""),
+    employee_name: str = Form(""),
+    sender_phone: str = Form(""),
+    work_date: str = Form(""),
+    hours: str = Form(""),
+    principal_id: str = Form(""),
+    principal_name: str = Form(""),
+    project_id: str = Form(""),
+    project_name: str = Form(""),
+    status: str = Form("controle"),
+    remarks: str = Form(""),
+):
+    timesheet_id = create_manual_timesheet(locals())
+    stage = _timesheet_stage(status)
+    return RedirectResponse(f"/dashboard/timesheets?stage={stage}&timesheet={timesheet_id}", status_code=303)
+
+
 @router.get("/dashboard/server", response_class=HTMLResponse)
 def server_page(request: Request):
     return _render_dashboard(request, "server")
@@ -842,6 +877,13 @@ def restore_period(period_id: int):
     return RedirectResponse("/dashboard/periods#periodes", status_code=303)
 
 
+@router.post("/api/periods/{period_id}/delete")
+def delete_period(period_id: int):
+    delete_payroll_period(period_id)
+    _audit("Periode definitief verwijderd", "periode", period_id, f"Periode {period_id}", "Loonperiode definitief verwijderd. Urenboekingen zijn niet verwijderd.", "Periodes")
+    return RedirectResponse("/dashboard/periods#periodes", status_code=303)
+
+
 async def _relation_photo_from_upload(photo: UploadFile | None):
     if not photo or not photo.filename:
         return None
@@ -870,6 +912,15 @@ async def save_relation(
     owner: str = Form(""),
     availability: str = Form(""),
     hourly_rate: str = Form(""),
+    payroll_license_plate: str = Form(""),
+    payroll_choice_budget: str = Form(""),
+    payroll_phase: str = Form(""),
+    payroll_pension: str = Form(""),
+    payroll_cao_hours: str = Form(""),
+    payroll_days_right: str = Form(""),
+    payroll_scale: str = Form(""),
+    payroll_function: str = Form(""),
+    payroll_hourly_wage: str = Form(""),
     kvk_number: str = Form(""),
     vat_number: str = Form(""),
     notes: str = Form(""),
@@ -905,6 +956,15 @@ async def edit_relation(
     owner: str = Form(""),
     availability: str = Form(""),
     hourly_rate: str = Form(""),
+    payroll_license_plate: str = Form(""),
+    payroll_choice_budget: str = Form(""),
+    payroll_phase: str = Form(""),
+    payroll_pension: str = Form(""),
+    payroll_cao_hours: str = Form(""),
+    payroll_days_right: str = Form(""),
+    payroll_scale: str = Form(""),
+    payroll_function: str = Form(""),
+    payroll_hourly_wage: str = Form(""),
     kvk_number: str = Form(""),
     vat_number: str = Form(""),
     notes: str = Form(""),
