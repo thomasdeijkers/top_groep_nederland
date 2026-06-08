@@ -1218,6 +1218,10 @@ def list_payroll_periods(limit: int = 25, archived: bool = False) -> list[dict]:
                                 OR (b.payroll_period_id IS NULL AND b.work_date BETWEEN p2.start_date AND p2.end_date)
                             )
                            AND LOWER(COALESCE(b.status, '')) = 'loon_te_berekenen'
+                        LEFT JOIN whatsapp_timesheet_inbox wi
+                            ON wi.id = b.timesheet_inbox_id
+                           AND LOWER(COALESCE(wi.status, '')) = 'loon_te_berekenen'
+                        WHERE wi.id IS NOT NULL
                         GROUP BY p2.id
                     ) b ON b.payroll_period_id = p.id
                     WHERE (
@@ -1351,7 +1355,11 @@ def get_payroll_period(period_id: int | None) -> dict | None:
                                 OR (b.payroll_period_id IS NULL AND b.work_date BETWEEN p2.start_date AND p2.end_date)
                             )
                            AND LOWER(COALESCE(b.status, '')) = 'loon_te_berekenen'
+                        LEFT JOIN whatsapp_timesheet_inbox wi
+                            ON wi.id = b.timesheet_inbox_id
+                           AND LOWER(COALESCE(wi.status, '')) = 'loon_te_berekenen'
                         WHERE p2.id = %s
+                          AND wi.id IS NOT NULL
                         GROUP BY p2.id
                     ) b ON b.payroll_period_id = p.id
                     WHERE p.id = %s;
@@ -1462,6 +1470,7 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                         OR (b.payroll_period_id IS NULL AND b.work_date BETWEEN %s AND %s)
                     )
                       AND LOWER(COALESCE(b.status, '')) = 'loon_te_berekenen'
+                      AND LOWER(COALESCE(w.status, '')) = 'loon_te_berekenen'
                     ORDER BY employee_name, b.work_date, b.id;
                     """,
                     (period_id, start_date, end_date),
@@ -2130,7 +2139,11 @@ def _attach_period_weeks(cursor, periods: list[dict]) -> None:
             ON b.work_date BETWEEN w.start_date AND w.end_date
            AND (b.payroll_period_id = w.payroll_period_id OR b.payroll_period_id IS NULL)
            AND LOWER(COALESCE(b.status, '')) = 'loon_te_berekenen'
+        LEFT JOIN whatsapp_timesheet_inbox wi
+            ON wi.id = b.timesheet_inbox_id
+           AND LOWER(COALESCE(wi.status, '')) = 'loon_te_berekenen'
         WHERE w.payroll_period_id = ANY(%s)
+          AND (b.id IS NULL OR wi.id IS NOT NULL)
         GROUP BY w.payroll_period_id, w.week_index
         ORDER BY w.payroll_period_id, w.week_index;
         """,

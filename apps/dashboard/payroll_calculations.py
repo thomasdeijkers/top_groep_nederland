@@ -130,7 +130,7 @@ def default_calculation_rules() -> list[dict]:
 
 
 def build_workbook_tabs(period_weeks: list[dict], candidates: list[dict], payroll_rows: list[dict], total_rows: list[dict]) -> list[dict]:
-    workbook_candidates = candidates[:15]
+    workbook_candidates = candidates[:15] if payroll_rows else []
     week_tabs = []
     for week in period_weeks:
         label = f"WK{week.get('week_number') or week.get('week_index')}"
@@ -156,22 +156,26 @@ def build_workbook_tabs(period_weeks: list[dict], candidates: list[dict], payrol
 
 def build_week_sheet_rows(sheet_label: str, candidates: list[dict], payroll_rows: list[dict], week: dict) -> list[dict]:
     rows = []
+    if not payroll_rows:
+        return rows
     week_index = int(week.get("week_index") or 1)
-    for index, candidate in enumerate(candidates, start=1):
-        payroll_row = next((row for row in payroll_rows if _key(row.get("employee_name")) == _key(candidate.get("name"))), {})
+    candidates_by_name = {_key(candidate.get("name")): candidate for candidate in candidates}
+    for index, payroll_row in enumerate(payroll_rows, start=1):
+        employee_name = payroll_row.get("employee_name") or "-"
+        candidate = candidates_by_name.get(_key(employee_name), {})
         weekly_hours = payroll_row.get("week_hours", [])
         worked_hours = _decimal(weekly_hours[week_index - 1] if len(weekly_hours) >= week_index else "")
         if not worked_hours:
-            worked_hours = Decimal("32") + Decimal((index + week_index) % 4)
+            continue
         worked_days = Decimal("5") if worked_hours >= 32 else Decimal("4")
         single_trip_km = Decimal(10 + ((index + week_index) % 18))
         total_km = single_trip_km * worked_days * 2
         net_advance = Decimal("0") if index % 4 else Decimal("150")
         rows.append(
             {
-                "employee_name": candidate.get("name") or "-",
+                "employee_name": employee_name,
                 "relation_id": candidate.get("id"),
-                "contract_hours": "40",
+                "contract_hours": payroll_row.get("standard_week_hours") or "40",
                 "worked_days": _format_number(worked_days),
                 "worked_hours": _format_number(worked_hours),
                 "vacation_hours": "0",
@@ -186,12 +190,12 @@ def build_week_sheet_rows(sheet_label: str, candidates: list[dict], payroll_rows
                 "fuel_amount": _format_money(Decimal("0")),
                 "extra_reimbursement": _format_money(Decimal("0")),
                 "net_advance": _format_money(net_advance),
-                "remarks": f"Dummyregel {sheet_label}",
-                "project_info": "Voorbeeldproject",
+                "remarks": "",
+                "project_info": payroll_row.get("projects") or "",
                 "single_trip_km": _format_number(single_trip_km),
-                "hours_check": "dummy",
-                "km_check": "dummy",
-                "source": "echte kandidaat + dummy weekdata",
+                "hours_check": "urenverwerking",
+                "km_check": "urenverwerking",
+                "source": "urenverwerking",
             }
         )
     return rows
@@ -274,16 +278,20 @@ def summarize_workbook_tabs(tabs: list[dict]) -> dict:
 
 
 def build_period_sheet_rows(candidates: list[dict], payroll_rows: list[dict]) -> list[dict]:
+    if not payroll_rows:
+        return []
     payroll_by_name = {
         _key(row.get("employee_name")): row
         for row in payroll_rows
         if row.get("employee_name")
     }
+    candidates_by_name = {_key(candidate.get("name")): candidate for candidate in candidates}
     rows = []
-    for index, candidate in enumerate(candidates, start=1):
-        payroll_row = payroll_by_name.get(_key(candidate.get("name")), {})
+    for index, payroll_row in enumerate(payroll_rows, start=1):
+        employee_name = payroll_row.get("employee_name") or "-"
+        candidate = candidates_by_name.get(_key(employee_name), {})
         hourly_wage = _decimal(candidate.get("hourly_rate")) or _decimal(payroll_row.get("hourly_wage")) or Decimal("21.50")
-        contract_hours = Decimal("40") if index % 3 else Decimal("32")
+        contract_hours = _decimal(payroll_row.get("standard_week_hours")) or Decimal("40")
         cao_name = payroll_row.get("cao_name") or ("UTA" if index % 3 == 0 else "SAVG" if index % 2 == 0 else "Bouw & Infra")
         phase = "Fase B" if index % 2 else "Fase A"
         reservation_percent = Decimal("18.5") if cao_name.lower().startswith("bouw") else Decimal("16.0")
@@ -291,7 +299,7 @@ def build_period_sheet_rows(candidates: list[dict], payroll_rows: list[dict]) ->
         staffing_factor = Decimal("1.83") if cao_name.lower().startswith("bouw") else Decimal("1.72")
         rows.append(
             {
-                "employee_name": candidate.get("name") or "-",
+                "employee_name": employee_name,
                 "relation_id": candidate.get("id"),
                 "license_plate": _dummy_license_plate(index),
                 "choice_budget": _format_money(Decimal("1100") + Decimal(index * 62)),
@@ -322,8 +330,8 @@ def build_period_sheet_rows(candidates: list[dict], payroll_rows: list[dict]) ->
                 "net_period_basis": _format_money(bruto_total * Decimal("0.62")),
                 "period_basis": "4 weken",
                 "reservation_basis": f"{cao_name} concept",
-                "source": "echte kandidaat + dummy looninstellingen",
-                "status": "dummy",
+                "source": "urenverwerking",
+                "status": "concept",
                 "excel_control": "zichtbaar gemaakt",
             }
         )
