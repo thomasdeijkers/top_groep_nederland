@@ -166,6 +166,7 @@ def build_week_sheet_rows(sheet_label: str, candidates: list[dict], payroll_rows
         rows.append(
             {
                 "employee_name": candidate.get("name") or "-",
+                "relation_id": candidate.get("id"),
                 "contract_hours": "40",
                 "worked_days": _format_number(worked_days),
                 "worked_hours": _format_number(worked_hours),
@@ -211,6 +212,7 @@ def build_period_sheet_rows(candidates: list[dict], payroll_rows: list[dict]) ->
         rows.append(
             {
                 "employee_name": candidate.get("name") or "-",
+                "relation_id": candidate.get("id"),
                 "license_plate": _dummy_license_plate(index),
                 "choice_budget": "Ja" if index % 2 else "Nee",
                 "phase": phase,
@@ -272,6 +274,7 @@ def build_payslip_sheet_rows(period_rows: list[dict], total_rows: list[dict]) ->
         rows.append(
             {
                 "employee_name": period_row.get("employee_name"),
+                "relation_id": period_row.get("relation_id"),
                 "cao_name": period_row.get("cao_name"),
                 "total_worked_days": _format_number(worked_days),
                 "total_worked_hours": _format_number(worked_hours),

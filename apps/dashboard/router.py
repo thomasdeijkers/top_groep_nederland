@@ -47,6 +47,7 @@ from apps.dashboard.records import (
     list_vacancy_statuses,
     list_whatsapp_timesheets,
     log_audit_event,
+    save_payroll_workbook_cell,
     search_candidate_matches,
     update_cao_setting,
 )
@@ -782,6 +783,14 @@ def export_payroll_period_excel(period_id: int):
         filename=f"{period.get('name', f'Periode {period_id}')}-verloning.xlsx",
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
+
+
+@router.post("/api/periods/{period_id}/workbook-cell")
+async def save_payroll_period_workbook_cell(period_id: int, request: Request):
+    payload = await request.json()
+    result = save_payroll_workbook_cell(period_id, payload)
+    status_code = 200 if result.get("ok") else 400
+    return JSONResponse(result, status_code=status_code)
 
 
 @router.post("/api/periods/{period_id}/archive")

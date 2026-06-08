@@ -148,7 +148,94 @@
                 });
             });
         });
+
+        workbook.querySelectorAll("[data-workbook-table]").forEach((table) => {
+            const tbody = table.tBodies[0];
+            table.querySelectorAll("[data-workbook-sort-column]").forEach((button) => {
+                button.addEventListener("click", () => {
+                    if (!tbody) {
+                        return;
+                    }
+                    const column = Number(button.dataset.workbookSortColumn);
+                    const direction = button.dataset.sortDirection === "asc" ? "desc" : "asc";
+                    table.querySelectorAll("[data-workbook-sort-column]").forEach((item) => {
+                        item.dataset.sortDirection = "";
+                    });
+                    button.dataset.sortDirection = direction;
+                    const rows = Array.from(tbody.rows);
+                    rows.sort((a, b) => {
+                        const aValue = workbookCellSortValue(a.cells[column]);
+                        const bValue = workbookCellSortValue(b.cells[column]);
+                        const compare = aValue.localeCompare(bValue, "nl", { numeric: true, sensitivity: "base" });
+                        return direction === "asc" ? compare : -compare;
+                    });
+                    rows.forEach((row) => tbody.appendChild(row));
+                });
+            });
+        });
+
+        workbook.querySelectorAll("[data-payroll-cell]").forEach((input) => {
+            let saveTimer = null;
+            const save = async () => {
+                const value = input.value;
+                const originalValue = input.dataset.originalValue || "";
+                if (value === originalValue && !input.dataset.dirtyOnce) {
+                    return;
+                }
+                input.dataset.dirtyOnce = "1";
+                input.classList.add("payroll-cell-input--saving");
+                try {
+                    const response = await fetch(input.dataset.saveUrl, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            tab_label: input.dataset.tabLabel,
+                            row_key: input.dataset.rowKey,
+                            employee_name: input.dataset.employeeName,
+                            relation_id: input.dataset.relationId,
+                            column_key: input.dataset.columnKey,
+                            column_label: input.dataset.columnLabel,
+                            original_value: originalValue,
+                            previous_value: input.dataset.previousValue || originalValue,
+                            value,
+                        }),
+                    });
+                    if (!response.ok) {
+                        throw new Error("Opslaan mislukt");
+                    }
+                    const result = await response.json();
+                    input.dataset.previousValue = result.previous_value || "";
+                    input.dataset.originalValue = result.value || value;
+                    input.classList.remove("payroll-cell-input--error");
+                    const meta = input.parentElement?.querySelector("[data-cell-meta]");
+                    if (meta) {
+                        meta.textContent = `Vorig: ${result.previous_value || "-"} · Mutatie: ${result.updated_at || "-"}`;
+                    }
+                } catch (error) {
+                    input.classList.add("payroll-cell-input--error");
+                } finally {
+                    input.classList.remove("payroll-cell-input--saving");
+                }
+            };
+            input.addEventListener("input", () => {
+                input.classList.add("payroll-cell-input--dirty");
+                window.clearTimeout(saveTimer);
+                saveTimer = window.setTimeout(save, 650);
+            });
+            input.addEventListener("blur", () => {
+                window.clearTimeout(saveTimer);
+                save();
+            });
+        });
     });
+
+    function workbookCellSortValue(cell) {
+        const input = cell?.querySelector?.("[data-payroll-cell]");
+        if (input) {
+            return input.value || "";
+        }
+        return cell?.textContent?.trim() || "";
+    }
 
     document.querySelectorAll("[data-clear-persist]").forEach((clearLink) => {
         clearLink.addEventListener("click", () => {

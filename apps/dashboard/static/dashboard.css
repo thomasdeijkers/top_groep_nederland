@@ -719,7 +719,7 @@ h2 {
 }
 
 .payroll-excel-table table {
-    min-width: 2200px;
+    min-width: 2600px;
     border-collapse: collapse;
 }
 
@@ -739,6 +739,7 @@ h2 {
     border: 1px solid rgba(255, 255, 255, 0.08);
     background: rgba(255, 255, 255, 0.02);
     white-space: nowrap;
+    vertical-align: top;
 }
 
 .payroll-excel-table tr:nth-child(even) td {
@@ -754,6 +755,75 @@ h2 {
     margin-top: 3px;
     color: #7a4f00;
     font-size: 0.62rem;
+}
+
+.page-periods .dashboard-shell {
+    width: 100%;
+    max-width: none;
+    padding-right: 12px;
+}
+
+.page-periods .content-grid,
+.page-periods .panel--full {
+    max-width: none;
+}
+
+.payroll-cell-input {
+    width: 100%;
+    min-width: 92px;
+    padding: 5px 6px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.04);
+    color: #f5fbff;
+    font: inherit;
+    font-size: 0.78rem;
+}
+
+.payroll-cell-input:focus {
+    border-color: rgba(127, 209, 160, 0.7);
+    outline: none;
+    background: rgba(127, 209, 160, 0.08);
+}
+
+.payroll-cell-input--saving {
+    border-color: rgba(251, 191, 36, 0.85);
+}
+
+.payroll-cell-input--error {
+    border-color: rgba(248, 113, 113, 0.95);
+}
+
+.payroll-cell-meta {
+    display: block;
+    margin-top: 3px;
+    color: #91a4b1;
+    font-size: 0.64rem;
+    line-height: 1.2;
+}
+
+.payroll-relation-link {
+    display: inline-block;
+    color: #9ee6b6;
+    font-weight: 900;
+    text-decoration: none;
+}
+
+.payroll-relation-link:hover {
+    text-decoration: underline;
+}
+
+.payroll-sort-header {
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 900;
+    text-align: left;
+    text-transform: uppercase;
 }
 
 .period-section-heading {

@@ -18,7 +18,7 @@
         </title>
         <link rel="icon" href="/dashboard/static/favicon.ico" sizes="any">
         <link rel="shortcut icon" href="/dashboard/static/favicon.ico">
-        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260608-02">
+        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260608-03">
     </head>
     <body class="page-{{ active_page }}">
         {% macro confidence_light(field) -%}
@@ -1097,7 +1097,7 @@
                             {% endfor %}
                         </div>
 
-                        <div class="payroll-workbook" data-payroll-workbook>
+                        <div class="payroll-workbook" data-payroll-workbook data-period-id="{{ selected_payroll_period.id }}">
                             <div class="payroll-workbook-tabs" role="tablist" aria-label="Verloning werkmap">
                                 {% for tab in selected_payroll_period.workbook_tabs %}
                                 <button class="payroll-workbook-tab {% if loop.first %}payroll-workbook-tab--active{% endif %}" type="button" role="tab" data-payroll-tab="{{ tab.label }}" aria-selected="{{ 'true' if loop.first else 'false' }}">
@@ -1116,12 +1116,13 @@
                                     <span class="status-tag">Alle kolommen zichtbaar</span>
                                 </div>
                                 <div class="table-wrap period-payroll-table payroll-excel-table">
-                                    <table>
+                                    <table data-workbook-table>
                                         <thead>
                                             <tr>
                                                 {% for column in tab.columns %}
+                                                {% set column_index = loop.index0 %}
                                                 <th class="{% if column.hidden_in_excel %}excel-hidden-column{% endif %}">
-                                                    {{ column.label }}
+                                                    <button class="sort-header payroll-sort-header" type="button" data-workbook-sort-column="{{ column_index }}">{{ column.label }}</button>
                                                     {% if column.hidden_in_excel %}<span>verborgen in Excel</span>{% endif %}
                                                 </th>
                                                 {% endfor %}
@@ -1131,8 +1132,21 @@
                                             {% for row in tab.rows %}
                                             <tr>
                                                 {% for column in tab.columns %}
-                                                <td class="{% if column.hidden_in_excel %}excel-hidden-column{% endif %}">
-                                                    {% if loop.first %}<strong>{{ row[column.key] }}</strong>{% else %}{{ row[column.key] }}{% endif %}
+                                                {% set cell_mutation = row._mutations[column.key] if row._mutations is defined and column.key in row._mutations else none %}
+                                                {% set cell_value = row[column.key] %}
+                                                <td class="{% if column.hidden_in_excel %}excel-hidden-column{% endif %}" data-sort-value="{{ cell_value }}">
+                                                    {% if column.key == 'employee_name' and row.relation_id %}
+                                                        <a class="payroll-relation-link" href="/dashboard/relations?tab=candidates&edit={{ row.relation_id }}#relatie-formulier">{{ cell_value }}</a>
+                                                    {% else %}
+                                                        <input class="payroll-cell-input" value="{{ cell_value }}" data-payroll-cell data-save-url="/api/periods/{{ selected_payroll_period.id }}/workbook-cell" data-tab-label="{{ tab.label }}" data-row-key="{{ row._row_key }}" data-employee-name="{{ row.employee_name }}" data-relation-id="{{ row.relation_id or '' }}" data-column-key="{{ column.key }}" data-column-label="{{ column.label }}" data-original-value="{{ cell_value }}" data-previous-value="{{ cell_mutation.previous_value if cell_mutation else cell_value }}" aria-label="{{ column.label }} {{ row.employee_name }}">
+                                                    {% endif %}
+                                                    <small class="payroll-cell-meta" data-cell-meta>
+                                                        {% if cell_mutation %}
+                                                            Vorig: {{ cell_mutation.previous_value or '-' }} · Mutatie: {{ cell_mutation.updated_at }}
+                                                        {% else %}
+                                                            Vorig: {{ cell_value }} · Mutatie: -
+                                                        {% endif %}
+                                                    </small>
                                                 </td>
                                                 {% endfor %}
                                             </tr>
@@ -2079,6 +2093,6 @@
                 </section>
             </main>
         </div>
-        <script src="/dashboard/static/dashboard.js?v=20260608-02"></script>
+        <script src="/dashboard/static/dashboard.js?v=20260608-03"></script>
     </body>
 </html>

@@ -1383,6 +1383,7 @@ def get_payroll_period(period_id: int | None) -> dict | None:
             period["payroll_rows"],
             period["period_calculation_rows"],
         )
+        apply_payroll_workbook_overrides(period_id, period["workbook_tabs"])
         period["payroll_import_logs"] = list_payroll_import_logs(period_id)
         period["payroll_calculation_rules"] = list_payroll_calculation_rules()
         period["payroll_validation_results"] = list_payroll_validation_results(period_id)
@@ -1613,6 +1614,135 @@ def list_payroll_sheet_candidates(limit: int = 250) -> list[dict]:
                 ]
     except Exception:
         return []
+
+
+def list_payroll_workbook_overrides(period_id: int) -> dict[tuple[str, str, str], dict]:
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT tab_label,
+                           row_key,
+                           column_key,
+                           original_value,
+                           previous_value,
+                           value,
+                           updated_at
+                    FROM payroll_workbook_cell_overrides
+                    WHERE payroll_period_id = %s;
+                    """,
+                    (period_id,),
+                )
+                return {
+                    (row[0], row[1], row[2]): {
+                        "original_value": row[3] or "",
+                        "previous_value": row[4] or "",
+                        "value": row[5] or "",
+                        "updated_at": row[6].strftime("%d-%m-%Y %H:%M") if row[6] else "",
+                    }
+                    for row in cursor.fetchall()
+                }
+    except Exception:
+        return {}
+
+
+def apply_payroll_workbook_overrides(period_id: int, tabs: list[dict]) -> None:
+    overrides = list_payroll_workbook_overrides(period_id)
+    for tab in tabs:
+        for row_index, row in enumerate(tab.get("rows", []), start=1):
+            row_key = _payroll_workbook_row_key(row, row_index)
+            row["_row_key"] = row_key
+            row["_mutations"] = {}
+            for column in tab.get("columns", []):
+                key = (tab.get("label"), row_key, column.get("key"))
+                override = overrides.get(key)
+                if override:
+                    row[column["key"]] = override["value"]
+                    row["_mutations"][column["key"]] = override
+
+
+def save_payroll_workbook_cell(period_id: int, payload: dict) -> dict:
+    ensure_dashboard_tables()
+    tab_label = str(payload.get("tab_label") or "").strip()
+    row_key = str(payload.get("row_key") or "").strip()
+    employee_name = str(payload.get("employee_name") or "").strip()
+    relation_id = _int_or_none(payload.get("relation_id"))
+    column_key = str(payload.get("column_key") or "").strip()
+    column_label = str(payload.get("column_label") or column_key).strip()
+    original_value = str(payload.get("original_value") or "").strip()
+    previous_value = str(payload.get("previous_value") or original_value).strip()
+    value = str(payload.get("value") or "").strip()
+    if not tab_label or not row_key or not column_key:
+        return {"ok": False, "error": "Tabblad, rij of kolom ontbreekt."}
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO payroll_workbook_cell_overrides (
+                    payroll_period_id, tab_label, row_key, employee_name, relation_id,
+                    column_key, column_label, original_value, previous_value, value, reviewed_by
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Admin')
+                ON CONFLICT (payroll_period_id, tab_label, row_key, column_key)
+                DO UPDATE SET
+                    previous_value = payroll_workbook_cell_overrides.value,
+                    value = EXCLUDED.value,
+                    employee_name = EXCLUDED.employee_name,
+                    relation_id = EXCLUDED.relation_id,
+                    column_label = EXCLUDED.column_label,
+                    reviewed_by = 'Admin',
+                    updated_at = NOW()
+                RETURNING previous_value, value, updated_at;
+                """,
+                (
+                    period_id,
+                    tab_label,
+                    row_key,
+                    employee_name,
+                    relation_id,
+                    column_key,
+                    column_label,
+                    original_value,
+                    previous_value,
+                    value,
+                ),
+            )
+            row = cursor.fetchone()
+        conn.commit()
+    log_audit_event(
+        action="Payroll cel aangepast",
+        entity_type="payroll_period",
+        entity_id=period_id,
+        entity_label=f"{tab_label} - {employee_name or row_key}",
+        description=f"{column_label}: '{row[0] or ''}' gewijzigd naar '{row[1] or ''}'.",
+        status="mutatie",
+        metadata={
+            "tab_label": tab_label,
+            "row_key": row_key,
+            "employee_name": employee_name,
+            "relation_id": relation_id,
+            "column_key": column_key,
+            "column_label": column_label,
+            "previous_value": row[0] or "",
+            "value": row[1] or "",
+        },
+    )
+    return {
+        "ok": True,
+        "previous_value": row[0] or "",
+        "value": row[1] or "",
+        "updated_at": row[2].strftime("%d-%m-%Y %H:%M") if row[2] else "",
+    }
+
+
+def _payroll_workbook_row_key(row: dict, row_index: int) -> str:
+    relation_id = row.get("relation_id")
+    if relation_id:
+        return f"relation:{relation_id}"
+    name = str(row.get("employee_name") or "").strip().lower()
+    return f"name:{name}" if name else f"row:{row_index}"
 
 
 def list_payroll_import_logs(period_id: int, limit: int = 20) -> list[dict]:
