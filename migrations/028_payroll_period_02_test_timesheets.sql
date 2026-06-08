@@ -173,7 +173,11 @@ inserted_timesheets AS (
             'project_name', jsonb_build_object('value', project_name, 'confidence', 95)
         ),
         98,
-        (work_date::timestamp + make_interval(hours => 8 + (candidate_index % 8), mins => (candidate_index * 7) % 60)),
+        (
+            work_date::timestamp
+            + ((8 + (candidate_index % 8)) * INTERVAL '1 hour')
+            + (((candidate_index * 7) % 60) * INTERVAL '1 minute')
+        ),
         NOW(),
         NOW()
     FROM timesheet_seed s
@@ -229,8 +233,11 @@ UPDATE whatsapp_timesheet_inbox w
 SET status = 'controle',
     validated_at = NULL,
     payroll_sent_at = NULL,
-    received_at = COALESCE(w.work_date, DATE '2026-06-01')::timestamp
-        + make_interval(hours => 8 + ((ordered_test_timesheets.row_number - 1) % 8), mins => ((ordered_test_timesheets.row_number - 1) * 7) % 60),
+    received_at = (
+        COALESCE(w.work_date, DATE '2026-06-01')::timestamp
+        + ((8 + ((ordered_test_timesheets.row_number - 1) % 8)) * INTERVAL '1 hour')
+        + ((((ordered_test_timesheets.row_number - 1) * 7) % 60) * INTERVAL '1 minute')
+    ),
     updated_at = NOW()
 FROM ordered_test_timesheets
 WHERE w.id = ordered_test_timesheets.id;
