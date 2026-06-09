@@ -773,10 +773,10 @@
                             <section class="audit-menu-section" id="audit-{{ group.label|lower|replace(' ', '-') }}">
                                 <div class="audit-menu-section__head">
                                     <h3>{{ group.label }}</h3>
-                                    <span>{{ group.items|length }} regels</span>
+                                    <span>{{ group["items"]|length }} regels</span>
                                 </div>
                                 <div class="audit-sheet audit-sheet--menu">
-                                    {% for item in group.items %}
+                                    {% for item in group["items"] %}
                                     <button class="audit-row audit-row--compact audit-detail-trigger" type="button" data-audit-detail-open>
                                         <time>{{ item.clock }}</time>
                                         <span class="audit-row__title">{{ item.title }}</span>
