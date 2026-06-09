@@ -63,6 +63,7 @@
     const auditDetailMeta = document.querySelector("[data-audit-detail-modal-meta]");
     const auditDetailBody = document.querySelector("[data-audit-detail-modal-body]");
     const auditDetailExtra = document.querySelector("[data-audit-detail-modal-extra]");
+    const auditDetailExtraSection = document.querySelector("[data-audit-extra-section]");
     const closeAuditDetail = () => {
         if (auditDetailModal) {
             auditDetailModal.hidden = true;
@@ -77,7 +78,11 @@
             auditDetailTitle.textContent = button.querySelector("[data-audit-detail-title]")?.textContent?.trim() || "Auditregel";
             auditDetailMeta.textContent = button.querySelector("[data-audit-detail-meta]")?.textContent?.trim() || "";
             auditDetailBody.textContent = button.querySelector("[data-audit-detail-body]")?.textContent?.trim() || "";
-            auditDetailExtra.textContent = button.querySelector("[data-audit-detail-extra]")?.textContent?.trim() || "";
+            const extra = button.querySelector("[data-audit-detail-extra]")?.textContent?.trim() || "";
+            auditDetailExtra.textContent = extra;
+            if (auditDetailExtraSection) {
+                auditDetailExtraSection.hidden = !extra;
+            }
             auditDetailModal.hidden = false;
         });
     });

@@ -776,6 +776,12 @@
                                     <span>{{ group["items"]|length }} regels</span>
                                 </div>
                                 <div class="audit-sheet audit-sheet--menu">
+                                    <div class="audit-row audit-row--compact audit-row--head" aria-hidden="true">
+                                        <span>Tijd</span>
+                                        <span>Actie</span>
+                                        <span>Object</span>
+                                        <span>ID</span>
+                                    </div>
                                     {% for item in group["items"] %}
                                     <button class="audit-row audit-row--compact audit-detail-trigger" type="button" data-audit-detail-open>
                                         <time>{{ item.clock }}</time>
@@ -785,7 +791,7 @@
                                         <span hidden data-audit-detail-title>Audit #{{ item.id }} · {{ item.title }}</span>
                                         <span hidden data-audit-detail-meta>{{ item.time }} · {{ item.user }} · {{ item.status }} · {{ item.entity_type }}{% if item.entity_id %} #{{ item.entity_id }}{% endif %}</span>
                                         <span hidden data-audit-detail-body>{{ item.detail or 'Geen omschrijving vastgelegd.' }}</span>
-                                        <span hidden data-audit-detail-extra>{{ item.metadata_summary }}</span>
+                                        <span hidden data-audit-detail-extra>{% if item.metadata_summary and item.metadata_summary != 'Geen extra metadata' %}{{ item.metadata_summary }}{% endif %}</span>
                                     </button>
                                     {% endfor %}
                                 </div>
@@ -814,6 +820,13 @@
                         </div>
 
                         <div class="api-audit-list">
+                            <div class="api-audit-row api-audit-row--head" aria-hidden="true">
+                                <span>Tijd</span>
+                                <span>Bron</span>
+                                <span>Model</span>
+                                <span>Status</span>
+                                <span>Tokens</span>
+                            </div>
                             {% for item in openai_api_audit_events|default([]) %}
                             <button class="api-audit-row api-audit-row--compact audit-detail-trigger" type="button" data-audit-detail-open>
                                 <span class="api-audit-row__time">{{ item.clock }}<small>{{ item.date }}</small></span>
@@ -823,7 +836,9 @@
                                 <span class="api-audit-row__tokens">{{ item.response_summary }}</span>
                                 <span hidden data-audit-detail-title>ChatGPT API #{{ item.id }} · {{ item.source }}{% if item.source_id %} #{{ item.source_id }}{% endif %}</span>
                                 <span hidden data-audit-detail-meta>{{ item.time }} · {{ item.model }} · {{ item.endpoint }} · status {{ item.status_code or '-' }}</span>
-                                <span hidden data-audit-detail-body>Gezonden prompt:
+                                <span hidden data-audit-detail-body>{{ item.request_avg_summary }}
+
+Gezonden prompt:
 {{ item.request_prompt }}
 
 Afbeelding:
@@ -831,10 +846,10 @@ Afbeelding:
                                 <span hidden data-audit-detail-extra>{% if item.error %}Fout:
 {{ item.error }}
 
-{% endif %}Gezonden data:
+{% endif %}Gezonden data naar ChatGPT:
 {{ item.request_json }}
 
-Gevigneerde/gelezen data:
+Teruggegeven parsing:
 {{ item.parsed_response_json }}
 
 Ruwe response:
@@ -864,7 +879,7 @@ Ruwe response:
                                     <h3>Omschrijving</h3>
                                     <pre data-audit-detail-modal-body></pre>
                                 </section>
-                                <section>
+                                <section data-audit-extra-section>
                                     <h3>Data</h3>
                                     <pre data-audit-detail-modal-extra></pre>
                                 </section>

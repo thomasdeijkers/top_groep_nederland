@@ -9,6 +9,10 @@
     box-sizing: border-box;
 }
 
+[hidden] {
+    display: none !important;
+}
+
 body {
     position: relative;
     margin: 0;
@@ -2200,6 +2204,27 @@ select.select-has-value {
     text-align: left;
 }
 
+.audit-row--head,
+.api-audit-row--head {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    border-color: rgba(255, 255, 255, 0.1);
+    background: #1c262f;
+    color: #9fb0bd;
+    cursor: default;
+    font-size: 0.66rem;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.audit-row--head span,
+.api-audit-row--head span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .audit-row--compact > time {
     color: #aebbc8;
     font-size: 0.7rem;
@@ -2219,6 +2244,11 @@ select.select-has-value {
     line-height: 1.2;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.audit-row__title,
+.api-audit-row__source {
+    color: #eef6fa;
 }
 
 .audit-row__object,
@@ -2248,6 +2278,11 @@ select.select-has-value {
     background: rgba(255, 255, 255, 0.035);
     cursor: pointer;
     text-align: left;
+}
+
+.api-audit-row--head {
+    padding-top: 6px;
+    padding-bottom: 6px;
 }
 
 .api-audit-row__time,

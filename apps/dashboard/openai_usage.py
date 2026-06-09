@@ -210,6 +210,7 @@ def _format_openai_api_audit_row(row) -> dict:
     request_summary = _openai_request_summary(request_payload)
     response_summary = _openai_response_summary(response_payload)
     parsed_response = _openai_response_json(response_payload)
+    avg_summary = _openai_avg_summary(request_payload, parsed_response)
     return {
         "id": row[0],
         "source": row[1],
@@ -223,6 +224,7 @@ def _format_openai_api_audit_row(row) -> dict:
         "date": row[9].strftime("%d-%m-%Y") if row[9] else "-",
         "request_prompt": request_summary["prompt"],
         "request_image": request_summary["image"],
+        "request_avg_summary": avg_summary,
         "request_json": _json_preview(_summarize_image_payload(request_payload)),
         "response_summary": response_summary,
         "parsed_response_json": _json_preview(parsed_response) if parsed_response else "Geen JSON parsing gevonden in response.",
@@ -265,6 +267,44 @@ def _openai_response_json(payload: dict) -> dict | None:
                 if parsed is not None:
                     return parsed
     return None
+
+
+def _openai_avg_summary(request_payload: dict, parsed_response: dict | None) -> str:
+    prompt = ""
+    image_bits = []
+    schema_fields = []
+    for item in request_payload.get("input", []):
+        for content in item.get("content", []):
+            if content.get("type") == "input_text":
+                prompt = content.get("text") or prompt
+            if content.get("type") == "input_image":
+                image_url = str(content.get("image_url") or "")
+                image_bits.append(f"documentafbeelding als data-url ({len(image_url)} tekens), detail={content.get('detail', 'auto')}")
+    try:
+        schema_fields = sorted(
+            (
+                request_payload.get("text", {})
+                .get("format", {})
+                .get("schema", {})
+                .get("properties", {})
+                .get("fields", {})
+                .get("properties", {})
+                .keys()
+            )
+        )
+    except Exception:
+        schema_fields = []
+    returned_fields = sorted((parsed_response or {}).get("fields", {}).keys())
+    lines = [
+        "AVG-overzicht API-call",
+        f"- Model: {request_payload.get('model', '-')}",
+        f"- Verzonden tekstinstructie: {len(prompt)} tekens",
+        f"- Verzonden documentdata: {', '.join(image_bits) if image_bits else 'geen afbeelding meegestuurd'}",
+        "- API-key: niet opgeslagen in het auditrecord",
+        f"- Gevraagde parsingvelden: {', '.join(schema_fields) if schema_fields else 'geen schema gevonden'}",
+        f"- Teruggegeven parsingvelden: {', '.join(returned_fields) if returned_fields else 'geen parsingvelden gevonden'}",
+    ]
+    return "\n".join(lines)
 
 
 def _loads_json(value: str) -> dict | None:
