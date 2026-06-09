@@ -777,7 +777,7 @@
 
                         <div class="audit-menu-grid" data-audit-search-scope>
                             {% for group in audit_menu_groups|default([]) %}
-                            <details class="audit-menu-section" id="audit-{{ group.label|lower|replace(' ', '-') }}" data-audit-group open>
+                            <details class="audit-menu-section" id="audit-{{ group.label|lower|replace(' ', '-') }}" data-audit-group>
                                 <summary class="audit-menu-section__head">
                                     <strong>{{ group.label }}</strong>
                                     <span data-audit-group-count>{{ group["items"]|length }} regels</span>
@@ -820,7 +820,7 @@ Metadata:
                             <div>
                                 <p class="section-label">ChatGPT API</p>
                                 <h2>Parsing auditspoor</h2>
-                                <p>Wat bij urenbriefjes naar ChatGPT is gestuurd en wat de API terugstuurde.</p>
+                                <p>AVG-overzicht van documentdata die naar ChatGPT ging en velden die terugkwamen.</p>
                             </div>
                             <div class="openai-cost-card">
                                 <span>Deze maand</span>
@@ -835,7 +835,7 @@ Metadata:
                                 <span>Bron</span>
                                 <span>Model</span>
                                 <span>Status</span>
-                                <span>Tokens</span>
+                                <span>AVG gegevens</span>
                             </div>
                             {% for item in openai_api_audit_events|default([]) %}
                             <button class="api-audit-row api-audit-row--compact audit-detail-trigger" type="button" data-audit-detail-open>
@@ -843,27 +843,14 @@ Metadata:
                                 <span class="api-audit-row__source">{{ item.source }}{% if item.source_id %} #{{ item.source_id }}{% endif %}</span>
                                 <span class="api-audit-row__model">{{ item.model }}</span>
                                 <span class="api-audit-row__status">status {{ item.status_code or '-' }}</span>
-                                <span class="api-audit-row__tokens">{{ item.response_summary }}</span>
+                                <span class="api-audit-row__tokens">{{ item.api_privacy_short }}</span>
                                 <span hidden data-audit-detail-title>ChatGPT API #{{ item.id }} · {{ item.source }}{% if item.source_id %} #{{ item.source_id }}{% endif %}</span>
                                 <span hidden data-audit-detail-meta>{{ item.time }} · {{ item.model }} · {{ item.endpoint }} · status {{ item.status_code or '-' }}</span>
-                                <span hidden data-audit-detail-body>{{ item.request_avg_summary }}
-
-Gezonden prompt:
-{{ item.request_prompt }}
-
-Afbeelding:
-{{ item.request_image }}</span>
+                                <span hidden data-audit-detail-body>{{ item.api_privacy_input_summary }}</span>
                                 <span hidden data-audit-detail-extra>{% if item.error %}Fout:
 {{ item.error }}
 
-{% endif %}Gezonden data naar ChatGPT:
-{{ item.request_json }}
-
-Teruggegeven parsing:
-{{ item.parsed_response_json }}
-
-Ruwe response:
-{{ item.response_json }}</span>
+{% endif %}{{ item.api_privacy_output_summary }}</span>
                             </button>
                             {% else %}
                             <div class="empty-state empty-state--compact">

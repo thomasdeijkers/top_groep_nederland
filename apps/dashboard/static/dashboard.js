@@ -114,7 +114,13 @@
             const rows = Array.from(group.querySelectorAll("[data-audit-detail-open]"));
             let visibleCount = 0;
             rows.forEach((row) => {
-                const haystack = normalizeAuditText(row.textContent);
+                const haystack = normalizeAuditText([
+                    row.textContent,
+                    row.querySelector("[data-audit-detail-title]")?.textContent,
+                    row.querySelector("[data-audit-detail-meta]")?.textContent,
+                    row.querySelector("[data-audit-detail-body]")?.textContent,
+                    row.querySelector("[data-audit-detail-extra]")?.textContent,
+                ].join(" "));
                 const isVisible = !query || haystack.includes(query);
                 row.hidden = !isVisible;
                 if (isVisible) {

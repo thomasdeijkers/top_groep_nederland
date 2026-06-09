@@ -211,6 +211,8 @@ def _format_openai_api_audit_row(row) -> dict:
     response_summary = _openai_response_summary(response_payload)
     parsed_response = _openai_response_json(response_payload)
     avg_summary = _openai_avg_summary(request_payload, parsed_response)
+    privacy_input_summary = _openai_privacy_input_summary(request_payload)
+    privacy_output_summary = _openai_privacy_output_summary(parsed_response)
     return {
         "id": row[0],
         "source": row[1],
@@ -225,6 +227,9 @@ def _format_openai_api_audit_row(row) -> dict:
         "request_prompt": request_summary["prompt"],
         "request_image": request_summary["image"],
         "request_avg_summary": avg_summary,
+        "api_privacy_short": _openai_privacy_short(request_payload, parsed_response),
+        "api_privacy_input_summary": privacy_input_summary,
+        "api_privacy_output_summary": privacy_output_summary,
         "request_json": _json_preview(_summarize_image_payload(request_payload)),
         "response_summary": response_summary,
         "parsed_response_json": _json_preview(parsed_response) if parsed_response else "Geen JSON parsing gevonden in response.",
@@ -305,6 +310,125 @@ def _openai_avg_summary(request_payload: dict, parsed_response: dict | None) -> 
         f"- Teruggegeven parsingvelden: {', '.join(returned_fields) if returned_fields else 'geen parsingvelden gevonden'}",
     ]
     return "\n".join(lines)
+
+
+def _openai_privacy_short(request_payload: dict, parsed_response: dict | None) -> str:
+    sent_document = any(
+        content.get("type") == "input_image"
+        for item in request_payload.get("input", [])
+        for content in item.get("content", [])
+    )
+    filled_count = len(_filled_openai_fields(parsed_response))
+    sent = "document" if sent_document else "geen document"
+    return f"{sent}, {filled_count} velden terug"
+
+
+def _openai_privacy_input_summary(request_payload: dict) -> str:
+    prompt = ""
+    sent_document = False
+    document_detail = ""
+    for item in request_payload.get("input", []):
+        for content in item.get("content", []):
+            if content.get("type") == "input_text":
+                prompt = content.get("text") or prompt
+            if content.get("type") == "input_image":
+                sent_document = True
+                image_url = str(content.get("image_url") or "")
+                document_detail = f"documentafbeelding van het urenbriefje ({len(image_url)} tekens in audit, afbeelding zelf niet leesbaar op deze regel)"
+
+    schema_fields = _requested_openai_fields(request_payload)
+    lines = [
+        "Naar ChatGPT gestuurd",
+        f"- Document: {document_detail if sent_document else 'geen documentafbeelding meegestuurd'}",
+        f"- Opdracht aan ChatGPT: urenbriefje lezen en alleen zichtbare ingevulde waarden overnemen ({len(prompt)} tekens instructie)",
+        "- API-key/geheimen: niet opgeslagen in dit auditspoor",
+        "- Gevraagde persoonsgegevens/velden:",
+        _field_list(schema_fields) if schema_fields else "  geen veldschema gevonden",
+    ]
+    return "\n".join(lines)
+
+
+def _openai_privacy_output_summary(parsed_response: dict | None) -> str:
+    fields = _filled_openai_fields(parsed_response)
+    if not fields:
+        return "Van ChatGPT teruggekregen\n- Geen ingevulde parsingvelden gevonden."
+    lines = ["Van ChatGPT teruggekregen", "- Ingevulde waarden:"]
+    for label, value, confidence in fields:
+        suffix = f" ({confidence}% zekerheid)" if confidence not in (None, "") else ""
+        lines.append(f"  - {label}: {value}{suffix}")
+    return "\n".join(lines)
+
+
+def _requested_openai_fields(request_payload: dict) -> list[str]:
+    try:
+        keys = (
+            request_payload.get("text", {})
+            .get("format", {})
+            .get("schema", {})
+            .get("properties", {})
+            .get("fields", {})
+            .get("properties", {})
+            .keys()
+        )
+    except Exception:
+        return []
+    return [_openai_field_label(key) for key in sorted(keys)]
+
+
+def _filled_openai_fields(parsed_response: dict | None) -> list[tuple[str, str, int | None]]:
+    raw_fields = (parsed_response or {}).get("fields") or {}
+    fields = []
+    for key, field in raw_fields.items():
+        value = field.get("value") if isinstance(field, dict) else field
+        if value in (None, "", [], {}):
+            continue
+        confidence = field.get("confidence") if isinstance(field, dict) else None
+        fields.append((_openai_field_label(key), str(value), confidence))
+    return fields[:30]
+
+
+def _field_list(labels: list[str]) -> str:
+    return "\n".join(f"  - {label}" for label in labels)
+
+
+def _openai_field_label(key: str) -> str:
+    labels = {
+        "employee_name": "naam medewerker",
+        "employee_phone": "telefoon medewerker",
+        "principal_name": "opdrachtgever",
+        "project_name": "project",
+        "project_number": "projectnummer",
+        "work_name": "werknaam",
+        "work_number": "werknummer",
+        "location": "plaats/locatie",
+        "date": "datum",
+        "week_number": "weeknummer",
+        "monday_hours": "uren maandag",
+        "tuesday_hours": "uren dinsdag",
+        "wednesday_hours": "uren woensdag",
+        "thursday_hours": "uren donderdag",
+        "friday_hours": "uren vrijdag",
+        "saturday_hours": "uren zaterdag",
+        "sunday_hours": "uren zondag",
+        "total_hours": "totaal uren",
+        "monday_km": "kilometers maandag",
+        "tuesday_km": "kilometers dinsdag",
+        "wednesday_km": "kilometers woensdag",
+        "thursday_km": "kilometers donderdag",
+        "friday_km": "kilometers vrijdag",
+        "saturday_km": "kilometers zaterdag",
+        "sunday_km": "kilometers zondag",
+        "total_km": "totaal kilometers",
+        "signature": "handtekening medewerker",
+        "client_signature": "handtekening opdrachtgever",
+        "signer_name": "naam ondertekenaar",
+        "signer_phone": "telefoon ondertekenaar",
+        "remarks": "opmerking",
+        "absence_code": "verzuimcode",
+        "expenses": "kosten",
+        "parking_costs": "parkeerkosten",
+    }
+    return labels.get(key, str(key).replace("_", " "))
 
 
 def _loads_json(value: str) -> dict | None:
