@@ -58,6 +58,43 @@
         }
     });
 
+    const auditDetailModal = document.querySelector("[data-audit-detail-modal]");
+    const auditDetailTitle = document.querySelector("[data-audit-detail-modal-title]");
+    const auditDetailMeta = document.querySelector("[data-audit-detail-modal-meta]");
+    const auditDetailBody = document.querySelector("[data-audit-detail-modal-body]");
+    const auditDetailExtra = document.querySelector("[data-audit-detail-modal-extra]");
+    const closeAuditDetail = () => {
+        if (auditDetailModal) {
+            auditDetailModal.hidden = true;
+        }
+    };
+
+    document.querySelectorAll("[data-audit-detail-open]").forEach((button) => {
+        button.addEventListener("click", () => {
+            if (!auditDetailModal) {
+                return;
+            }
+            auditDetailTitle.textContent = button.querySelector("[data-audit-detail-title]")?.textContent?.trim() || "Auditregel";
+            auditDetailMeta.textContent = button.querySelector("[data-audit-detail-meta]")?.textContent?.trim() || "";
+            auditDetailBody.textContent = button.querySelector("[data-audit-detail-body]")?.textContent?.trim() || "";
+            auditDetailExtra.textContent = button.querySelector("[data-audit-detail-extra]")?.textContent?.trim() || "";
+            auditDetailModal.hidden = false;
+        });
+    });
+
+    document.querySelector("[data-audit-detail-close]")?.addEventListener("click", closeAuditDetail);
+    auditDetailModal?.addEventListener("click", (event) => {
+        if (event.target === auditDetailModal) {
+            closeAuditDetail();
+        }
+    });
+
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+            closeAuditDetail();
+        }
+    });
+
     mobileMenuBreakpoint.addEventListener?.("change", (event) => {
         if (!event.matches) {
             setMobileMenuOpen(false);

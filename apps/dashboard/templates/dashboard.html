@@ -18,7 +18,7 @@
         </title>
         <link rel="icon" href="/dashboard/static/favicon.ico" sizes="any">
         <link rel="shortcut icon" href="/dashboard/static/favicon.ico">
-        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260609-01">
+        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260609-02">
     </head>
     <body class="page-{{ active_page }}">
         {% macro confidence_light(field) -%}
@@ -769,7 +769,7 @@
                         </div>
 
                         <div class="audit-menu-grid">
-                            {% for group in audit_menu_groups %}
+                            {% for group in audit_menu_groups|default([]) %}
                             <section class="audit-menu-section" id="audit-{{ group.label|lower|replace(' ', '-') }}">
                                 <div class="audit-menu-section__head">
                                     <h3>{{ group.label }}</h3>
@@ -777,20 +777,16 @@
                                 </div>
                                 <div class="audit-sheet audit-sheet--menu">
                                     {% for item in group.items %}
-                                    <article class="audit-row audit-row--compact">
-                                        <time>{{ item.time }}</time>
-                                        <div class="audit-row__primary">
-                                            <strong>{{ item.title }}</strong>
-                                            <span>{{ item.entity_display }}</span>
-                                        </div>
-                                        <div class="audit-row__detail">
-                                            <p>{{ item.detail or 'Geen omschrijving vastgelegd.' }}</p>
-                                            {% if item.metadata_summary and item.metadata_summary != 'Geen extra metadata' %}
-                                            <small>{{ item.metadata_summary }}</small>
-                                            {% endif %}
-                                        </div>
+                                    <button class="audit-row audit-row--compact audit-detail-trigger" type="button" data-audit-detail-open>
+                                        <time>{{ item.clock }}</time>
+                                        <span class="audit-row__title">{{ item.title }}</span>
+                                        <span class="audit-row__object">{{ item.entity_display }}</span>
                                         <span class="audit-row__id">#{{ item.id }}</span>
-                                    </article>
+                                        <span hidden data-audit-detail-title>Audit #{{ item.id }} · {{ item.title }}</span>
+                                        <span hidden data-audit-detail-meta>{{ item.time }} · {{ item.user }} · {{ item.status }} · {{ item.entity_type }}{% if item.entity_id %} #{{ item.entity_id }}{% endif %}</span>
+                                        <span hidden data-audit-detail-body>{{ item.detail or 'Geen omschrijving vastgelegd.' }}</span>
+                                        <span hidden data-audit-detail-extra>{{ item.metadata_summary }}</span>
+                                    </button>
                                     {% endfor %}
                                 </div>
                             </section>
@@ -818,39 +814,32 @@
                         </div>
 
                         <div class="api-audit-list">
-                            {% for item in openai_api_audit_events %}
-                            <details class="api-audit-row">
-                                <summary>
-                                    <span class="api-audit-row__time">{{ item.clock }}<small>{{ item.date }}</small></span>
-                                    <span>
-                                        <strong>{{ item.source }}{% if item.source_id %} #{{ item.source_id }}{% endif %}</strong>
-                                        <small>{{ item.model }} · {{ item.endpoint }} · status {{ item.status_code or '-' }}</small>
-                                    </span>
-                                    <b>{{ item.response_summary }}</b>
-                                </summary>
-                                <div class="api-audit-row__body">
-                                    <div>
-                                        <h3>Prompt</h3>
-                                        <p>{{ item.request_prompt }}</p>
-                                        <small>{{ item.request_image }}</small>
-                                    </div>
-                                    {% if item.error %}
-                                    <div>
-                                        <h3>Fout</h3>
-                                        <pre>{{ item.error }}</pre>
-                                    </div>
-                                    {% endif %}
-                                    <div>
-                                        <h3>Request payload</h3>
-                                        <small>Afbeelding is in deze schermpreview samengevat; de volledige waarde staat in het auditrecord.</small>
-                                        <pre>{{ item.request_json }}</pre>
-                                    </div>
-                                    <div>
-                                        <h3>Response payload</h3>
-                                        <pre>{{ item.response_json }}</pre>
-                                    </div>
-                                </div>
-                            </details>
+                            {% for item in openai_api_audit_events|default([]) %}
+                            <button class="api-audit-row api-audit-row--compact audit-detail-trigger" type="button" data-audit-detail-open>
+                                <span class="api-audit-row__time">{{ item.clock }}<small>{{ item.date }}</small></span>
+                                <span class="api-audit-row__source">{{ item.source }}{% if item.source_id %} #{{ item.source_id }}{% endif %}</span>
+                                <span class="api-audit-row__model">{{ item.model }}</span>
+                                <span class="api-audit-row__status">status {{ item.status_code or '-' }}</span>
+                                <span class="api-audit-row__tokens">{{ item.response_summary }}</span>
+                                <span hidden data-audit-detail-title>ChatGPT API #{{ item.id }} · {{ item.source }}{% if item.source_id %} #{{ item.source_id }}{% endif %}</span>
+                                <span hidden data-audit-detail-meta>{{ item.time }} · {{ item.model }} · {{ item.endpoint }} · status {{ item.status_code or '-' }}</span>
+                                <span hidden data-audit-detail-body>Gezonden prompt:
+{{ item.request_prompt }}
+
+Afbeelding:
+{{ item.request_image }}</span>
+                                <span hidden data-audit-detail-extra>{% if item.error %}Fout:
+{{ item.error }}
+
+{% endif %}Gezonden data:
+{{ item.request_json }}
+
+Gevigneerde/gelezen data:
+{{ item.parsed_response_json }}
+
+Ruwe response:
+{{ item.response_json }}</span>
+                            </button>
                             {% else %}
                             <div class="empty-state empty-state--compact">
                                 <strong>Nog geen ChatGPT API-audit</strong>
@@ -859,6 +848,29 @@
                             {% endfor %}
                         </div>
                     </article>
+
+                    <div class="modal-backdrop audit-detail-modal" data-audit-detail-modal hidden>
+                        <article class="audit-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="audit-detail-title">
+                            <header class="audit-detail-dialog__header">
+                                <div>
+                                    <p class="section-label">Audit details</p>
+                                    <h2 id="audit-detail-title" data-audit-detail-modal-title>Auditregel</h2>
+                                    <small data-audit-detail-modal-meta></small>
+                                </div>
+                                <button class="modal-close" type="button" data-audit-detail-close aria-label="Sluiten">x</button>
+                            </header>
+                            <div class="audit-detail-dialog__content">
+                                <section>
+                                    <h3>Omschrijving</h3>
+                                    <pre data-audit-detail-modal-body></pre>
+                                </section>
+                                <section>
+                                    <h3>Data</h3>
+                                    <pre data-audit-detail-modal-extra></pre>
+                                </section>
+                            </div>
+                        </article>
+                    </div>
 
                     <article class="panel panel--full vacancies-only" id="vacatures">
                         <div class="sticky-work-header">

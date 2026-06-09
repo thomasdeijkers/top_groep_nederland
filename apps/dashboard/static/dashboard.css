@@ -60,7 +60,7 @@ a {
     display: flex;
     flex-direction: column;
     height: 100vh;
-    padding: 24px 18px;
+    padding: 16px 18px;
     border-right: 1px solid rgba(255, 255, 255, 0.09);
     background: rgba(11, 14, 17, 0.88);
 }
@@ -69,16 +69,20 @@ a {
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 86px;
-    margin-bottom: 26px;
+    min-height: 44px;
+    width: 104px;
+    margin: 0 auto 18px;
+    padding: 5px 8px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
     background: #ffffff;
 }
 
 .brand img {
-    width: min(168px, 82%);
+    width: 88px;
+    max-height: 34px;
     height: auto;
+    object-fit: contain;
     display: block;
 }
 
@@ -2139,15 +2143,15 @@ select.select-has-value {
 
 .audit-menu-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
+    grid-template-columns: 1fr;
+    gap: 8px;
 }
 
 .audit-menu-section {
     display: grid;
-    gap: 8px;
+    gap: 6px;
     min-width: 0;
-    padding: 10px;
+    padding: 8px;
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 8px;
     background: rgba(255, 255, 255, 0.025);
@@ -2163,12 +2167,11 @@ select.select-has-value {
 .audit-menu-section__head h3 {
     margin: 0;
     color: #ffffff;
-    font-size: 0.98rem;
+    font-size: 0.88rem;
 }
 
 .audit-menu-section__head span,
-.audit-row__id,
-.api-audit-row summary b {
+.audit-row__id {
     display: inline-flex;
     min-height: 22px;
     align-items: center;
@@ -2182,125 +2185,151 @@ select.select-has-value {
 }
 
 .audit-sheet--menu {
-    max-height: 340px;
+    gap: 3px;
+    max-height: 260px;
     padding-right: 4px;
 }
 
 .audit-row--compact {
-    grid-template-columns: 92px minmax(140px, 0.8fr) minmax(220px, 1.2fr) auto;
-    gap: 10px;
-    padding: 8px 10px;
+    grid-template-columns: 52px minmax(160px, 0.8fr) minmax(220px, 1.2fr) 46px;
+    gap: 8px;
+    align-items: center;
+    width: 100%;
+    padding: 5px 8px;
+    cursor: pointer;
+    text-align: left;
 }
 
 .audit-row--compact > time {
     color: #aebbc8;
-    font-size: 0.76rem;
+    font-size: 0.7rem;
     font-weight: 800;
 }
 
-.audit-row--compact .audit-row__primary,
-.audit-row--compact .audit-row__detail {
-    gap: 3px;
+.audit-row__title,
+.audit-row__object,
+.api-audit-row__source,
+.api-audit-row__model,
+.api-audit-row__status,
+.api-audit-row__tokens {
+    overflow: hidden;
+    color: #dbe5eb;
+    font-size: 0.74rem;
+    font-weight: 800;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.audit-row--compact .audit-row__primary strong {
-    font-size: 0.86rem;
-}
-
-.audit-row--compact .audit-row__primary span,
-.audit-row--compact .audit-row__detail p {
-    font-size: 0.78rem;
-    line-height: 1.35;
-}
-
-.audit-row--compact .audit-row__detail small {
-    min-height: 0;
-    padding: 0;
-    border-radius: 0;
-    background: transparent;
-    color: #aebbc8;
-    font-size: 0.72rem;
+.audit-row__object,
+.api-audit-row__model,
+.api-audit-row__status {
+    color: #9fb0bd;
     font-weight: 700;
 }
 
 .api-audit-list {
     display: grid;
-    gap: 8px;
-    max-height: min(72vh, 760px);
+    gap: 3px;
+    max-height: min(62vh, 640px);
     overflow-y: auto;
     padding-right: 6px;
 }
 
 .api-audit-row {
+    display: grid;
+    grid-template-columns: 76px minmax(160px, 1fr) minmax(120px, 0.6fr) 86px minmax(160px, 0.8fr);
+    gap: 8px;
+    align-items: center;
+    width: 100%;
+    padding: 5px 8px;
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 8px;
     background: rgba(255, 255, 255, 0.035);
-}
-
-.api-audit-row summary {
-    display: grid;
-    grid-template-columns: 88px minmax(0, 1fr) auto;
-    gap: 10px;
-    align-items: center;
-    padding: 10px;
     cursor: pointer;
-    list-style: none;
+    text-align: left;
 }
 
-.api-audit-row summary::-webkit-details-marker {
-    display: none;
-}
-
-.api-audit-row summary strong,
-.api-audit-row summary small,
 .api-audit-row__time,
 .api-audit-row__time small {
     display: block;
 }
 
-.api-audit-row summary strong {
-    color: #ffffff;
-    font-size: 0.88rem;
-}
-
-.api-audit-row summary small,
 .api-audit-row__time small {
     color: #aebbc8;
-    font-size: 0.72rem;
+    font-size: 0.66rem;
 }
 
 .api-audit-row__time {
     color: #ffffff;
-    font-size: 0.92rem;
+    font-size: 0.74rem;
     font-weight: 900;
 }
 
-.api-audit-row__body {
-    display: grid;
-    gap: 10px;
-    padding: 0 10px 10px;
+.audit-detail-trigger:hover {
+    border-color: rgba(127, 209, 160, 0.28);
+    background: rgba(127, 209, 160, 0.06);
 }
 
-.api-audit-row__body h3 {
+.audit-detail-dialog {
+    width: min(980px, 100%);
+    max-height: min(86vh, 860px);
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    padding: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    border-radius: 8px;
+    background: #182028;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
+}
+
+.audit-detail-dialog__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.audit-detail-dialog__header h2 {
+    margin: 0 0 4px;
+    color: #ffffff;
+    font-size: 1.15rem;
+}
+
+.audit-detail-dialog__header small {
+    color: #9fb0bd;
+}
+
+.audit-detail-dialog__content {
+    display: grid;
+    grid-template-columns: minmax(260px, 0.7fr) minmax(360px, 1.3fr);
+    gap: 10px;
+    min-height: 0;
+}
+
+.audit-detail-dialog__content section {
+    min-width: 0;
+    min-height: 0;
+}
+
+.audit-detail-dialog__content h3 {
     margin: 0 0 6px;
     color: #ffffff;
     font-size: 0.82rem;
 }
 
-.api-audit-row__body p,
-.api-audit-row__body pre {
+.audit-detail-dialog__content pre {
+    max-height: calc(86vh - 170px);
+    min-height: 160px;
     margin: 0;
-    color: #dbe5eb;
-    font-size: 0.76rem;
-    line-height: 1.45;
-}
-
-.api-audit-row__body pre {
-    max-height: 260px;
     overflow: auto;
     padding: 10px;
     border-radius: 7px;
     background: rgba(7, 14, 18, 0.52);
+    color: #dbe5eb;
+    font-size: 0.76rem;
+    line-height: 1.45;
     white-space: pre-wrap;
     word-break: break-word;
 }
@@ -3508,21 +3537,31 @@ body[data-theme="light"] .api-audit-row {
 }
 
 body[data-theme="light"] .audit-menu-section__head h3,
-body[data-theme="light"] .api-audit-row summary strong,
 body[data-theme="light"] .api-audit-row__time,
-body[data-theme="light"] .api-audit-row__body h3 {
+body[data-theme="light"] .audit-detail-dialog__header h2,
+body[data-theme="light"] .audit-detail-dialog__content h3 {
     color: #172027;
 }
 
 body[data-theme="light"] .audit-row--compact > time,
-body[data-theme="light"] .api-audit-row summary small,
 body[data-theme="light"] .api-audit-row__time small,
-body[data-theme="light"] .api-audit-row__body p,
-body[data-theme="light"] .api-audit-row__body pre {
+body[data-theme="light"] .audit-row__title,
+body[data-theme="light"] .audit-row__object,
+body[data-theme="light"] .api-audit-row__source,
+body[data-theme="light"] .api-audit-row__model,
+body[data-theme="light"] .api-audit-row__status,
+body[data-theme="light"] .api-audit-row__tokens,
+body[data-theme="light"] .audit-detail-dialog__header small,
+body[data-theme="light"] .audit-detail-dialog__content pre {
     color: #52616a;
 }
 
-body[data-theme="light"] .api-audit-row__body pre {
+body[data-theme="light"] .audit-detail-dialog {
+    border-color: rgba(28, 42, 50, 0.14);
+    background: #ffffff;
+}
+
+body[data-theme="light"] .audit-detail-dialog__content pre {
     background: rgba(28, 42, 50, 0.06);
 }
 
@@ -5749,14 +5788,14 @@ body[data-theme="light"] .theme-toggle strong {
 
     .brand {
         justify-content: flex-start;
-        min-height: 72px;
-        max-width: 220px;
+        min-height: 42px;
+        max-width: 112px;
         margin-bottom: 0;
-        padding: 0 16px;
+        padding: 5px 8px;
     }
 
     .brand img {
-        width: min(154px, 100%);
+        width: 88px;
     }
 
     .mobile-menu-toggle {
@@ -5964,7 +6003,11 @@ body[data-theme="light"] .theme-toggle strong {
         grid-template-columns: 1fr;
     }
 
-    .api-audit-row summary {
+    .api-audit-row {
+        grid-template-columns: 1fr;
+    }
+
+    .audit-detail-dialog__content {
         grid-template-columns: 1fr;
     }
 

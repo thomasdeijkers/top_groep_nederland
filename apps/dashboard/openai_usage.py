@@ -209,6 +209,7 @@ def _format_openai_api_audit_row(row) -> dict:
     response_payload = row[6] or {}
     request_summary = _openai_request_summary(request_payload)
     response_summary = _openai_response_summary(response_payload)
+    parsed_response = _openai_response_json(response_payload)
     return {
         "id": row[0],
         "source": row[1],
@@ -224,6 +225,7 @@ def _format_openai_api_audit_row(row) -> dict:
         "request_image": request_summary["image"],
         "request_json": _json_preview(_summarize_image_payload(request_payload)),
         "response_summary": response_summary,
+        "parsed_response_json": _json_preview(parsed_response) if parsed_response else "Geen JSON parsing gevonden in response.",
         "response_json": _json_preview(response_payload),
     }
 
@@ -250,6 +252,27 @@ def _openai_response_summary(payload: dict) -> str:
     if payload.get("id"):
         return f"Response {payload.get('id')}"
     return "Geen responsepayload"
+
+
+def _openai_response_json(payload: dict) -> dict | None:
+    if isinstance(payload.get("output_text"), str):
+        return _loads_json(payload["output_text"])
+    for item in payload.get("output", []):
+        for content in item.get("content", []):
+            text = content.get("text")
+            if isinstance(text, str) and text.strip():
+                parsed = _loads_json(text)
+                if parsed is not None:
+                    return parsed
+    return None
+
+
+def _loads_json(value: str) -> dict | None:
+    try:
+        parsed = json.loads(value)
+        return parsed if isinstance(parsed, dict) else {"value": parsed}
+    except Exception:
+        return None
 
 
 def _json_preview(payload: dict) -> str:
