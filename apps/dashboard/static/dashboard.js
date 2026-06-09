@@ -100,6 +100,41 @@
         }
     });
 
+    const auditSearch = document.querySelector("[data-audit-search]");
+    const auditGroups = Array.from(document.querySelectorAll("[data-audit-group]"));
+    const normalizeAuditText = (value) => (value || "")
+        .toString()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+
+    const filterAuditRows = () => {
+        const query = normalizeAuditText(auditSearch?.value || "");
+        auditGroups.forEach((group) => {
+            const rows = Array.from(group.querySelectorAll("[data-audit-detail-open]"));
+            let visibleCount = 0;
+            rows.forEach((row) => {
+                const haystack = normalizeAuditText(row.textContent);
+                const isVisible = !query || haystack.includes(query);
+                row.hidden = !isVisible;
+                if (isVisible) {
+                    visibleCount += 1;
+                }
+            });
+            group.hidden = query ? visibleCount === 0 : false;
+            if (query && visibleCount > 0) {
+                group.open = true;
+            }
+            const countLabel = group.querySelector("[data-audit-group-count]");
+            if (countLabel) {
+                const total = rows.length;
+                countLabel.textContent = query ? `${visibleCount}/${total} regels` : `${total} regels`;
+            }
+        });
+    };
+
+    auditSearch?.addEventListener("input", filterAuditRows);
+
     mobileMenuBreakpoint.addEventListener?.("change", (event) => {
         if (!event.matches) {
             setMobileMenuOpen(false);

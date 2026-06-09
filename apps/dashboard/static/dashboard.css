@@ -2145,6 +2145,36 @@ select.select-has-value {
     gap: 14px;
 }
 
+.audit-toolbar {
+    display: grid;
+    gap: 8px;
+}
+
+.audit-toolbar label {
+    display: grid;
+    gap: 5px;
+    max-width: 620px;
+}
+
+.audit-toolbar span {
+    color: #9fb0bd;
+    font-size: 0.72rem;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.audit-toolbar input {
+    width: 100%;
+    min-height: 38px;
+    padding: 0 12px;
+    border: 1px solid rgba(127, 209, 160, 0.18);
+    border-radius: 8px;
+    background: rgba(7, 14, 18, 0.46);
+    color: #f5fbff;
+    font: inherit;
+    font-size: 0.86rem;
+}
+
 .audit-menu-grid {
     display: grid;
     grid-template-columns: 1fr;
@@ -2166,12 +2196,31 @@ select.select-has-value {
     align-items: center;
     justify-content: space-between;
     gap: 12px;
+    cursor: pointer;
+    list-style: none;
 }
 
-.audit-menu-section__head h3 {
+.audit-menu-section__head::-webkit-details-marker {
+    display: none;
+}
+
+.audit-menu-section__head strong {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
     margin: 0;
     color: #ffffff;
     font-size: 0.88rem;
+}
+
+.audit-menu-section__head strong::before {
+    content: "▾";
+    color: #7fd1a0;
+    font-size: 0.72rem;
+}
+
+.audit-menu-section:not([open]) .audit-menu-section__head strong::before {
+    content: "▸";
 }
 
 .audit-menu-section__head span,
@@ -3571,7 +3620,13 @@ body[data-theme="light"] .api-audit-row {
     background: rgba(247, 251, 248, 0.84);
 }
 
-body[data-theme="light"] .audit-menu-section__head h3,
+body[data-theme="light"] .audit-toolbar input {
+    border-color: rgba(28, 42, 50, 0.12);
+    background: rgba(255, 255, 255, 0.78);
+    color: #172027;
+}
+
+body[data-theme="light"] .audit-menu-section__head strong,
 body[data-theme="light"] .api-audit-row__time,
 body[data-theme="light"] .audit-detail-dialog__header h2,
 body[data-theme="light"] .audit-detail-dialog__content h3 {

@@ -309,6 +309,7 @@ def list_audit_events(limit: int = 25, entity_type: str = "", entity_id: int | N
                         "status": row[7] or row[3],
                         "metadata": row[8] or {},
                         "metadata_summary": _audit_metadata_summary(row[8] or {}),
+                        "privacy_summary": "",
                         "time": row[9].strftime("%d-%m-%Y %H:%M") if row[9] else "-",
                         "date": row[9].strftime("%d-%m-%Y") if row[9] else "-",
                         "clock": row[9].strftime("%H:%M") if row[9] else "-",
@@ -342,12 +343,14 @@ def _enrich_audit_events(cursor, rows: list[dict]) -> None:
                 row["entity_display"] = context["display"]
                 row["detail"] = _audit_detail_with_context(row["detail"], context["summary"])
                 row["metadata_summary"] = _combine_audit_summary(row["metadata_summary"], context["metadata"])
+                row["privacy_summary"] = context.get("privacy", "")
         elif row.get("entity_type") in {"relatie", "candidate", "principal"}:
             context = relations.get(row.get("entity_id"))
             if context:
                 row["entity_display"] = context["display"]
                 row["detail"] = _audit_detail_with_context(row["detail"], context["summary"])
                 row["metadata_summary"] = _combine_audit_summary(row["metadata_summary"], context["metadata"])
+                row["privacy_summary"] = context.get("privacy", "")
 
 
 def _audit_timesheet_context(cursor, ids: list[int]) -> dict[int, dict]:
@@ -364,7 +367,14 @@ def _audit_timesheet_context(cursor, ids: list[int]) -> dict[int, dict]:
                work_date,
                hours,
                COALESCE(media_filename, '') AS media_filename,
-               COALESCE(status, '') AS status
+               COALESCE(status, '') AS status,
+               COALESCE(parse_source, '') AS parse_source,
+               overall_confidence,
+               COALESCE(source_channel, '') AS source_channel,
+               COALESCE(parsed_fields, '{}'::jsonb) AS parsed_fields,
+               matched_relation_id,
+               selected_principal_id,
+               selected_project_id
         FROM whatsapp_timesheet_inbox
         WHERE id = ANY(%s);
         """,
@@ -392,10 +402,31 @@ def _audit_timesheet_context(cursor, ids: list[int]) -> dict[int, dict]:
             metadata_parts.append(f"bestand: {row[8]}")
         if row[9]:
             metadata_parts.append(f"huidige status: {row[9]}")
+        privacy_parts = [
+            "AVG-context urenbriefje",
+            f"- Urenbriefje ID: {row[0]}",
+            f"- Bronkanaal: {row[12] or '-'}",
+            f"- Parsebron: {row[10] or '-'}",
+            f"- Bestand/document: {row[8] or '-'}",
+            f"- Werknemer/afzender: {row[1] or '-'}",
+            f"- Telefoonnummer: {row[2] or '-'}",
+            f"- Opdrachtgever: {row[4] or '-'}",
+            f"- Project/werk: {row[3] or '-'}",
+            f"- Werkdatum: {row[6].strftime('%d-%m-%Y') if row[6] else '-'}",
+            f"- Uren: {_format_number(row[7]) if row[7] else '-'}",
+            f"- Status: {row[9] or '-'}",
+            f"- Parserzekerheid: {int(row[11] or 0)}%",
+            f"- Gekoppelde kandidaat/relatie ID: {row[14] or '-'}",
+            f"- Geselecteerde opdrachtgever ID: {row[15] or '-'}",
+            f"- Geselecteerd project ID: {row[16] or '-'}",
+            f"- Ingevulde parsingvelden: {_filled_parsed_field_summary(row[13] or {})}",
+            f"- ChatGPT betrokken: {'ja' if (row[10] or '').lower() == 'openai' else 'nee'}",
+        ]
         contexts[row[0]] = {
             "display": display,
             "summary": ", ".join(summary_parts),
             "metadata": " | ".join(metadata_parts),
+            "privacy": "\n".join(privacy_parts),
         }
     return contexts
 
@@ -412,7 +443,13 @@ def _audit_relation_context(cursor, ids: list[int]) -> dict[int, dict]:
                COALESCE(email, '') AS email,
                COALESCE(phone, '') AS phone,
                COALESCE(city, '') AS city,
-               COALESCE(status, '') AS status
+               COALESCE(status, '') AS status,
+               COALESCE(street, '') AS street,
+               COALESCE(house_number, '') AS house_number,
+               COALESCE(postal_code, '') AS postal_code,
+               COALESCE(country, '') AS country,
+               COALESCE(kvk_number, '') AS kvk_number,
+               COALESCE(vat_number, '') AS vat_number
         FROM relations
         WHERE id = ANY(%s);
         """,
@@ -440,6 +477,22 @@ def _audit_relation_context(cursor, ids: list[int]) -> dict[int, dict]:
             "display": display,
             "summary": ", ".join(summary_parts),
             "metadata": " | ".join(metadata_parts),
+            "privacy": "\n".join(
+                [
+                    "AVG-context relatie",
+                    f"- Type: {relation_type}",
+                    f"- Naam: {row[2] or '-'}",
+                    f"- Contactpersoon: {row[3] or '-'}",
+                    f"- E-mail: {row[4] or '-'}",
+                    f"- Telefoon: {row[5] or '-'}",
+                    f"- Adres: {' '.join(part for part in (row[8], row[9]) if part) or '-'}",
+                    f"- Postcode/plaats: {' '.join(part for part in (row[10], row[6]) if part) or '-'}",
+                    f"- Land: {row[11] or '-'}",
+                    f"- KvK: {row[12] or '-'}",
+                    f"- BTW: {row[13] or '-'}",
+                    f"- Status: {row[7] or '-'}",
+                ]
+            ),
         }
     return contexts
 
@@ -472,6 +525,35 @@ def _audit_metadata_summary(metadata) -> str:
         if len(parts) >= 4:
             break
     return " | ".join(parts) if parts else "Geen extra metadata"
+
+
+def _filled_parsed_field_summary(fields: dict) -> str:
+    if not isinstance(fields, dict) or not fields:
+        return "geen parsed_fields opgeslagen"
+    labels = {
+        "employee_name": "werknemer",
+        "employee_phone": "telefoon",
+        "principal_name": "opdrachtgever",
+        "project_name": "project",
+        "work_name": "werk",
+        "date": "datum",
+        "week_number": "week",
+        "total_hours": "uren totaal",
+        "total_km": "km totaal",
+        "signature": "handtekening",
+        "client_signature": "handtekening opdrachtgever",
+        "remarks": "opmerking",
+    }
+    filled = []
+    for key, field in fields.items():
+        value = field.get("value") if isinstance(field, dict) else field
+        if value in (None, "", [], {}):
+            continue
+        label = labels.get(key, str(key).replace("_", " "))
+        confidence = field.get("confidence") if isinstance(field, dict) else None
+        suffix = f" ({confidence}%)" if confidence not in (None, "") else ""
+        filled.append(f"{label}: {value}{suffix}")
+    return "; ".join(filled[:18]) if filled else "geen ingevulde parsingvelden"
 
 
 def _whatsapp_workflow(statuses: dict) -> list[dict]:

@@ -768,13 +768,20 @@
                             <a class="ghost-button" href="/dashboard">Terug naar overzicht</a>
                         </div>
 
-                        <div class="audit-menu-grid">
+                        <div class="audit-toolbar">
+                            <label>
+                                <span>Zoeken in auditspoor</span>
+                                <input type="search" placeholder="Zoek op actie, object, ID, persoon, bestand, telefoon, API-data..." data-audit-search>
+                            </label>
+                        </div>
+
+                        <div class="audit-menu-grid" data-audit-search-scope>
                             {% for group in audit_menu_groups|default([]) %}
-                            <section class="audit-menu-section" id="audit-{{ group.label|lower|replace(' ', '-') }}">
-                                <div class="audit-menu-section__head">
-                                    <h3>{{ group.label }}</h3>
-                                    <span>{{ group["items"]|length }} regels</span>
-                                </div>
+                            <details class="audit-menu-section" id="audit-{{ group.label|lower|replace(' ', '-') }}" data-audit-group open>
+                                <summary class="audit-menu-section__head">
+                                    <strong>{{ group.label }}</strong>
+                                    <span data-audit-group-count>{{ group["items"]|length }} regels</span>
+                                </summary>
                                 <div class="audit-sheet audit-sheet--menu">
                                     <div class="audit-row audit-row--compact audit-row--head" aria-hidden="true">
                                         <span>Tijd</span>
@@ -791,11 +798,14 @@
                                         <span hidden data-audit-detail-title>Audit #{{ item.id }} · {{ item.title }}</span>
                                         <span hidden data-audit-detail-meta>{{ item.time }} · {{ item.user }} · {{ item.status }} · {{ item.entity_type }}{% if item.entity_id %} #{{ item.entity_id }}{% endif %}</span>
                                         <span hidden data-audit-detail-body>{{ item.detail or 'Geen omschrijving vastgelegd.' }}</span>
-                                        <span hidden data-audit-detail-extra>{% if item.metadata_summary and item.metadata_summary != 'Geen extra metadata' %}{{ item.metadata_summary }}{% endif %}</span>
+                                        <span hidden data-audit-detail-extra>{% if item.privacy_summary %}{{ item.privacy_summary }}{% endif %}{% if item.privacy_summary and item.metadata_summary and item.metadata_summary != 'Geen extra metadata' %}
+
+Metadata:
+{% endif %}{% if item.metadata_summary and item.metadata_summary != 'Geen extra metadata' %}{{ item.metadata_summary }}{% endif %}</span>
                                     </button>
                                     {% endfor %}
                                 </div>
-                            </section>
+                            </details>
                             {% else %}
                             <div class="empty-state">
                                 <strong>Nog geen auditregels</strong>
