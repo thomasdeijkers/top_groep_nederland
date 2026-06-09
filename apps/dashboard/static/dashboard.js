@@ -64,6 +64,8 @@
     const auditDetailBody = document.querySelector("[data-audit-detail-modal-body]");
     const auditDetailExtra = document.querySelector("[data-audit-detail-modal-extra]");
     const auditDetailExtraSection = document.querySelector("[data-audit-extra-section]");
+    const auditDetailBodyTitle = document.querySelector("[data-audit-detail-modal-body-title]");
+    const auditDetailExtraTitle = document.querySelector("[data-audit-detail-modal-extra-title]");
     const closeAuditDetail = () => {
         if (auditDetailModal) {
             auditDetailModal.hidden = true;
@@ -78,6 +80,13 @@
             auditDetailTitle.textContent = button.querySelector("[data-audit-detail-title]")?.textContent?.trim() || "Auditregel";
             auditDetailMeta.textContent = button.querySelector("[data-audit-detail-meta]")?.textContent?.trim() || "";
             auditDetailBody.textContent = button.querySelector("[data-audit-detail-body]")?.textContent?.trim() || "";
+            const isApiAudit = auditDetailTitle.textContent.includes("ChatGPT API");
+            if (auditDetailBodyTitle) {
+                auditDetailBodyTitle.textContent = isApiAudit ? "Naar ChatGPT gestuurd" : "Omschrijving";
+            }
+            if (auditDetailExtraTitle) {
+                auditDetailExtraTitle.textContent = isApiAudit ? "Van ChatGPT teruggekregen" : "Data";
+            }
             const extra = button.querySelector("[data-audit-detail-extra]")?.textContent?.trim() || "";
             auditDetailExtra.textContent = extra;
             if (auditDetailExtraSection) {

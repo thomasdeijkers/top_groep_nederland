@@ -2356,8 +2356,8 @@ select.select-has-value {
 }
 
 .audit-detail-dialog {
-    width: min(980px, 100%);
-    max-height: min(86vh, 860px);
+    width: min(960px, 100%);
+    max-height: min(88vh, 860px);
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
     padding: 16px;
@@ -2387,35 +2387,66 @@ select.select-has-value {
 
 .audit-detail-dialog__content {
     display: grid;
-    grid-template-columns: minmax(260px, 0.7fr) minmax(360px, 1.3fr);
-    gap: 10px;
+    gap: 8px;
     min-height: 0;
+    overflow: auto;
+    padding-right: 2px;
 }
 
-.audit-detail-dialog__content section {
+.audit-detail-section {
     min-width: 0;
     min-height: 0;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.025);
+    overflow: hidden;
 }
 
-.audit-detail-dialog__content h3 {
-    margin: 0 0 6px;
+.audit-detail-section summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 38px;
+    padding: 0 10px;
+    cursor: pointer;
+    list-style: none;
+}
+
+.audit-detail-section summary::-webkit-details-marker {
+    display: none;
+}
+
+.audit-detail-section summary::before {
+    content: "▾";
+    color: #7fd1a0;
+    font-size: 0.72rem;
+}
+
+.audit-detail-section:not([open]) summary::before {
+    content: "▸";
+}
+
+.audit-detail-section summary strong {
     color: #ffffff;
     font-size: 0.82rem;
 }
 
 .audit-detail-dialog__content pre {
-    max-height: calc(86vh - 170px);
-    min-height: 160px;
+    max-height: min(38vh, 330px);
+    min-height: 0;
     margin: 0;
     overflow: auto;
-    padding: 10px;
-    border-radius: 7px;
+    padding: 10px 12px 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 0;
     background: rgba(7, 14, 18, 0.52);
     color: #dbe5eb;
-    font-size: 0.76rem;
-    line-height: 1.45;
+    font-family: inherit;
+    font-size: 0.8rem;
+    line-height: 1.55;
     white-space: pre-wrap;
-    word-break: break-word;
+    word-break: normal;
+    overflow-wrap: anywhere;
 }
 
 .candidate-match-parsed strong {
@@ -3629,7 +3660,7 @@ body[data-theme="light"] .audit-toolbar input {
 body[data-theme="light"] .audit-menu-section__head strong,
 body[data-theme="light"] .api-audit-row__time,
 body[data-theme="light"] .audit-detail-dialog__header h2,
-body[data-theme="light"] .audit-detail-dialog__content h3 {
+body[data-theme="light"] .audit-detail-section summary strong {
     color: #172027;
 }
 
@@ -3649,6 +3680,11 @@ body[data-theme="light"] .audit-detail-dialog__content pre {
 body[data-theme="light"] .audit-detail-dialog {
     border-color: rgba(28, 42, 50, 0.14);
     background: #ffffff;
+}
+
+body[data-theme="light"] .audit-detail-section {
+    border-color: rgba(28, 42, 50, 0.1);
+    background: rgba(247, 251, 248, 0.84);
 }
 
 body[data-theme="light"] .audit-detail-dialog__content pre {
@@ -6094,10 +6130,6 @@ body[data-theme="light"] .theme-toggle strong {
     }
 
     .api-audit-row {
-        grid-template-columns: 1fr;
-    }
-
-    .audit-detail-dialog__content {
         grid-template-columns: 1fr;
     }
 

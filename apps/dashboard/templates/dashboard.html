@@ -872,14 +872,18 @@ Metadata:
                                 <button class="modal-close" type="button" data-audit-detail-close aria-label="Sluiten">x</button>
                             </header>
                             <div class="audit-detail-dialog__content">
-                                <section>
-                                    <h3>Omschrijving</h3>
+                                <details class="audit-detail-section" open>
+                                    <summary>
+                                        <strong data-audit-detail-modal-body-title>Omschrijving</strong>
+                                    </summary>
                                     <pre data-audit-detail-modal-body></pre>
-                                </section>
-                                <section data-audit-extra-section>
-                                    <h3>Data</h3>
+                                </details>
+                                <details class="audit-detail-section" data-audit-extra-section open>
+                                    <summary>
+                                        <strong data-audit-detail-modal-extra-title>Data</strong>
+                                    </summary>
                                     <pre data-audit-detail-modal-extra></pre>
-                                </section>
+                                </details>
                             </div>
                         </article>
                     </div>
