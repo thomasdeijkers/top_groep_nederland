@@ -15,7 +15,7 @@ from apps.dashboard.placeholders import (
     TICKET_QUEUES,
 )
 from apps.dashboard.organizations import create_organization, list_organizations
-from apps.dashboard.openai_usage import get_openai_usage_summary
+from apps.dashboard.openai_usage import get_openai_usage_summary, list_openai_api_audit_events
 from apps.dashboard.payroll_excel import build_payroll_output_workbook
 from apps.dashboard.records import (
     archive_payroll_period,
@@ -354,7 +354,9 @@ def _dashboard_context(
         "whatsapp_workflow": [],
         "weekly_hours_yoy": [],
     }
-    audit_events = list_audit_events(120 if data_page == "audit" else 14) if data_page in {"overview", "audit", "settings", "periods"} else []
+    audit_events = list_audit_events(160 if data_page == "audit" else 8) if data_page in {"overview", "audit", "settings", "periods"} else []
+    audit_menu_groups = _audit_menu_groups(audit_events) if data_page == "audit" else []
+    openai_api_audit_events = list_openai_api_audit_events(40) if data_page == "audit" else []
     openai_usage = get_openai_usage_summary()
     project_options = list_project_options() if data_page in {"timesheets", "projects", "periods"} else []
     projects = list_projects(query=query) if data_page == "projects" else []
@@ -409,6 +411,8 @@ def _dashboard_context(
         "review_items": REVIEW_ITEMS,
         "activity_items": ACTIVITY_ITEMS,
         "audit_events": audit_events,
+        "audit_menu_groups": audit_menu_groups,
+        "openai_api_audit_events": openai_api_audit_events,
         "server_metrics": server_overview["server_metrics"],
         "server_system_tiles": server_overview["server_system_tiles"],
         "server_scheduler_tiles": server_overview["server_scheduler_tiles"],
@@ -469,6 +473,38 @@ def _dashboard_context(
             "Overig",
         ],
     }
+
+
+def _audit_menu_groups(events: list[dict]) -> list[dict]:
+    labels = [
+        "Urenverwerking",
+        "Controle",
+        "Loon berekenen",
+        "Accorderen",
+        "Periodes",
+        "Relaties",
+        "Vacatures",
+        "Projecten",
+        "Instellingen",
+        "Archief",
+        "Verwijderd",
+        "Systeem",
+    ]
+    grouped = {label: [] for label in labels}
+    other = []
+    for event in events:
+        label = event.get("status") or event.get("entity_type") or "Overig"
+        target = label if label in grouped else None
+        if not target and str(label).lower() in {"akkoord"}:
+            target = "Accorderen"
+        if target:
+            grouped[target].append(event)
+        else:
+            other.append(event)
+    result = [{"label": label, "items": grouped[label]} for label in labels if grouped[label]]
+    if other:
+        result.append({"label": "Overig", "items": other})
+    return result
 
 
 def _render_dashboard(

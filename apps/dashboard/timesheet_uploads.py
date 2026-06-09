@@ -4,7 +4,7 @@ from uuid import uuid4
 from psycopg2.extras import Json
 
 from apps.dashboard.data_store import ensure_dashboard_tables
-from apps.dashboard.openai_usage import record_openai_usage
+from apps.dashboard.openai_usage import record_openai_api_audit, record_openai_usage
 from apps.dashboard.phone_match import find_candidate_by_phone
 from apps.dashboard.timesheet_parser import parse_timesheet
 from shared.db.connection import get_connection
@@ -104,6 +104,17 @@ def save_timesheet_upload(
 
     if parsed.get("openai_usage"):
         record_openai_usage("whatsapp_timesheet", record_id, parsed.get("model", "gpt-4.1-mini"), parsed["openai_usage"])
+    if parsed.get("openai_api_audit"):
+        audit = parsed["openai_api_audit"]
+        record_openai_api_audit(
+            "whatsapp_timesheet",
+            record_id,
+            audit.get("model", parsed.get("model", "gpt-4.1-mini")),
+            audit.get("endpoint", ""),
+            audit.get("request_payload") or {},
+            audit.get("response_payload") or {},
+            audit.get("status_code"),
+        )
 
     return record_id
 
@@ -184,3 +195,14 @@ def reparse_timesheet_upload(timesheet_id: int, allow_openai: bool = True) -> No
 
     if parsed.get("openai_usage"):
         record_openai_usage("whatsapp_timesheet_reparse", timesheet_id, parsed.get("model", "gpt-4.1-mini"), parsed["openai_usage"])
+    if parsed.get("openai_api_audit"):
+        audit = parsed["openai_api_audit"]
+        record_openai_api_audit(
+            "whatsapp_timesheet_reparse",
+            timesheet_id,
+            audit.get("model", parsed.get("model", "gpt-4.1-mini")),
+            audit.get("endpoint", ""),
+            audit.get("request_payload") or {},
+            audit.get("response_payload") or {},
+            audit.get("status_code"),
+        )

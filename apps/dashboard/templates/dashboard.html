@@ -18,7 +18,7 @@
         </title>
         <link rel="icon" href="/dashboard/static/favicon.ico" sizes="any">
         <link rel="shortcut icon" href="/dashboard/static/favicon.ico">
-        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260608-08">
+        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260609-01">
     </head>
     <body class="page-{{ active_page }}">
         {% macro confidence_light(field) -%}
@@ -724,7 +724,7 @@
                         <div class="panel-header">
                             <div>
                                 <h2>Auditspoor</h2>
-                                <p>Laatste dashboardacties met tijd, gebruiker, object, omschrijving, status en extra context.</p>
+                                <p>Laatste dashboardacties compact samengevat per tijd, object en onderdeel.</p>
                             </div>
                             <a class="ghost-button" href="/dashboard/audit#auditspoor">Open auditspoor</a>
                         </div>
@@ -744,12 +744,9 @@
                                     <p>{{ item.detail or 'Geen omschrijving vastgelegd.' }}</p>
                                     <div class="audit-rich-row__meta">
                                         <span>Audit #{{ item.id }}</span>
-                                        <span>{{ item.entity_type }}{% if item.entity_id %} #{{ item.entity_id }}{% endif %}</span>
-                                        {% if item.entity_label %}<span>Label: {{ item.entity_label }}</span>{% endif %}
-                                        <span>{{ item.user }}</span>
                                         <span>{{ item.status }}</span>
+                                        <span>{{ item.entity_type }}{% if item.entity_id %} #{{ item.entity_id }}{% endif %}</span>
                                     </div>
-                                    <small>{{ item.metadata_summary }}</small>
                                 </div>
                             </article>
                             {% else %}
@@ -761,39 +758,103 @@
                         </div>
                     </article>
 
-                    <article class="panel panel--full audit-only" id="auditspoor">
+                    <article class="panel panel--full audit-only audit-workspace" id="auditspoor">
                         <div class="panel-header">
                             <div>
                                 <p class="section-label">Trackrecord</p>
-                                <h2>Volledig auditspoor</h2>
-                                <p>Scroll door de vastgelegde dashboardacties. Voor nu worden alle acties onder gebruiker Admin opgeslagen.</p>
+                                <h2>Auditspoor per menu</h2>
+                                <p>Dashboardacties gegroepeerd per onderdeel, met compacte regels en metadata alleen waar nodig.</p>
                             </div>
                             <a class="ghost-button" href="/dashboard">Terug naar overzicht</a>
                         </div>
 
-                        <div class="audit-sheet">
-                            {% for item in audit_events %}
-                            <article class="audit-row">
-                                <div class="audit-row__primary">
-                                    <strong>{{ item.title }}</strong>
-                                    <span>{{ item.entity_display }}</span>
-                                    {% if item.entity_label %}<span>{{ item.entity_label }}</span>{% endif %}
-                                    <small>Audit #{{ item.id }} · {{ item.entity_type }}{% if item.entity_id %} #{{ item.entity_id }}{% endif %}</small>
+                        <div class="audit-menu-grid">
+                            {% for group in audit_menu_groups %}
+                            <section class="audit-menu-section" id="audit-{{ group.label|lower|replace(' ', '-') }}">
+                                <div class="audit-menu-section__head">
+                                    <h3>{{ group.label }}</h3>
+                                    <span>{{ group.items|length }} regels</span>
                                 </div>
-                                <div class="audit-row__detail">
-                                    <p>{{ item.detail or 'Geen omschrijving vastgelegd.' }}</p>
-                                    <small>{{ item.metadata_summary }}</small>
+                                <div class="audit-sheet audit-sheet--menu">
+                                    {% for item in group.items %}
+                                    <article class="audit-row audit-row--compact">
+                                        <time>{{ item.time }}</time>
+                                        <div class="audit-row__primary">
+                                            <strong>{{ item.title }}</strong>
+                                            <span>{{ item.entity_display }}</span>
+                                        </div>
+                                        <div class="audit-row__detail">
+                                            <p>{{ item.detail or 'Geen omschrijving vastgelegd.' }}</p>
+                                            {% if item.metadata_summary and item.metadata_summary != 'Geen extra metadata' %}
+                                            <small>{{ item.metadata_summary }}</small>
+                                            {% endif %}
+                                        </div>
+                                        <span class="audit-row__id">#{{ item.id }}</span>
+                                    </article>
+                                    {% endfor %}
                                 </div>
-                                <div class="activity-meta-row">
-                                    <em>{{ item.user }}</em>
-                                    <time>{{ item.time }}</time>
-                                    <b>{{ item.status }}</b>
-                                </div>
-                            </article>
+                            </section>
                             {% else %}
                             <div class="empty-state">
                                 <strong>Nog geen auditregels</strong>
                                 <span>Nieuwe acties worden vanaf nu automatisch vastgelegd.</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </article>
+
+                    <article class="panel panel--full audit-only audit-workspace" id="chatgpt-api-audit">
+                        <div class="panel-header">
+                            <div>
+                                <p class="section-label">ChatGPT API</p>
+                                <h2>Parsing auditspoor</h2>
+                                <p>Wat bij urenbriefjes naar ChatGPT is gestuurd en wat de API terugstuurde.</p>
+                            </div>
+                            <div class="openai-cost-card">
+                                <span>Deze maand</span>
+                                <strong>${{ "%.2f"|format(openai_usage.month_cost_usd|float) }}</strong>
+                                <small>{{ openai_usage.month_requests }} parsing{% if openai_usage.month_requests != 1 %}s{% endif %}</small>
+                            </div>
+                        </div>
+
+                        <div class="api-audit-list">
+                            {% for item in openai_api_audit_events %}
+                            <details class="api-audit-row">
+                                <summary>
+                                    <span class="api-audit-row__time">{{ item.clock }}<small>{{ item.date }}</small></span>
+                                    <span>
+                                        <strong>{{ item.source }}{% if item.source_id %} #{{ item.source_id }}{% endif %}</strong>
+                                        <small>{{ item.model }} · {{ item.endpoint }} · status {{ item.status_code or '-' }}</small>
+                                    </span>
+                                    <b>{{ item.response_summary }}</b>
+                                </summary>
+                                <div class="api-audit-row__body">
+                                    <div>
+                                        <h3>Prompt</h3>
+                                        <p>{{ item.request_prompt }}</p>
+                                        <small>{{ item.request_image }}</small>
+                                    </div>
+                                    {% if item.error %}
+                                    <div>
+                                        <h3>Fout</h3>
+                                        <pre>{{ item.error }}</pre>
+                                    </div>
+                                    {% endif %}
+                                    <div>
+                                        <h3>Request payload</h3>
+                                        <small>Afbeelding is in deze schermpreview samengevat; de volledige waarde staat in het auditrecord.</small>
+                                        <pre>{{ item.request_json }}</pre>
+                                    </div>
+                                    <div>
+                                        <h3>Response payload</h3>
+                                        <pre>{{ item.response_json }}</pre>
+                                    </div>
+                                </div>
+                            </details>
+                            {% else %}
+                            <div class="empty-state empty-state--compact">
+                                <strong>Nog geen ChatGPT API-audit</strong>
+                                <span>Nieuwe OpenAI parsing-aanroepen worden hier vastgelegd.</span>
                             </div>
                             {% endfor %}
                         </div>

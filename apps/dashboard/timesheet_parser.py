@@ -157,8 +157,9 @@ def _parse_with_openai(content: bytes, filename: str) -> dict | None:
     }
 
     try:
+        endpoint = "https://api.openai.com/v1/responses"
         response = requests.post(
-            "https://api.openai.com/v1/responses",
+            endpoint,
             headers={
                 "Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}",
                 "Content-Type": "application/json",
@@ -173,6 +174,13 @@ def _parse_with_openai(content: bytes, filename: str) -> dict | None:
             return None
         parsed = _normalize_openai_result(data, filename)
         parsed["openai_usage"] = _normalize_usage(response_payload.get("usage") or {})
+        parsed["openai_api_audit"] = {
+            "model": model,
+            "endpoint": endpoint,
+            "request_payload": payload,
+            "response_payload": response_payload,
+            "status_code": response.status_code,
+        }
         return parsed
     except Exception:
         return None

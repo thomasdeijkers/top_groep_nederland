@@ -1,6 +1,9 @@
 import os
 import time
+import json
 from decimal import Decimal
+
+from psycopg2.extras import Json
 
 from apps.dashboard.data_store import ensure_dashboard_tables
 from shared.db.connection import get_connection
@@ -67,6 +70,64 @@ def record_openai_usage(source: str, source_id: int | None, model: str, usage: d
             )
         conn.commit()
     _USAGE_CACHE = None
+
+
+def record_openai_api_audit(
+    source: str,
+    source_id: int | None,
+    model: str,
+    endpoint: str,
+    request_payload: dict,
+    response_payload: dict | None = None,
+    status_code: int | None = None,
+    error: str = "",
+) -> None:
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO openai_api_audit_events (
+                        source, source_id, model, endpoint, request_payload,
+                        response_payload, status_code, error
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s);
+                    """,
+                    (
+                        source,
+                        source_id,
+                        model,
+                        endpoint,
+                        Json(request_payload or {}),
+                        Json(response_payload or {}),
+                        status_code,
+                        error or "",
+                    ),
+                )
+            conn.commit()
+    except Exception:
+        return
+
+
+def list_openai_api_audit_events(limit: int = 30) -> list[dict]:
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT id, source, source_id, model, endpoint, request_payload,
+                           response_payload, status_code, error, created_at
+                    FROM openai_api_audit_events
+                    ORDER BY created_at DESC, id DESC
+                    LIMIT %s;
+                    """,
+                    (limit,),
+                )
+                return [_format_openai_api_audit_row(row) for row in cursor.fetchall()]
+    except Exception:
+        return []
 
 
 def get_openai_usage_summary() -> dict:
@@ -141,3 +202,69 @@ def _decimal_env(name: str, fallback: str) -> Decimal:
 
 def _display_cost(value) -> Decimal:
     return Decimal(str(value or 0)) * OPENAI_USAGE_COST_MULTIPLIER
+
+
+def _format_openai_api_audit_row(row) -> dict:
+    request_payload = row[5] or {}
+    response_payload = row[6] or {}
+    request_summary = _openai_request_summary(request_payload)
+    response_summary = _openai_response_summary(response_payload)
+    return {
+        "id": row[0],
+        "source": row[1],
+        "source_id": row[2],
+        "model": row[3],
+        "endpoint": row[4],
+        "status_code": row[7],
+        "error": row[8] or "",
+        "time": row[9].strftime("%d-%m-%Y %H:%M") if row[9] else "-",
+        "clock": row[9].strftime("%H:%M") if row[9] else "-",
+        "date": row[9].strftime("%d-%m-%Y") if row[9] else "-",
+        "request_prompt": request_summary["prompt"],
+        "request_image": request_summary["image"],
+        "request_json": _json_preview(_summarize_image_payload(request_payload)),
+        "response_summary": response_summary,
+        "response_json": _json_preview(response_payload),
+    }
+
+
+def _openai_request_summary(payload: dict) -> dict:
+    prompt = ""
+    image = ""
+    for item in payload.get("input", []):
+        for content in item.get("content", []):
+            if content.get("type") == "input_text":
+                prompt = content.get("text") or prompt
+            if content.get("type") == "input_image":
+                image_url = content.get("image_url") or ""
+                image = f"{content.get('detail', 'auto')} detail, {len(image_url)} tekens image_url"
+    return {"prompt": prompt, "image": image or "Geen afbeelding"}
+
+
+def _openai_response_summary(payload: dict) -> str:
+    usage = payload.get("usage") or {}
+    output_tokens = _int(usage.get("output_tokens"))
+    total_tokens = _int(usage.get("total_tokens"))
+    if total_tokens:
+        return f"{total_tokens} tokens totaal, {output_tokens} output"
+    if payload.get("id"):
+        return f"Response {payload.get('id')}"
+    return "Geen responsepayload"
+
+
+def _json_preview(payload: dict) -> str:
+    return json.dumps(payload or {}, ensure_ascii=False, indent=2, default=str)
+
+
+def _summarize_image_payload(payload: dict) -> dict:
+    try:
+        clone = json.loads(json.dumps(payload or {}, default=str))
+    except Exception:
+        return payload or {}
+    for item in clone.get("input", []):
+        for content in item.get("content", []):
+            if content.get("type") == "input_image" and content.get("image_url"):
+                image_url = content["image_url"]
+                prefix = str(image_url).split(",", 1)[0]
+                content["image_url"] = f"{prefix},... ({len(str(image_url))} tekens; volledige waarde opgeslagen in auditrecord)"
+    return clone
