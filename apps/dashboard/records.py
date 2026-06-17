@@ -2577,6 +2577,137 @@ def _attach_project_bookings(cursor, projects: list[dict], per_project: int = 5)
         )
 
 
+def get_payroll_parameter_values(year: int, period_number: int, branch: str = "build") -> dict[str, Decimal | str | None]:
+    branch_key = "uta_value" if str(branch).lower() == "uta" else "build_value"
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT DISTINCT ON (p.parameter_key)
+                           p.parameter_key,
+                           p.unit,
+                           v.build_value,
+                           v.uta_value,
+                           v.text_value
+                    FROM payroll_parameters p
+                    JOIN payroll_parameter_versions v
+                        ON v.parameter_id = p.id
+                    WHERE COALESCE(p.status, 'active') = 'active'
+                      AND COALESCE(v.status, 'active') = 'active'
+                      AND (v.year = %s OR v.year IS NULL)
+                      AND (v.period_number <= %s OR v.period_number IS NULL)
+                    ORDER BY p.parameter_key,
+                             v.year DESC NULLS LAST,
+                             v.period_number DESC NULLS LAST,
+                             v.id DESC;
+                    """,
+                    (year, period_number),
+                )
+                rows = cursor.fetchall()
+        values = {}
+        for key, _unit, build_value, uta_value, text_value in rows:
+            numeric_value = uta_value if branch_key == "uta_value" else build_value
+            if numeric_value is None and branch_key == "uta_value":
+                numeric_value = build_value
+            if numeric_value is None and branch_key == "build_value":
+                numeric_value = uta_value
+            values[key] = Decimal(str(numeric_value)) if numeric_value is not None else text_value
+        return values
+    except Exception:
+        return {}
+
+
+def list_payroll_parameters(limit: int = 200) -> list[dict]:
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT p.id,
+                           p.parameter_key,
+                           p.name,
+                           p.category,
+                           p.unit,
+                           p.value_type,
+                           p.applies_to,
+                           p.source_reference,
+                           p.description,
+                           p.status,
+                           v.year,
+                           v.period_number,
+                           v.build_value,
+                           v.uta_value,
+                           v.text_value,
+                           COALESCE(v.source_reference, p.source_reference),
+                           v.notes,
+                           v.status
+                    FROM payroll_parameters p
+                    LEFT JOIN payroll_parameter_versions v
+                        ON v.parameter_id = p.id
+                    WHERE COALESCE(p.status, 'active') <> 'archived'
+                    ORDER BY
+                        p.category,
+                        p.name,
+                        v.year NULLS LAST,
+                        v.period_number NULLS LAST,
+                        v.id NULLS LAST
+                    LIMIT %s;
+                    """,
+                    (limit,),
+                )
+                rows = cursor.fetchall()
+        parameters: dict[int, dict] = {}
+        for row in rows:
+            item = parameters.setdefault(
+                row[0],
+                {
+                    "id": row[0],
+                    "parameter_key": row[1],
+                    "name": row[2],
+                    "category": row[3],
+                    "unit": row[4],
+                    "value_type": row[5],
+                    "applies_to": row[6],
+                    "source_reference": row[7] or "",
+                    "description": row[8] or "",
+                    "status": row[9] or "active",
+                    "versions": [],
+                },
+            )
+            if row[10] is not None or row[11] is not None:
+                item["versions"].append(
+                    {
+                        "year": row[10] or "-",
+                        "period_number": row[11] or "-",
+                        "build_value": _format_parameter_value(row[12], row[4]),
+                        "uta_value": _format_parameter_value(row[13], row[4]),
+                        "text_value": row[14] or "",
+                        "source_reference": row[15] or "",
+                        "notes": row[16] or "",
+                        "status": row[17] or "active",
+                    }
+                )
+        return list(parameters.values())
+    except Exception:
+        return []
+
+
+def _format_parameter_value(value, unit: str = "") -> str:
+    if value is None:
+        return "-"
+    decimal_value = Decimal(str(value))
+    if unit == "percentage":
+        return f"{(decimal_value * Decimal('100')).normalize()}%"
+    if unit.startswith("euro"):
+        return _format_money(decimal_value)
+    if decimal_value == decimal_value.to_integral():
+        return str(int(decimal_value))
+    return _format_number(decimal_value)
+
+
 def list_cao_settings(limit: int = 25) -> list[dict]:
     try:
         ensure_dashboard_tables()

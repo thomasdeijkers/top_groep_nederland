@@ -42,6 +42,7 @@ def ensure_dashboard_tables():
         Path("migrations/028_payroll_period_02_test_timesheets.sql"),
         Path("migrations/029_relation_payroll_settings.sql"),
         Path("migrations/030_openai_api_audit_events.sql"),
+        Path("migrations/031_payroll_parameters.sql"),
     ]
 
     optional_migrations = {

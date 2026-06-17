@@ -97,6 +97,16 @@ class PayrollCalculationTests(unittest.TestCase):
         self.assertEqual(workbook.sheetnames, ["WK17", "Periode", "Loonstrook"])
 
 
+class PayrollParameterTests(unittest.TestCase):
+    def test_formats_parameter_percentages_for_display(self):
+        self.assertEqual(records._format_parameter_value("0.0833", "percentage"), "8.33%")
+        self.assertEqual(records._format_parameter_value("0.0800", "percentage"), "8%")
+
+    def test_formats_parameter_money_for_display(self):
+        self.assertIn("0,28", records._format_parameter_value("0.28", "euro_per_km"))
+
+
+
 class PayrollPeriodStructureTests(unittest.TestCase):
     def test_available_payroll_period_numbers_stop_at_thirteen(self):
         with patch.object(records, "ensure_dashboard_tables", side_effect=RuntimeError("geen database")):

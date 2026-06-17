@@ -309,6 +309,72 @@
                                 </div>
                             </section>
 
+                            <section class="settings-card settings-card--wide" id="grondslag-parameters">
+                                <div class="settings-card-heading">
+                                    <div>
+                                        <p class="section-label">Verloning</p>
+                                        <h2>Grondslag parameters</h2>
+                                        <p>Centrale periode-gebonden bron voor tarieven, percentages en vergoedingen uit de blauwdruk.</p>
+                                    </div>
+                                </div>
+
+                                <div class="table-wrap payroll-settings-table">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Parameter</th>
+                                                <th>Categorie</th>
+                                                <th>Periode</th>
+                                                <th>Bouwplaats</th>
+                                                <th>UTA</th>
+                                                <th>Eenheid</th>
+                                                <th>Bron</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for parameter in payroll_parameters %}
+                                                {% for version in parameter.versions %}
+                                                <tr>
+                                                    <td>
+                                                        <strong>{{ parameter.name }}</strong>
+                                                        <span>{{ parameter.description or parameter.parameter_key }}</span>
+                                                    </td>
+                                                    <td>{{ parameter.category }}</td>
+                                                    <td>{{ version.year }} / P{{ version.period_number }}</td>
+                                                    <td>{{ version.build_value }}</td>
+                                                    <td>{{ version.uta_value }}</td>
+                                                    <td>{{ parameter.unit }}</td>
+                                                    <td>{{ version.source_reference or parameter.source_reference or '-' }}</td>
+                                                </tr>
+                                                {% else %}
+                                                <tr>
+                                                    <td>
+                                                        <strong>{{ parameter.name }}</strong>
+                                                        <span>{{ parameter.description or parameter.parameter_key }}</span>
+                                                    </td>
+                                                    <td>{{ parameter.category }}</td>
+                                                    <td>-</td>
+                                                    <td>-</td>
+                                                    <td>-</td>
+                                                    <td>{{ parameter.unit }}</td>
+                                                    <td>{{ parameter.source_reference or '-' }}</td>
+                                                </tr>
+                                                {% endfor %}
+                                            {% else %}
+                                            <tr>
+                                                <td colspan="7">
+                                                    <div class="empty-state">
+                                                        <strong>Nog geen grondslag parameters</strong>
+                                                        <span>De migratie vult de eerste set met waarden uit de blauwdruk.</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </section>
+
                             <section class="settings-card settings-card--wide" id="cao-instellingen">
                                 <div class="settings-card-heading">
                                     <div>
