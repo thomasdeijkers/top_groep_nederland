@@ -202,6 +202,28 @@ class PayrollParameterTests(unittest.TestCase):
 
 
 
+class RelationPayrollContextTests(unittest.TestCase):
+    def test_relation_payroll_context_combines_employee_layers(self):
+        arrangement = {"id": 11, "relation_id": 7}
+        balance = {"id": 21, "relation_id": 7}
+        settlement = {"period_label": "2026 P5", "relation_id": 7}
+
+        with patch.object(records, "list_relation_payroll_employee_arrangements", return_value=[arrangement]), \
+             patch.object(records, "list_relation_payroll_running_balances", return_value=[balance]), \
+             patch.object(records, "list_relation_payroll_period_settlements", return_value=[settlement]):
+            context = records.get_relation_payroll_context(7)
+
+        self.assertEqual(context["current_arrangement"], arrangement)
+        self.assertEqual(context["balances"], [balance])
+        self.assertEqual(context["settlements"], [settlement])
+
+    def test_relation_payroll_context_handles_empty_relation(self):
+        self.assertEqual(
+            records.get_relation_payroll_context(None),
+            {"arrangements": [], "current_arrangement": None, "balances": [], "settlements": []},
+        )
+
+
 class PayrollPeriodStructureTests(unittest.TestCase):
     def test_available_payroll_period_numbers_stop_at_thirteen(self):
         with patch.object(records, "ensure_dashboard_tables", side_effect=RuntimeError("geen database")):

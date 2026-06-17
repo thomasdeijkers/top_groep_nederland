@@ -839,6 +839,87 @@
                                 <label class="form-span-2">Notities <textarea name="notes">{{ selected_relation.notes|default('', true) if selected_relation else '' }}</textarea></label>
                                 <button class="ghost-button create-form__submit" type="submit">Relatie opslaan</button>
                             </form>
+                            {% if selected_relation and selected_relation_payroll %}
+                            <section class="relation-payroll-card" data-candidate-field>
+                                <div class="panel-header panel-header--compact">
+                                    <div>
+                                        <p class="section-label">Medewerkerkaart</p>
+                                        <h3>Verloning medewerkerkaart</h3>
+                                    </div>
+                                    <a class="ghost-button" href="/dashboard/periods#periodes">Periodes openen</a>
+                                </div>
+                                {% set payroll_arrangement = selected_relation_payroll.current_arrangement %}
+                                <div class="relation-payroll-overview">
+                                    {% if payroll_arrangement %}
+                                    <div>
+                                        <span>Inrichting</span>
+                                        <strong>{{ payroll_arrangement.cao_branch }} &middot; {{ payroll_arrangement.payment_schedule }}</strong>
+                                        <small>{{ payroll_arrangement.valid_from }} tot {{ payroll_arrangement.valid_until }}</small>
+                                    </div>
+                                    <div>
+                                        <span>Netto basis 40 uur</span>
+                                        <strong>{{ payroll_arrangement.net_base_40h }}</strong>
+                                        <small>{{ payroll_arrangement.phase }} &middot; {{ payroll_arrangement.pension_scheme }}</small>
+                                    </div>
+                                    <div>
+                                        <span>Functie / schaal</span>
+                                        <strong>{{ payroll_arrangement.function_name }}</strong>
+                                        <small>{{ payroll_arrangement.scale_code }} &middot; bruto {{ payroll_arrangement.gross_hourly_wage }}</small>
+                                    </div>
+                                    {% else %}
+                                    <div class="relation-payroll-empty">
+                                        <strong>Nog geen medewerkerinrichting</strong>
+                                        <small>Vul de vaste verloningsgegevens hierboven aan; daarna kan de periodeberekening deze medewerker koppelen.</small>
+                                    </div>
+                                    {% endif %}
+                                </div>
+
+                                <div class="relation-payroll-split">
+                                    <div class="relation-payroll-list">
+                                        <h4>Lopende saldi</h4>
+                                        {% for balance in selected_relation_payroll.balances %}
+                                        <div class="relation-payroll-line">
+                                            <div>
+                                                <strong>{{ balance.balance_label }}</strong>
+                                                <span>{{ balance.balance_year }} &middot; {{ balance.mutation_count }} mutaties &middot; laatste {{ balance.last_mutation_date }}</span>
+                                            </div>
+                                            <div>
+                                                <strong>{{ balance.current_balance }}</strong>
+                                                <span>{{ balance.status }}{% if balance.annual_limit != '-' %} &middot; max {{ balance.annual_limit }}{% endif %}</span>
+                                            </div>
+                                        </div>
+                                        {% else %}
+                                        <div class="empty-state empty-state--compact">
+                                            <strong>Nog geen lopende saldi</strong>
+                                            <span>WKR, voorschotten/leningen en keuzebudget verschijnen hier zodra ze voor deze medewerker zijn vastgelegd.</span>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+
+                                    <div class="relation-payroll-list">
+                                        <h4>Recente afrekeningen</h4>
+                                        {% for settlement in selected_relation_payroll.settlements %}
+                                        <div class="relation-payroll-line">
+                                            <div>
+                                                <strong>{{ settlement.period_label }}</strong>
+                                                <span>{{ settlement.week_count }} weken &middot; {{ settlement.worked_hours }} uur &middot; {{ settlement.payment_schedule }}</span>
+                                            </div>
+                                            <div>
+                                                <strong>{{ settlement.net_period_total }}</strong>
+                                                <span>{{ settlement.status_label }}</span>
+                                            </div>
+                                        </div>
+                                        {% else %}
+                                        <div class="empty-state empty-state--compact">
+                                            <strong>Nog geen periode-afrekening</strong>
+                                            <span>Na weekverwerking en periodeberekening komt de meest recente netto indicatie hier terug.</span>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </section>
+                            {% endif %}
+
                             {% if selected_relation %}
                             <section class="relation-audit-panel">
                                 <div class="panel-header panel-header--compact">

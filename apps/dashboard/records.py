@@ -1575,25 +1575,7 @@ def list_payroll_period_settlements(period_id: int, limit: int = 200) -> list[di
                     """,
                     (period_id, limit),
                 )
-                return [
-                    {
-                        "relation_id": row[0],
-                        "employee_name": row[1] or "Onbekend",
-                        "week_count": row[2] or 0,
-                        "worked_hours": _format_number(row[3]),
-                        "total_km": _format_number(row[4]),
-                        "net_wage_amount": _format_money(row[5]),
-                        "travel_amount": _format_money(row[6]),
-                        "day_allowance_amount": _format_money(row[7]),
-                        "advance_weeks_1_3": _format_money(row[8]),
-                        "week_4_amount": _format_money(row[9]),
-                        "net_period_total": _format_money(row[10]),
-                        "payment_schedule": "4-wekelijks" if row[11] == "four_weekly" else "wekelijks",
-                        "status_label": row[12] or "concept",
-                        "status_details": row[13] or {},
-                    }
-                    for row in cursor.fetchall()
-                ]
+                return [_payroll_period_settlement_row((*row, None, None, None)) for row in cursor.fetchall()]
     except Exception:
         return []
 
@@ -2882,26 +2864,155 @@ def list_payroll_running_balances(limit: int = 200) -> list[dict]:
                     (limit,),
                 )
                 rows = cursor.fetchall()
-        return [
-            {
-                "id": row[0],
-                "relation_id": row[1],
-                "employee_name": row[2] or "Onbekend",
-                "balance_type": row[3],
-                "balance_label": row[4],
-                "balance_year": row[5] or "doorlopend",
-                "annual_limit": _format_money(row[6]) if row[6] is not None else "-",
-                "current_balance": _format_money(row[7]),
-                "raw_current_balance": Decimal(str(row[7] or 0)),
-                "mutation_count": row[8] or 0,
-                "last_mutation_date": row[9].strftime("%d-%m-%Y") if row[9] else "-",
-                "status": _running_balance_status(row[3], row[6], row[7]),
-                "source": row[11] or "dashboard",
-            }
-            for row in rows
-        ]
+        return [_payroll_running_balance_row(row) for row in rows]
     except Exception:
         return []
+
+
+def list_relation_payroll_running_balances(relation_id: int, limit: int = 25) -> list[dict]:
+    if not relation_id:
+        return []
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT a.id,
+                           a.relation_id,
+                           r.name,
+                           a.balance_type,
+                           a.balance_label,
+                           a.balance_year,
+                           a.annual_limit,
+                           COALESCE(SUM(m.amount), 0) AS current_balance,
+                           COUNT(m.id) AS mutation_count,
+                           MAX(m.mutation_date) AS last_mutation_date,
+                           a.status,
+                           a.source
+                    FROM payroll_running_balance_accounts a
+                    JOIN relations r ON r.id = a.relation_id
+                    LEFT JOIN payroll_running_balance_mutations m ON m.account_id = a.id
+                    WHERE a.relation_id = %s
+                      AND COALESCE(a.status, 'active') <> 'archived'
+                    GROUP BY a.id, a.relation_id, r.name, a.balance_type, a.balance_label,
+                             a.balance_year, a.annual_limit, a.status, a.source
+                    ORDER BY CASE a.balance_type
+                                 WHEN 'wkr' THEN 1
+                                 WHEN 'loan_advance' THEN 2
+                                 WHEN 'choice_budget' THEN 3
+                                 ELSE 4
+                             END,
+                             a.id DESC
+                    LIMIT %s;
+                    """,
+                    (relation_id, limit),
+                )
+                rows = cursor.fetchall()
+        return [_payroll_running_balance_row(row) for row in rows]
+    except Exception:
+        return []
+
+
+def _payroll_running_balance_row(row) -> dict:
+    return {
+        "id": row[0],
+        "relation_id": row[1],
+        "employee_name": row[2] or "Onbekend",
+        "balance_type": row[3],
+        "balance_label": row[4],
+        "balance_year": row[5] or "doorlopend",
+        "annual_limit": _format_money(row[6]) if row[6] is not None else "-",
+        "current_balance": _format_money(row[7]),
+        "raw_current_balance": Decimal(str(row[7] or 0)),
+        "mutation_count": row[8] or 0,
+        "last_mutation_date": row[9].strftime("%d-%m-%Y") if row[9] else "-",
+        "status": _running_balance_status(row[3], row[6], row[7]),
+        "source": row[11] or "dashboard",
+    }
+
+
+def list_relation_payroll_employee_arrangements(relation_id: int, limit: int = 5) -> list[dict]:
+    if not relation_id:
+        return []
+    return [
+        item
+        for item in list_payroll_employee_arrangements(limit=500)
+        if item.get("relation_id") == relation_id
+    ][:limit]
+
+
+def list_relation_payroll_period_settlements(relation_id: int, limit: int = 5) -> list[dict]:
+    if not relation_id:
+        return []
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT s.relation_id,
+                           s.employee_name,
+                           s.week_count,
+                           s.total_worked_hours,
+                           s.total_km,
+                           s.net_wage_amount,
+                           s.travel_amount,
+                           s.day_allowance_amount,
+                           s.advance_weeks_1_3,
+                           s.week_4_amount,
+                           s.total_period_amount,
+                           s.payment_schedule,
+                           s.settlement_status,
+                           s.status_details,
+                           p.year,
+                           p.period_number,
+                           p.name
+                    FROM payroll_period_settlements s
+                    JOIN payroll_periods p ON p.id = s.payroll_period_id
+                    WHERE s.relation_id = %s
+                    ORDER BY p.year DESC, p.period_number DESC, s.id DESC
+                    LIMIT %s;
+                    """,
+                    (relation_id, limit),
+                )
+                rows = cursor.fetchall()
+        return [_payroll_period_settlement_row(row) for row in rows]
+    except Exception:
+        return []
+
+
+def _payroll_period_settlement_row(row) -> dict:
+    return {
+        "relation_id": row[0],
+        "employee_name": row[1] or "Onbekend",
+        "week_count": row[2] or 0,
+        "worked_hours": _format_number(row[3]),
+        "total_km": _format_number(row[4]),
+        "net_wage_amount": _format_money(row[5]),
+        "travel_amount": _format_money(row[6]),
+        "day_allowance_amount": _format_money(row[7]),
+        "advance_weeks_1_3": _format_money(row[8]),
+        "week_4_amount": _format_money(row[9]),
+        "net_period_total": _format_money(row[10]),
+        "payment_schedule": "4-wekelijks" if row[11] == "four_weekly" else "wekelijks",
+        "status_label": row[12] or "concept",
+        "status_details": row[13] or {},
+        "period_label": f"{row[14]} P{row[15]}" if row[14] and row[15] else row[16] or "Periode",
+        "period_name": row[16] or "",
+    }
+
+
+def get_relation_payroll_context(relation_id: int | None) -> dict:
+    if not relation_id:
+        return {"arrangements": [], "current_arrangement": None, "balances": [], "settlements": []}
+    arrangements = list_relation_payroll_employee_arrangements(relation_id)
+    return {
+        "arrangements": arrangements,
+        "current_arrangement": arrangements[0] if arrangements else None,
+        "balances": list_relation_payroll_running_balances(relation_id),
+        "settlements": list_relation_payroll_period_settlements(relation_id),
+    }
 
 
 def _running_balance_status(balance_type: str, annual_limit, current_balance) -> str:

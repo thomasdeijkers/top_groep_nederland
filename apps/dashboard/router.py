@@ -30,6 +30,7 @@ from apps.dashboard.records import (
     get_project,
     get_overview_data,
     get_payroll_period_defaults,
+    get_relation_payroll_context,
     get_timesheet_channel_tiles,
     ensure_relation_for_candidate_match,
     list_audit_events,
@@ -275,6 +276,7 @@ def _dashboard_context(
             "tickets": [],
             "vacancies": [],
             "selected_relation": None,
+            "selected_relation_payroll": None,
             "selected_vacancy": None,
             "query": query,
             "overview_data": {
@@ -377,6 +379,9 @@ def _dashboard_context(
     cao_settings = list_cao_settings() if data_page in {"settings", "periods"} else []
     selected_cao_setting = get_cao_setting(cao_id) if data_page == "settings" and cao_id else None
     selected_relation = get_relation(edit_id) if data_page == "relations" and edit_id else None
+    selected_relation_payroll = None
+    if selected_relation and selected_relation.get("relation_type") == "candidate":
+        selected_relation_payroll = get_relation_payroll_context(selected_relation.get("id"))
     selected_relation_audit_events = []
     if selected_relation:
         relation_audit_types = {"relatie", "candidate", "principal", selected_relation.get("relation_type") or ""}
@@ -451,6 +456,7 @@ def _dashboard_context(
         "tickets": imported_tickets,
         "vacancies": imported_vacancies,
         "selected_relation": selected_relation,
+        "selected_relation_payroll": selected_relation_payroll,
         "selected_relation_audit_events": selected_relation_audit_events,
         "selected_vacancy": selected_vacancy,
         "query": query,

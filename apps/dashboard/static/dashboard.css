@@ -671,6 +671,78 @@ h2 {
     gap: 12px;
 }
 
+.relation-payroll-card {
+    grid-column: 1 / -1;
+    display: grid;
+    gap: 12px;
+    margin-top: 4px;
+    padding: 12px;
+    border: 1px solid rgba(127, 209, 160, 0.18);
+    border-radius: 8px;
+    background: rgba(9, 20, 24, 0.38);
+}
+
+.relation-payroll-overview,
+.relation-payroll-split {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.relation-payroll-split {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.relation-payroll-overview > div,
+.relation-payroll-list {
+    min-width: 0;
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: rgba(11, 27, 34, 0.62);
+}
+
+.relation-payroll-overview span,
+.relation-payroll-line span,
+.relation-payroll-empty small {
+    display: block;
+    color: #9fb0bd;
+    font-size: 0.78rem;
+}
+
+.relation-payroll-overview strong,
+.relation-payroll-line strong,
+.relation-payroll-empty strong {
+    display: block;
+    margin: 3px 0;
+    color: #f6fbff;
+    font-size: 0.92rem;
+}
+
+.relation-payroll-list {
+    display: grid;
+    gap: 8px;
+}
+
+.relation-payroll-list h4 {
+    margin: 0;
+    color: #f6fbff;
+    font-size: 0.92rem;
+}
+
+.relation-payroll-line {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(120px, auto);
+    gap: 10px;
+    align-items: center;
+    padding: 8px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.relation-payroll-line > div:last-child {
+    text-align: right;
+}
+
 .panel-header--compact {
     margin-bottom: 0;
 }
@@ -3183,6 +3255,19 @@ select option:checked {
 }
 
 @media (max-width: 760px) {
+    .relation-payroll-overview,
+    .relation-payroll-split {
+        grid-template-columns: 1fr;
+    }
+
+    .relation-payroll-line {
+        grid-template-columns: 1fr;
+    }
+
+    .relation-payroll-line > div:last-child {
+        text-align: left;
+    }
+
     .relation-editor-backdrop {
         align-items: stretch;
         padding: 12px;
