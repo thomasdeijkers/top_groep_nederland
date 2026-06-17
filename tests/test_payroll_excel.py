@@ -274,5 +274,39 @@ class PayrollPeriodStructureTests(unittest.TestCase):
                 records.create_payroll_period({"year": "2026", "period_number": "14"})
 
 
+class PayrollDatamodelFoundationTests(unittest.TestCase):
+    def test_foundation_migration_creates_year_and_week_line_tables(self):
+        migration = Path("migrations/037_payroll_datamodel_foundation.sql").read_text(encoding="utf-8-sig")
+
+        self.assertIn("payroll_years", migration)
+        self.assertIn("period_count INTEGER NOT NULL DEFAULT 13", migration)
+        self.assertIn("weeks_per_period INTEGER NOT NULL DEFAULT 4", migration)
+        self.assertIn("payroll_week_lines", migration)
+        self.assertIn("cost_center", migration)
+        self.assertIn("UNIQUE (payroll_week_input_id, line_index)", migration)
+
+    def test_foundation_migration_extends_openai_audit_for_ocr_context(self):
+        migration = Path("migrations/037_payroll_datamodel_foundation.sql").read_text(encoding="utf-8-sig")
+
+        for field in [
+            "purpose",
+            "relation_id",
+            "timesheet_inbox_id",
+            "payroll_week_input_id",
+            "request_hash",
+            "response_hash",
+            "prompt_tokens",
+            "completion_tokens",
+            "total_tokens",
+            "latency_ms",
+        ]:
+            self.assertIn(field, migration)
+
+    def test_foundation_migration_is_part_of_dashboard_startup(self):
+        data_store = Path("apps/dashboard/data_store.py").read_text(encoding="utf-8-sig")
+
+        self.assertIn("migrations/037_payroll_datamodel_foundation.sql", data_store)
+
+
 if __name__ == "__main__":
     unittest.main()
