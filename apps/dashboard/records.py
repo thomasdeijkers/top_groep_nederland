@@ -18,6 +18,9 @@ from apps.dashboard.payroll_calculations import (
 from shared.db.connection import get_connection
 
 
+PAYROLL_PERIODS_PER_YEAR = 13
+
+
 def get_overview_data() -> dict:
     try:
         ensure_dashboard_tables()
@@ -1396,18 +1399,28 @@ def get_payroll_period_defaults() -> dict:
                     """,
                     (next_year,),
                 )
-                used_numbers = {int(number or 0) for (number,) in cursor.fetchall()}
-                next_number = 1
-                while next_number in used_numbers:
-                    next_number += 1
-                display_number = len(used_numbers) + 1
+                used_numbers = {
+                    int(number or 0)
+                    for (number,) in cursor.fetchall()
+                    if 1 <= int(number or 0) <= PAYROLL_PERIODS_PER_YEAR
+                }
+                available_numbers = [
+                    number
+                    for number in range(1, PAYROLL_PERIODS_PER_YEAR + 1)
+                    if number not in used_numbers
+                ]
+                next_number = available_numbers[0] if available_numbers else PAYROLL_PERIODS_PER_YEAR
+                remaining_period_count = len(available_numbers)
                 return {
                     "year": next_year,
                     "period_number": next_number,
-                    "display_period_number": display_number,
+                    "display_period_number": next_number,
+                    "remaining_period_count": remaining_period_count,
+                    "max_period_count": PAYROLL_PERIODS_PER_YEAR,
+                    "can_create": remaining_period_count > 0,
                     "start_date": next_start.isoformat(),
                     "end_date": next_end.isoformat(),
-                    "name": _payroll_period_name(display_number, next_start, next_end),
+                    "name": _payroll_period_name(next_number, next_start, next_end) if remaining_period_count else f"Loonjaar {next_year} compleet",
                 }
     except Exception:
         fallback_end = fallback_start + timedelta(days=27)
@@ -1415,6 +1428,9 @@ def get_payroll_period_defaults() -> dict:
             "year": fallback_start.year,
             "period_number": 1,
             "display_period_number": 1,
+            "remaining_period_count": PAYROLL_PERIODS_PER_YEAR,
+            "max_period_count": PAYROLL_PERIODS_PER_YEAR,
+            "can_create": True,
             "start_date": fallback_start.isoformat(),
             "end_date": fallback_end.isoformat(),
             "name": _payroll_period_name(1, fallback_start, fallback_end),
@@ -2227,6 +2243,8 @@ def create_payroll_period(data: dict) -> int:
     ensure_dashboard_tables()
     year = _int_or_none(data.get("year")) or date.today().year
     period_number = _int_or_none(data.get("period_number")) or 1
+    if period_number < 1 or period_number > PAYROLL_PERIODS_PER_YEAR:
+        raise ValueError(f"Een loonjaar heeft precies {PAYROLL_PERIODS_PER_YEAR} periodes.")
     start_date = _date_or_none(data.get("start_date")) or date.today()
     end_date = _date_or_none(data.get("end_date")) or start_date + timedelta(days=27)
     name = (data.get("name") or "").strip() or f"Periode {period_number} - {year}"
@@ -2286,7 +2304,8 @@ def create_payroll_period(data: dict) -> int:
 def create_payroll_period_batch(data: dict) -> list[int]:
     defaults = get_payroll_period_defaults()
     period_number = _int_or_none(data.get("period_number")) or defaults["period_number"]
-    period_count = min(max(_int_or_none(data.get("period_count")) or 1, 1), 2)
+    requested_count = max(_int_or_none(data.get("period_count")) or 1, 1)
+    period_count = min(requested_count, PAYROLL_PERIODS_PER_YEAR)
     start_date = _date_or_none(data.get("start_date")) or _date_or_none(defaults["start_date"]) or date.today()
     display_period_number = _int_or_none(data.get("display_period_number")) or defaults.get("display_period_number") or period_number
     year = start_date.year
@@ -2294,6 +2313,7 @@ def create_payroll_period_batch(data: dict) -> list[int]:
     status = (data.get("status") or "Open").strip() or "Open"
 
     available_numbers = _available_payroll_period_numbers(year, period_count)
+    period_count = min(period_count, len(available_numbers))
     created_ids: list[int] = []
     for offset in range(period_count):
         current_number = available_numbers[offset] if offset < len(available_numbers) else period_number + offset
@@ -2332,7 +2352,7 @@ def _available_payroll_period_numbers(year: int, count: int) -> list[int]:
         used_numbers = set()
     numbers: list[int] = []
     candidate = 1
-    while len(numbers) < count:
+    while len(numbers) < count and candidate <= PAYROLL_PERIODS_PER_YEAR:
         if candidate not in used_numbers:
             numbers.append(candidate)
         candidate += 1

@@ -70,3 +70,15 @@ Laat `TGN_AUTH_ENABLED` leeg of `false` in lokale/staging omgevingen waar je nog
 ## 5. Deploy
 
 Elke push naar `main` start de GitHub Actions deploy. Handmatig kan via `Actions` -> `Deploy TGN dashboard` -> `Run workflow`.
+
+Voor dit project deployen we altijd via deze vaste werkwijze vanuit de werkmap:
+
+```bash
+cd C:\Users\thoma\.codex\worktrees\bf3a\top_groep_nederland
+git add <files>
+git commit -m "<message>"
+git push origin HEAD:main
+```
+
+Gebruik geen alternatieve deploy-route tenzij Thomas dat expliciet vraagt.
+

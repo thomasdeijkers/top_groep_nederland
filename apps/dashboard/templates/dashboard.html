@@ -1061,16 +1061,18 @@ Metadata:
                                 <div class="period-create-proposal">
                                     <span>Volgende voorstel</span>
                                     <strong>{{ payroll_period_defaults.name }}</strong>
-                                    <small>{{ payroll_period_defaults.start_date }} t/m {{ payroll_period_defaults.end_date }} · volgende periode {{ payroll_period_defaults.period_number }} {{ payroll_period_defaults.year }}</small>
+                                    <small>{{ payroll_period_defaults.start_date }} t/m {{ payroll_period_defaults.end_date }} - {{ payroll_period_defaults.remaining_period_count or 0 }} van {{ payroll_period_defaults.max_period_count or 13 }} periodes nog beschikbaar in {{ payroll_period_defaults.year }}</small>
                                 </div>
+                                {% if payroll_period_defaults.can_create %}
                                 <div class="period-create-form">
                                     <input type="hidden" name="year" value="{{ payroll_period_defaults.year }}">
                                     <input type="hidden" name="period_number" value="{{ payroll_period_defaults.period_number }}">
                                     <input type="hidden" name="display_period_number" value="{{ payroll_period_defaults.display_period_number }}">
                                     <label>Aantal periodes
                                         <select name="period_count">
-                                            <option value="1">1 x 4 weken</option>
-                                            <option value="2">2 x 4 weken</option>
+                                            {% for count in range(1, (payroll_period_defaults.remaining_period_count or 1) + 1) %}
+                                            <option value="{{ count }}">{{ count }} x 4 weken</option>
+                                            {% endfor %}
                                         </select>
                                     </label>
                                     <label>Startdatum <input type="date" name="start_date" value="{{ payroll_period_defaults.start_date }}" required></label>
@@ -1085,6 +1087,11 @@ Metadata:
                                     <label class="period-create-form__notes">Notitie <input type="text" name="notes" placeholder="Bijvoorbeeld: afwijkende bouwkalender"></label>
                                     <button class="ghost-button" type="submit">Periodes aanmaken</button>
                                 </div>
+                                {% else %}
+                                <div class="period-create-form">
+                                    <p class="form-note">Dit loonjaar heeft al 13 periodes. Start een nieuw loonjaar als de volgende cyclus begint.</p>
+                                </div>
+                                {% endif %}
                             </form>
                         </div>
 

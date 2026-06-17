@@ -1,7 +1,9 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+from apps.dashboard import records
 from apps.dashboard.payroll_calculations import derived_period_total_rows
 from apps.dashboard.payroll_excel import analyze_payroll_workbook, build_payroll_output_workbook
 
@@ -93,6 +95,19 @@ class PayrollCalculationTests(unittest.TestCase):
             workbook = load_workbook(path)
 
         self.assertEqual(workbook.sheetnames, ["WK17", "Periode", "Loonstrook"])
+
+
+class PayrollPeriodStructureTests(unittest.TestCase):
+    def test_available_payroll_period_numbers_stop_at_thirteen(self):
+        with patch.object(records, "ensure_dashboard_tables", side_effect=RuntimeError("geen database")):
+            numbers = records._available_payroll_period_numbers(2026, 20)
+
+        self.assertEqual(numbers, list(range(1, records.PAYROLL_PERIODS_PER_YEAR + 1)))
+
+    def test_create_payroll_period_rejects_period_fourteen(self):
+        with patch.object(records, "ensure_dashboard_tables"):
+            with self.assertRaises(ValueError):
+                records.create_payroll_period({"year": "2026", "period_number": "14"})
 
 
 if __name__ == "__main__":
