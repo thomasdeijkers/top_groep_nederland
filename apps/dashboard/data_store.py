@@ -45,6 +45,7 @@ def ensure_dashboard_tables():
         Path("migrations/031_payroll_parameters.sql"),
         Path("migrations/032_payroll_employee_arrangements.sql"),
         Path("migrations/033_payroll_week_inputs.sql"),
+        Path("migrations/034_payroll_week_results.sql"),
     ]
 
     optional_migrations = {

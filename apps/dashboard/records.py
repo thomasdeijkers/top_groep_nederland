@@ -1516,6 +1516,7 @@ def get_payroll_period(period_id: int | None) -> dict | None:
                 }
                 _attach_period_weeks(cursor, [period])
         period["week_input_summary"] = get_payroll_week_input_summary(period_id)
+        period["week_result_summary"] = get_payroll_week_result_summary(period_id)
         period["payroll_rows"] = list_payroll_period_payroll(period_id)
         period["payroll_totals"] = _payroll_period_totals(period["payroll_rows"])
         stored_totals = list_payroll_period_totals(period_id)
@@ -1540,6 +1541,70 @@ def get_payroll_period(period_id: int | None) -> dict | None:
         return period
     except Exception:
         return None
+
+
+def get_payroll_week_result_summary(period_id: int) -> dict:
+    zero_money = _format_money(0)
+    empty = {
+        "result_count": 0,
+        "total_net_week": zero_money,
+        "net_wage_amount": zero_money,
+        "travel_amount": zero_money,
+        "day_allowance_amount": zero_money,
+        "concept_count": 0,
+        "missing_arrangement_count": 0,
+        "missing_wage_count": 0,
+        "status_counts": [],
+    }
+    if not period_id:
+        return empty
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT COUNT(*),
+                           COALESCE(SUM(net_week_total), 0),
+                           COALESCE(SUM(net_wage_amount), 0),
+                           COALESCE(SUM(travel_amount), 0),
+                           COALESCE(SUM(day_allowance_amount), 0),
+                           COUNT(*) FILTER (WHERE calculation_status = 'concept'),
+                           COUNT(*) FILTER (WHERE calculation_status = 'mist_inrichting'),
+                           COUNT(*) FILTER (WHERE calculation_status = 'mist_netto_basisloon')
+                    FROM payroll_week_results
+                    WHERE payroll_period_id = %s;
+                    """,
+                    (period_id,),
+                )
+                row = cursor.fetchone() or (0, 0, 0, 0, 0, 0, 0, 0)
+                cursor.execute(
+                    """
+                    SELECT COALESCE(calculation_status, 'concept'), COUNT(*)
+                    FROM payroll_week_results
+                    WHERE payroll_period_id = %s
+                    GROUP BY COALESCE(calculation_status, 'concept')
+                    ORDER BY COUNT(*) DESC, COALESCE(calculation_status, 'concept');
+                    """,
+                    (period_id,),
+                )
+                status_counts = [
+                    {"status": status, "count": count}
+                    for status, count in cursor.fetchall()
+                ]
+        return {
+            "result_count": row[0] or 0,
+            "total_net_week": _format_money(row[1]),
+            "net_wage_amount": _format_money(row[2]),
+            "travel_amount": _format_money(row[3]),
+            "day_allowance_amount": _format_money(row[4]),
+            "concept_count": row[5] or 0,
+            "missing_arrangement_count": row[6] or 0,
+            "missing_wage_count": row[7] or 0,
+            "status_counts": status_counts,
+        }
+    except Exception:
+        return empty
 
 
 def get_payroll_week_input_summary(period_id: int) -> dict:

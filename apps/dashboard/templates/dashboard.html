@@ -1362,6 +1362,7 @@ Metadata:
                         </div>
 
                         {% set week_input = selected_payroll_period.week_input_summary %}
+                        {% set week_result = selected_payroll_period.week_result_summary %}
                         <div class="project-detail-summary">
                             <div>
                                 <span>Week-invoer</span>
@@ -1380,12 +1381,20 @@ Metadata:
                                 <strong>{{ week_input.total_hours }} / {{ week_input.total_km }}</strong>
                             </div>
                             <div>
-                                <span>Met inrichting</span>
-                                <strong>{{ week_input.with_arrangement }}</strong>
+                                <span>Weekresultaten</span>
+                                <strong>{{ week_result.result_count }}</strong>
                             </div>
                             <div>
-                                <span>Nog te koppelen</span>
-                                <strong>{{ week_input.without_arrangement }}</strong>
+                                <span>Netto indicatie</span>
+                                <strong>{{ week_result.total_net_week }}</strong>
+                            </div>
+                            <div>
+                                <span>Concept</span>
+                                <strong>{{ week_result.concept_count }}</strong>
+                            </div>
+                            <div>
+                                <span>Nog te berekenen</span>
+                                <strong>{{ week_result.missing_arrangement_count + week_result.missing_wage_count }}</strong>
                             </div>
                         </div>
 

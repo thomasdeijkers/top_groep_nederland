@@ -97,6 +97,26 @@ class PayrollCalculationTests(unittest.TestCase):
         self.assertEqual(workbook.sheetnames, ["WK17", "Periode", "Loonstrook"])
 
 
+class PayrollWeekResultTests(unittest.TestCase):
+    def test_week_result_migration_creates_calculation_outputs(self):
+        migration = Path("migrations/034_payroll_week_results.sql").read_text(encoding="utf-8")
+
+        self.assertIn("payroll_week_results", migration)
+        self.assertIn("net_wage_amount", migration)
+        self.assertIn("travel_amount", migration)
+        self.assertIn("day_allowance_amount", migration)
+        self.assertIn("net_week_total", migration)
+
+    def test_week_result_migration_tracks_missing_inputs(self):
+        migration = Path("migrations/034_payroll_week_results.sql").read_text(encoding="utf-8")
+
+        self.assertIn("mist_inrichting", migration)
+        self.assertIn("mist_netto_basisloon", migration)
+        self.assertIn("travel_km_net_uta", migration)
+        self.assertIn("travel_km_net_build", migration)
+
+
+
 class PayrollWeekInputTests(unittest.TestCase):
     def test_week_input_migration_creates_normalized_layers(self):
         migration = Path("migrations/033_payroll_week_inputs.sql").read_text(encoding="utf-8")
