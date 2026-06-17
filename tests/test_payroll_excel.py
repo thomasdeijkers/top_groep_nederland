@@ -97,6 +97,23 @@ class PayrollCalculationTests(unittest.TestCase):
         self.assertEqual(workbook.sheetnames, ["WK17", "Periode", "Loonstrook"])
 
 
+class PayrollWeekInputTests(unittest.TestCase):
+    def test_week_input_migration_creates_normalized_layers(self):
+        migration = Path("migrations/033_payroll_week_inputs.sql").read_text(encoding="utf-8")
+
+        self.assertIn("payroll_week_inputs", migration)
+        self.assertIn("payroll_week_input_days", migration)
+        self.assertIn("payroll_week_input_projects", migration)
+        self.assertIn("idx_payroll_week_inputs_timesheet", migration)
+
+    def test_week_input_days_cover_full_week(self):
+        migration = Path("migrations/033_payroll_week_inputs.sql").read_text(encoding="utf-8")
+
+        for day_name in ["maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag", "zondag"]:
+            self.assertIn(day_name, migration)
+
+
+
 class PayrollEmployeeArrangementTests(unittest.TestCase):
     def test_arrangement_migration_limits_period_numbers_to_thirteen(self):
         migration = Path("migrations/032_payroll_employee_arrangements.sql").read_text(encoding="utf-8")

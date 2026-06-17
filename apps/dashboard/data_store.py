@@ -44,6 +44,7 @@ def ensure_dashboard_tables():
         Path("migrations/030_openai_api_audit_events.sql"),
         Path("migrations/031_payroll_parameters.sql"),
         Path("migrations/032_payroll_employee_arrangements.sql"),
+        Path("migrations/033_payroll_week_inputs.sql"),
     ]
 
     optional_migrations = {

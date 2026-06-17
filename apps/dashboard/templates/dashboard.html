@@ -1361,6 +1361,34 @@ Metadata:
                             </div>
                         </div>
 
+                        {% set week_input = selected_payroll_period.week_input_summary %}
+                        <div class="project-detail-summary">
+                            <div>
+                                <span>Week-invoer</span>
+                                <strong>{{ week_input.input_count }}</strong>
+                            </div>
+                            <div>
+                                <span>Dagregels</span>
+                                <strong>{{ week_input.day_count }}</strong>
+                            </div>
+                            <div>
+                                <span>Projectregels</span>
+                                <strong>{{ week_input.project_count }}</strong>
+                            </div>
+                            <div>
+                                <span>Uren / km</span>
+                                <strong>{{ week_input.total_hours }} / {{ week_input.total_km }}</strong>
+                            </div>
+                            <div>
+                                <span>Met inrichting</span>
+                                <strong>{{ week_input.with_arrangement }}</strong>
+                            </div>
+                            <div>
+                                <span>Nog te koppelen</span>
+                                <strong>{{ week_input.without_arrangement }}</strong>
+                            </div>
+                        </div>
+
                         <div class="payroll-workbook" data-payroll-workbook data-period-id="{{ selected_payroll_period.id }}">
                             <div class="payroll-workbook-tabs" role="tablist" aria-label="Verloning werkmap">
                                 {% for tab in selected_payroll_period.workbook_tabs %}

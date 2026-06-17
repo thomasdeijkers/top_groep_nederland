@@ -1515,6 +1515,7 @@ def get_payroll_period(period_id: int | None) -> dict | None:
                     "weeks": [],
                 }
                 _attach_period_weeks(cursor, [period])
+        period["week_input_summary"] = get_payroll_week_input_summary(period_id)
         period["payroll_rows"] = list_payroll_period_payroll(period_id)
         period["payroll_totals"] = _payroll_period_totals(period["payroll_rows"])
         stored_totals = list_payroll_period_totals(period_id)
@@ -1539,6 +1540,84 @@ def get_payroll_period(period_id: int | None) -> dict | None:
         return period
     except Exception:
         return None
+
+
+def get_payroll_week_input_summary(period_id: int) -> dict:
+    empty = {
+        "input_count": 0,
+        "day_count": 0,
+        "project_count": 0,
+        "total_hours": "0",
+        "total_km": "0",
+        "with_arrangement": 0,
+        "without_arrangement": 0,
+        "status_counts": [],
+    }
+    if not period_id:
+        return empty
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT COUNT(*),
+                           COALESCE(SUM(worked_hours), 0),
+                           COALESCE(SUM(total_km), 0),
+                           COUNT(*) FILTER (WHERE arrangement_id IS NOT NULL),
+                           COUNT(*) FILTER (WHERE arrangement_id IS NULL)
+                    FROM payroll_week_inputs
+                    WHERE payroll_period_id = %s;
+                    """,
+                    (period_id,),
+                )
+                summary_row = cursor.fetchone() or (0, 0, 0, 0, 0)
+                cursor.execute(
+                    """
+                    SELECT COUNT(d.id)
+                    FROM payroll_week_input_days d
+                    JOIN payroll_week_inputs i ON i.id = d.payroll_week_input_id
+                    WHERE i.payroll_period_id = %s;
+                    """,
+                    (period_id,),
+                )
+                day_count = cursor.fetchone()[0]
+                cursor.execute(
+                    """
+                    SELECT COUNT(p.id)
+                    FROM payroll_week_input_projects p
+                    JOIN payroll_week_inputs i ON i.id = p.payroll_week_input_id
+                    WHERE i.payroll_period_id = %s;
+                    """,
+                    (period_id,),
+                )
+                project_count = cursor.fetchone()[0]
+                cursor.execute(
+                    """
+                    SELECT COALESCE(status, 'concept'), COUNT(*)
+                    FROM payroll_week_inputs
+                    WHERE payroll_period_id = %s
+                    GROUP BY COALESCE(status, 'concept')
+                    ORDER BY COUNT(*) DESC, COALESCE(status, 'concept');
+                    """,
+                    (period_id,),
+                )
+                status_counts = [
+                    {"status": row[0], "count": row[1]}
+                    for row in cursor.fetchall()
+                ]
+        return {
+            "input_count": summary_row[0] or 0,
+            "day_count": day_count or 0,
+            "project_count": project_count or 0,
+            "total_hours": _format_number(summary_row[1]),
+            "total_km": _format_number(summary_row[2]),
+            "with_arrangement": summary_row[3] or 0,
+            "without_arrangement": summary_row[4] or 0,
+            "status_counts": status_counts,
+        }
+    except Exception:
+        return empty
 
 
 def list_payroll_period_payroll(period_id: int) -> list[dict]:
