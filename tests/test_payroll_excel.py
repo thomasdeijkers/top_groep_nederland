@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+from datetime import date, datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -308,5 +309,81 @@ class PayrollDatamodelFoundationTests(unittest.TestCase):
         self.assertIn("migrations/037_payroll_datamodel_foundation.sql", data_store)
 
 
+
+class PayrollDatamodelViewTests(unittest.TestCase):
+    def test_datamodel_views_migration_creates_period_and_year_views(self):
+        migration = Path("migrations/038_payroll_datamodel_views.sql").read_text(encoding="utf-8-sig")
+
+        self.assertIn("payroll_year_overview", migration)
+        self.assertIn("payroll_period_datamodel_status", migration)
+        self.assertIn("expected_period_count", migration)
+        self.assertIn("actual_week_count", migration)
+        self.assertIn("week_structure_status", migration)
+
+    def test_period_datamodel_status_tracks_foundation_layers(self):
+        migration = Path("migrations/038_payroll_datamodel_views.sql").read_text(encoding="utf-8-sig")
+
+        for field in [
+            "week_input_count",
+            "week_line_count",
+            "week_result_count",
+            "period_settlement_count",
+            "employee_arrangement_count",
+            "parameter_version_count",
+            "running_balance_account_count",
+            "audit_event_count",
+            "openai_api_audit_event_count",
+        ]:
+            self.assertIn(field, migration)
+
+    def test_datamodel_views_migration_is_part_of_dashboard_startup(self):
+        data_store = Path("apps/dashboard/data_store.py").read_text(encoding="utf-8-sig")
+
+        self.assertIn("migrations/038_payroll_datamodel_views.sql", data_store)
+
+
+class PayrollDatamodelRecordTests(unittest.TestCase):
+    def test_datamodel_status_row_formats_counts_and_dates(self):
+        row = (
+            12,
+            2026,
+            5,
+            "Periode 5 - 2026",
+            date(2026, 5, 4),
+            date(2026, 5, 31),
+            "open",
+            4,
+            10,
+            14,
+            8,
+            3,
+            7,
+            16,
+            21,
+            2,
+            5,
+            6,
+            "ok",
+            datetime(2026, 6, 17, 9, 30),
+        )
+
+        item = records._payroll_datamodel_status_row(row)
+
+        self.assertEqual(item["period_number"], 5)
+        self.assertEqual(item["week_count"], 4)
+        self.assertEqual(item["week_line_count"], 14)
+        self.assertEqual(item["parameter_version_count"], 16)
+        self.assertEqual(item["week_structure_status"], "ok")
+        self.assertEqual(item["start_date"], "04-05-2026")
+
+    def test_year_overview_row_formats_expected_structure(self):
+        row = (1, 2026, 13, 4, 2, 8, date(2026, 1, 5), date(2026, 2, 28), "active", None)
+
+        item = records._payroll_year_overview_row(row)
+
+        self.assertEqual(item["expected_period_count"], 13)
+        self.assertEqual(item["expected_weeks_per_period"], 4)
+        self.assertEqual(item["actual_week_count"], 8)
+        self.assertEqual(item["status"], "active")
 if __name__ == "__main__":
     unittest.main()

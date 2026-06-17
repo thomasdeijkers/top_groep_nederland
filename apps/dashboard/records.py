@@ -1365,6 +1365,144 @@ def list_payroll_periods(limit: int = 25, archived: bool = False) -> list[dict]:
         return []
 
 
+def list_payroll_year_overview(limit: int = 5) -> list[dict]:
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT payroll_year_id,
+                           year,
+                           expected_period_count,
+                           expected_weeks_per_period,
+                           actual_period_count,
+                           actual_week_count,
+                           first_period_start_date,
+                           last_period_end_date,
+                           status,
+                           updated_at
+                    FROM payroll_year_overview
+                    ORDER BY year DESC
+                    LIMIT %s;
+                    """,
+                    (limit,),
+                )
+                rows = cursor.fetchall()
+        return [_payroll_year_overview_row(row) for row in rows]
+    except Exception:
+        return []
+
+
+def _payroll_year_overview_row(row) -> dict:
+    return {
+        "payroll_year_id": row[0],
+        "year": row[1],
+        "expected_period_count": row[2] or PAYROLL_PERIODS_PER_YEAR,
+        "expected_weeks_per_period": row[3] or 4,
+        "actual_period_count": row[4] or 0,
+        "actual_week_count": row[5] or 0,
+        "first_period_start_date": row[6].strftime("%d-%m-%Y") if row[6] else "-",
+        "last_period_end_date": row[7].strftime("%d-%m-%Y") if row[7] else "-",
+        "status": row[8] or "concept",
+        "updated_at": row[9].strftime("%d-%m-%Y %H:%M") if row[9] else "-",
+    }
+
+
+def list_payroll_datamodel_status(year: int | None = None, limit: int = 25) -> list[dict]:
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                if year:
+                    cursor.execute(
+                        """
+                        SELECT payroll_period_id,
+                               year,
+                               period_number,
+                               period_name,
+                               start_date,
+                               end_date,
+                               period_status,
+                               week_count,
+                               week_input_count,
+                               week_line_count,
+                               week_result_count,
+                               period_settlement_count,
+                               employee_arrangement_count,
+                               parameter_version_count,
+                               running_balance_account_count,
+                               running_balance_mutation_count,
+                               audit_event_count,
+                               openai_api_audit_event_count,
+                               week_structure_status,
+                               updated_at
+                        FROM payroll_period_datamodel_status
+                        WHERE year = %s
+                        ORDER BY period_number ASC
+                        LIMIT %s;
+                        """,
+                        (year, limit),
+                    )
+                else:
+                    cursor.execute(
+                        """
+                        SELECT payroll_period_id,
+                               year,
+                               period_number,
+                               period_name,
+                               start_date,
+                               end_date,
+                               period_status,
+                               week_count,
+                               week_input_count,
+                               week_line_count,
+                               week_result_count,
+                               period_settlement_count,
+                               employee_arrangement_count,
+                               parameter_version_count,
+                               running_balance_account_count,
+                               running_balance_mutation_count,
+                               audit_event_count,
+                               openai_api_audit_event_count,
+                               week_structure_status,
+                               updated_at
+                        FROM payroll_period_datamodel_status
+                        ORDER BY year DESC, period_number ASC
+                        LIMIT %s;
+                        """,
+                        (limit,),
+                    )
+                rows = cursor.fetchall()
+        return [_payroll_datamodel_status_row(row) for row in rows]
+    except Exception:
+        return []
+
+
+def _payroll_datamodel_status_row(row) -> dict:
+    return {
+        "payroll_period_id": row[0],
+        "year": row[1],
+        "period_number": row[2],
+        "period_name": row[3] or f"Periode {row[2]}",
+        "start_date": row[4].strftime("%d-%m-%Y") if row[4] else "-",
+        "end_date": row[5].strftime("%d-%m-%Y") if row[5] else "-",
+        "period_status": row[6] or "concept",
+        "week_count": row[7] or 0,
+        "week_input_count": row[8] or 0,
+        "week_line_count": row[9] or 0,
+        "week_result_count": row[10] or 0,
+        "period_settlement_count": row[11] or 0,
+        "employee_arrangement_count": row[12] or 0,
+        "parameter_version_count": row[13] or 0,
+        "running_balance_account_count": row[14] or 0,
+        "running_balance_mutation_count": row[15] or 0,
+        "audit_event_count": row[16] or 0,
+        "openai_api_audit_event_count": row[17] or 0,
+        "week_structure_status": row[18] or "onbekend",
+        "updated_at": row[19].strftime("%d-%m-%Y %H:%M") if row[19] else "-",
+    }
+
 def get_payroll_period_defaults() -> dict:
     today = date.today()
     fallback_start = today - timedelta(days=today.weekday())
