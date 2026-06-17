@@ -98,6 +98,12 @@ class PayrollCalculationTests(unittest.TestCase):
 
 
 class PayrollWeekResultTests(unittest.TestCase):
+
+    def test_employee_week_result_status_prioritizes_missing_data(self):
+        self.assertEqual(records._employee_week_result_status(1, 1, 0), "mist inrichting")
+        self.assertEqual(records._employee_week_result_status(1, 0, 1), "mist netto basisloon")
+        self.assertEqual(records._employee_week_result_status(1, 0, 0), "concept")
+        self.assertEqual(records._employee_week_result_status(0, 0, 0), "controle")
     def test_week_result_migration_creates_calculation_outputs(self):
         migration = Path("migrations/034_payroll_week_results.sql").read_text(encoding="utf-8")
 

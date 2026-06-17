@@ -1517,6 +1517,7 @@ def get_payroll_period(period_id: int | None) -> dict | None:
                 _attach_period_weeks(cursor, [period])
         period["week_input_summary"] = get_payroll_week_input_summary(period_id)
         period["week_result_summary"] = get_payroll_week_result_summary(period_id)
+        period["employee_week_results"] = list_payroll_employee_week_results(period_id)
         period["payroll_rows"] = list_payroll_period_payroll(period_id)
         period["payroll_totals"] = _payroll_period_totals(period["payroll_rows"])
         stored_totals = list_payroll_period_totals(period_id)
@@ -1541,6 +1542,75 @@ def get_payroll_period(period_id: int | None) -> dict | None:
         return period
     except Exception:
         return None
+
+
+def list_payroll_employee_week_results(period_id: int, limit: int = 200) -> list[dict]:
+    if not period_id:
+        return []
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT COALESCE(r.relation_id, 0) AS relation_key,
+                           MAX(r.relation_id) AS relation_id,
+                           r.employee_name,
+                           COUNT(*) AS week_count,
+                           COALESCE(SUM(r.worked_hours), 0) AS worked_hours,
+                           COALESCE(SUM(r.total_km), 0) AS total_km,
+                           COALESCE(SUM(r.net_wage_amount), 0) AS net_wage_amount,
+                           COALESCE(SUM(r.travel_amount), 0) AS travel_amount,
+                           COALESCE(SUM(r.day_allowance_amount), 0) AS day_allowance_amount,
+                           COALESCE(SUM(r.net_week_total), 0) AS net_period_total,
+                           COALESCE(SUM(r.net_week_total) FILTER (WHERE w.week_index BETWEEN 1 AND 3), 0) AS advance_weeks_1_3,
+                           COALESCE(SUM(r.net_week_total) FILTER (WHERE w.week_index = 4), 0) AS week_4_amount,
+                           COUNT(*) FILTER (WHERE r.calculation_status = 'concept') AS concept_count,
+                           COUNT(*) FILTER (WHERE r.calculation_status = 'mist_inrichting') AS missing_arrangement_count,
+                           COUNT(*) FILTER (WHERE r.calculation_status = 'mist_netto_basisloon') AS missing_wage_count,
+                           STRING_AGG(DISTINCT r.calculation_status, ', ' ORDER BY r.calculation_status) AS statuses
+                    FROM payroll_week_results r
+                    LEFT JOIN payroll_period_weeks w ON w.id = r.payroll_period_week_id
+                    WHERE r.payroll_period_id = %s
+                    GROUP BY COALESCE(r.relation_id, 0), r.employee_name
+                    ORDER BY r.employee_name ASC
+                    LIMIT %s;
+                    """,
+                    (period_id, limit),
+                )
+                return [
+                    {
+                        "relation_id": row[1],
+                        "employee_name": row[2] or "Onbekend",
+                        "week_count": row[3] or 0,
+                        "worked_hours": _format_number(row[4]),
+                        "total_km": _format_number(row[5]),
+                        "net_wage_amount": _format_money(row[6]),
+                        "travel_amount": _format_money(row[7]),
+                        "day_allowance_amount": _format_money(row[8]),
+                        "net_period_total": _format_money(row[9]),
+                        "advance_weeks_1_3": _format_money(row[10]),
+                        "week_4_amount": _format_money(row[11]),
+                        "concept_count": row[12] or 0,
+                        "missing_arrangement_count": row[13] or 0,
+                        "missing_wage_count": row[14] or 0,
+                        "statuses": row[15] or "concept",
+                        "status_label": _employee_week_result_status(row[12], row[13], row[14]),
+                    }
+                    for row in cursor.fetchall()
+                ]
+    except Exception:
+        return []
+
+
+def _employee_week_result_status(concept_count, missing_arrangement_count, missing_wage_count) -> str:
+    if missing_arrangement_count:
+        return "mist inrichting"
+    if missing_wage_count:
+        return "mist netto basisloon"
+    if concept_count:
+        return "concept"
+    return "controle"
 
 
 def get_payroll_week_result_summary(period_id: int) -> dict:
