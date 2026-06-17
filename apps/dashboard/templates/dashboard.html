@@ -1532,6 +1532,51 @@ Metadata:
                             </div>
                         </div>
 
+                        {% set exception_summary = selected_payroll_period.payroll_exception_summary %}
+                        <details class="period-import-log payroll-exception-panel" open>
+                            <summary>Payroll-uitzonderingen{% if exception_summary.total %} &middot; {{ exception_summary.blocking }} blokkerend &middot; {{ exception_summary.warning }} nalopen{% endif %}</summary>
+                            <div class="payroll-exception-summary">
+                                <div>
+                                    <span>Totaal</span>
+                                    <strong>{{ exception_summary.total }}</strong>
+                                </div>
+                                <div>
+                                    <span>Blokkerend</span>
+                                    <strong>{{ exception_summary.blocking }}</strong>
+                                </div>
+                                <div>
+                                    <span>Nalopen</span>
+                                    <strong>{{ exception_summary.warning }}</strong>
+                                </div>
+                            </div>
+                            <div class="payroll-exception-list">
+                                {% for exception in selected_payroll_period.payroll_exceptions %}
+                                <article class="payroll-exception-row payroll-exception-row--{{ exception.severity }}">
+                                    <div>
+                                        <span class="status-tag">{{ exception.severity_label }}</span>
+                                    </div>
+                                    <div>
+                                        <strong>{{ exception.title }}</strong>
+                                        <span>{{ exception.employee_name }}{% if exception.week_numbers != '-' %} &middot; week {{ exception.week_numbers }}{% endif %} &middot; {{ exception.occurrence_count }} signaal{% if exception.occurrence_count != 1 %}en{% endif %}</span>
+                                        <small>{{ exception.detail }}</small>
+                                    </div>
+                                    <div>
+                                        {% if exception.relation_id %}
+                                        <a class="ghost-button" href="/dashboard/relations?tab=candidates&edit={{ exception.relation_id }}#relatie-formulier">{{ exception.next_step }}</a>
+                                        {% else %}
+                                        <a class="ghost-button" href="/dashboard/timesheets?q={{ exception.employee_name|urlencode }}#timesheet-inbox">{{ exception.next_step }}</a>
+                                        {% endif %}
+                                    </div>
+                                </article>
+                                {% else %}
+                                <div class="empty-state empty-state--compact">
+                                    <strong>Geen payroll-uitzonderingen</strong>
+                                    <span>De bekende blokkades voor medewerkerinrichting, netto basisloon, kandidaatkoppeling, ontbrekende weken en projectregels zijn niet gevonden.</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </details>
+
                         <details class="period-import-log" open>
                             <summary>Periode-afrekening per medewerker</summary>
                             <div class="table-wrap period-payroll-table">

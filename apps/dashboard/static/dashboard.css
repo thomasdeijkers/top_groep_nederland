@@ -1169,6 +1169,82 @@ h2 {
     margin: 0 12px 12px;
 }
 
+.payroll-exception-panel {
+    border-color: rgba(255, 210, 122, 0.22);
+}
+
+.payroll-exception-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    padding: 0 12px 10px;
+}
+
+.payroll-exception-summary div {
+    min-height: 54px;
+    padding: 9px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: rgba(11, 27, 34, 0.56);
+}
+
+.payroll-exception-summary span,
+.payroll-exception-row span,
+.payroll-exception-row small {
+    display: block;
+    color: #9fb0bd;
+    font-size: 0.78rem;
+}
+
+.payroll-exception-summary strong {
+    display: block;
+    margin-top: 3px;
+    color: #ffffff;
+    font-size: 1.18rem;
+}
+
+.payroll-exception-list {
+    display: grid;
+    gap: 8px;
+    padding: 0 12px 12px;
+}
+
+.payroll-exception-row {
+    display: grid;
+    grid-template-columns: 104px minmax(0, 1fr) minmax(150px, auto);
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: rgba(11, 27, 34, 0.52);
+}
+
+.payroll-exception-row--blokkerend {
+    border-color: rgba(255, 136, 136, 0.28);
+    background: rgba(84, 36, 36, 0.26);
+}
+
+.payroll-exception-row--waarschuwing {
+    border-color: rgba(255, 210, 122, 0.24);
+    background: rgba(74, 58, 26, 0.22);
+}
+
+.payroll-exception-row strong {
+    display: block;
+    margin-bottom: 3px;
+    color: #f6fbff;
+    font-size: 0.92rem;
+}
+
+.payroll-exception-row small {
+    margin-top: 4px;
+}
+
+.payroll-exception-row > div:last-child {
+    justify-self: end;
+}
+
 .payroll-settings-table {
     margin-top: 12px;
 }
@@ -3255,6 +3331,15 @@ select option:checked {
 }
 
 @media (max-width: 760px) {
+    .payroll-exception-summary,
+    .payroll-exception-row {
+        grid-template-columns: 1fr;
+    }
+
+    .payroll-exception-row > div:last-child {
+        justify-self: start;
+    }
+
     .relation-payroll-overview,
     .relation-payroll-split {
         grid-template-columns: 1fr;

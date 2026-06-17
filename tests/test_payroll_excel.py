@@ -202,6 +202,23 @@ class PayrollParameterTests(unittest.TestCase):
 
 
 
+class PayrollExceptionTests(unittest.TestCase):
+    def test_exception_summary_counts_severities(self):
+        summary = records.summarize_payroll_exceptions([
+            {"severity": "blokkerend"},
+            {"severity": "waarschuwing"},
+            {"severity": "waarschuwing"},
+            {"severity": "info"},
+        ])
+
+        self.assertEqual(summary, {"total": 4, "blocking": 1, "warning": 2, "info": 1})
+
+    def test_exception_severity_labels_match_period_ui(self):
+        self.assertEqual(records._payroll_exception_severity_label("blokkerend"), "Blokkeert")
+        self.assertEqual(records._payroll_exception_severity_label("waarschuwing"), "Nalopen")
+        self.assertEqual(records._payroll_exception_severity_label("anders"), "Info")
+
+
 class RelationPayrollContextTests(unittest.TestCase):
     def test_relation_payroll_context_combines_employee_layers(self):
         arrangement = {"id": 11, "relation_id": 7}

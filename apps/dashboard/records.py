@@ -1517,6 +1517,8 @@ def get_payroll_period(period_id: int | None) -> dict | None:
                 _attach_period_weeks(cursor, [period])
         period["week_input_summary"] = get_payroll_week_input_summary(period_id)
         period["week_result_summary"] = get_payroll_week_result_summary(period_id)
+        period["payroll_exceptions"] = list_payroll_period_exceptions(period_id)
+        period["payroll_exception_summary"] = summarize_payroll_exceptions(period["payroll_exceptions"])
         period["period_settlements"] = list_payroll_period_settlements(period_id)
         period["employee_week_results"] = period["period_settlements"] or list_payroll_employee_week_results(period_id)
         period["payroll_rows"] = list_payroll_period_payroll(period_id)
@@ -1711,6 +1713,151 @@ def get_payroll_week_result_summary(period_id: int) -> dict:
         }
     except Exception:
         return empty
+
+
+def list_payroll_period_exceptions(period_id: int, limit: int = 100) -> list[dict]:
+    if not period_id:
+        return []
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    WITH input_project_counts AS (
+                        SELECT payroll_week_input_id, COUNT(*) AS project_count
+                        FROM payroll_week_input_projects
+                        GROUP BY payroll_week_input_id
+                    ), exceptions AS (
+                        SELECT 'missing_relation' AS exception_key,
+                               'blokkerend' AS severity,
+                               NULL::integer AS relation_id,
+                               i.employee_name,
+                               COUNT(*) AS occurrence_count,
+                               STRING_AGG(DISTINCT COALESCE(i.week_number::text, '-'), ', ' ORDER BY COALESCE(i.week_number::text, '-')) AS week_numbers,
+                               'Kandidaatkoppeling ontbreekt' AS title,
+                               'Koppel deze week-invoer aan de juiste medewerkerkaart voordat de periode betrouwbaar is.' AS detail,
+                               'Urenbriefje controleren' AS next_step
+                        FROM payroll_week_inputs i
+                        WHERE i.payroll_period_id = %s
+                          AND i.relation_id IS NULL
+                        GROUP BY i.employee_name
+
+                        UNION ALL
+
+                        SELECT 'missing_arrangement' AS exception_key,
+                               'blokkerend' AS severity,
+                               i.relation_id,
+                               i.employee_name,
+                               COUNT(*) AS occurrence_count,
+                               STRING_AGG(DISTINCT COALESCE(i.week_number::text, '-'), ', ' ORDER BY COALESCE(i.week_number::text, '-')) AS week_numbers,
+                               'Medewerkerinrichting ontbreekt' AS title,
+                               'Leg de verloningsinrichting vast op de medewerkerkaart voor deze periode.' AS detail,
+                               'Medewerkerkaart openen' AS next_step
+                        FROM payroll_week_inputs i
+                        WHERE i.payroll_period_id = %s
+                          AND i.relation_id IS NOT NULL
+                          AND i.arrangement_id IS NULL
+                        GROUP BY i.relation_id, i.employee_name
+
+                        UNION ALL
+
+                        SELECT 'missing_net_base' AS exception_key,
+                               'blokkerend' AS severity,
+                               r.relation_id,
+                               r.employee_name,
+                               COUNT(*) AS occurrence_count,
+                               STRING_AGG(DISTINCT COALESCE(r.week_number::text, '-'), ', ' ORDER BY COALESCE(r.week_number::text, '-')) AS week_numbers,
+                               'Netto basisloon ontbreekt' AS title,
+                               'Vul netto basis 40 uur in zodat de netto indicatie per week en periode kan worden berekend.' AS detail,
+                               'Medewerkerkaart openen' AS next_step
+                        FROM payroll_week_results r
+                        WHERE r.payroll_period_id = %s
+                          AND r.calculation_status = 'mist_netto_basisloon'
+                        GROUP BY r.relation_id, r.employee_name
+
+                        UNION ALL
+
+                        SELECT 'incomplete_period' AS exception_key,
+                               'waarschuwing' AS severity,
+                               s.relation_id,
+                               s.employee_name,
+                               GREATEST(4 - COALESCE(s.week_count, 0), 0) AS occurrence_count,
+                               '-' AS week_numbers,
+                               'Periode niet compleet' AS title,
+                               'Deze medewerker heeft minder dan vier weekregels in deze periode.' AS detail,
+                               'Week-invoer controleren' AS next_step
+                        FROM payroll_period_settlements s
+                        WHERE s.payroll_period_id = %s
+                          AND COALESCE(s.week_count, 0) < 4
+
+                        UNION ALL
+
+                        SELECT 'missing_project_booking' AS exception_key,
+                               'waarschuwing' AS severity,
+                               i.relation_id,
+                               i.employee_name,
+                               COUNT(*) AS occurrence_count,
+                               STRING_AGG(DISTINCT COALESCE(i.week_number::text, '-'), ', ' ORDER BY COALESCE(i.week_number::text, '-')) AS week_numbers,
+                               'Projectregel ontbreekt' AS title,
+                               'Er zijn uren verwerkt zonder gekoppelde projectregel; controleer opdrachtgever/project voor facturatie en CAO-context.' AS detail,
+                               'Urenbriefje controleren' AS next_step
+                        FROM payroll_week_inputs i
+                        LEFT JOIN input_project_counts pc ON pc.payroll_week_input_id = i.id
+                        WHERE i.payroll_period_id = %s
+                          AND COALESCE(i.worked_hours, 0) > 0
+                          AND COALESCE(pc.project_count, 0) = 0
+                        GROUP BY i.relation_id, i.employee_name
+                    )
+                    SELECT exception_key, severity, relation_id, employee_name, occurrence_count,
+                           week_numbers, title, detail, next_step
+                    FROM exceptions
+                    WHERE occurrence_count > 0
+                    ORDER BY CASE severity WHEN 'blokkerend' THEN 1 WHEN 'waarschuwing' THEN 2 ELSE 3 END,
+                             employee_name ASC, title ASC
+                    LIMIT %s;
+                    """,
+                    (period_id, period_id, period_id, period_id, period_id, limit),
+                )
+                rows = cursor.fetchall()
+        return [
+            {
+                "exception_key": row[0],
+                "severity": row[1],
+                "severity_label": _payroll_exception_severity_label(row[1]),
+                "relation_id": row[2],
+                "employee_name": row[3] or "Onbekend",
+                "occurrence_count": row[4] or 0,
+                "week_numbers": row[5] or "-",
+                "title": row[6],
+                "detail": row[7],
+                "next_step": row[8],
+            }
+            for row in rows
+        ]
+    except Exception:
+        return []
+
+
+def _payroll_exception_severity_label(severity: str) -> str:
+    if severity == "blokkerend":
+        return "Blokkeert"
+    if severity == "waarschuwing":
+        return "Nalopen"
+    return "Info"
+
+
+def summarize_payroll_exceptions(exceptions: list[dict]) -> dict:
+    summary = {"total": len(exceptions), "blocking": 0, "warning": 0, "info": 0}
+    for item in exceptions:
+        severity = item.get("severity")
+        if severity == "blokkerend":
+            summary["blocking"] += 1
+        elif severity == "waarschuwing":
+            summary["warning"] += 1
+        else:
+            summary["info"] += 1
+    return summary
 
 
 def get_payroll_week_input_summary(period_id: int) -> dict:
