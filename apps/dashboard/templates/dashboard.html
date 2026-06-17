@@ -432,6 +432,59 @@
                                 </div>
                             </section>
 
+                            <section class="settings-card settings-card--wide" id="lopende-saldi">
+                                <div class="settings-card-heading">
+                                    <div>
+                                        <p class="section-label">Verloning</p>
+                                        <h2>Lopende saldi</h2>
+                                        <p>Persistente waarden over periodes heen: WKR-teller, loonvoorschot/geldlening en keuzebudget.</p>
+                                    </div>
+                                </div>
+
+                                <div class="table-wrap payroll-settings-table">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Medewerker</th>
+                                                <th>Saldo</th>
+                                                <th>Jaar</th>
+                                                <th>Stand</th>
+                                                <th>Maximum</th>
+                                                <th>Mutaties</th>
+                                                <th>Laatste mutatie</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for balance in payroll_running_balances %}
+                                            <tr>
+                                                <td>
+                                                    <strong>{{ balance.employee_name }}</strong>
+                                                    <span>{{ balance.source }}</span>
+                                                </td>
+                                                <td>{{ balance.balance_label }}</td>
+                                                <td>{{ balance.balance_year }}</td>
+                                                <td><strong>{{ balance.current_balance }}</strong></td>
+                                                <td>{{ balance.annual_limit }}</td>
+                                                <td>{{ balance.mutation_count }}</td>
+                                                <td>{{ balance.last_mutation_date }}</td>
+                                                <td><span class="status-tag">{{ balance.status }}</span></td>
+                                            </tr>
+                                            {% else %}
+                                            <tr>
+                                                <td colspan="8">
+                                                    <div class="empty-state">
+                                                        <strong>Nog geen lopende saldi</strong>
+                                                        <span>De migratie maakt saldo-rekeningen aan zodra medewerkers inrichting, afrekening of keuzebudget hebben.</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </section>
+
                             <section class="settings-card settings-card--wide" id="cao-instellingen">
                                 <div class="settings-card-heading">
                                     <div>

@@ -97,6 +97,24 @@ class PayrollCalculationTests(unittest.TestCase):
         self.assertEqual(workbook.sheetnames, ["WK17", "Periode", "Loonstrook"])
 
 
+class PayrollRunningBalanceTests(unittest.TestCase):
+    def test_running_balance_migration_tracks_required_balance_types(self):
+        migration = Path("migrations/036_payroll_running_balances.sql").read_text(encoding="utf-8")
+
+        self.assertIn("payroll_running_balance_accounts", migration)
+        self.assertIn("payroll_running_balance_mutations", migration)
+        self.assertIn("'wkr'", migration)
+        self.assertIn("'loan_advance'", migration)
+        self.assertIn("'choice_budget'", migration)
+        self.assertIn("balance_year INTEGER NOT NULL DEFAULT 0", migration)
+
+    def test_wkr_balance_status_warns_near_limit(self):
+        self.assertEqual(records._running_balance_status("wkr", "2400", "2200"), "let op")
+        self.assertEqual(records._running_balance_status("wkr", "2400", "2500"), "boven maximum")
+        self.assertEqual(records._running_balance_status("loan_advance", None, "100"), "actief")
+
+
+
 class PayrollPeriodSettlementTests(unittest.TestCase):
     def test_period_settlement_migration_creates_employee_period_totals(self):
         migration = Path("migrations/035_payroll_period_settlements.sql").read_text(encoding="utf-8")

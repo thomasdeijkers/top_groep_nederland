@@ -36,6 +36,7 @@ from apps.dashboard.records import (
     list_cao_settings,
     list_projects,
     list_payroll_periods,
+    list_payroll_running_balances,
     list_payroll_employee_arrangements,
     list_payroll_parameters,
     list_candidates,
@@ -297,6 +298,7 @@ def _dashboard_context(
             "payroll_period_defaults": {},
             "payroll_parameters": [],
             "payroll_employee_arrangements": [],
+            "payroll_running_balances": [],
             "cao_settings": [],
             "selected_cao_setting": None,
             "show_cao_form": False,
@@ -371,6 +373,7 @@ def _dashboard_context(
     selected_payroll_period = get_payroll_period(period_id) if data_page == "periods" and period_id else None
     payroll_parameters = list_payroll_parameters() if data_page == "settings" else []
     payroll_employee_arrangements = list_payroll_employee_arrangements() if data_page == "settings" else []
+    payroll_running_balances = list_payroll_running_balances() if data_page == "settings" else []
     cao_settings = list_cao_settings() if data_page in {"settings", "periods"} else []
     selected_cao_setting = get_cao_setting(cao_id) if data_page == "settings" and cao_id else None
     selected_relation = get_relation(edit_id) if data_page == "relations" and edit_id else None
@@ -463,6 +466,7 @@ def _dashboard_context(
         "payroll_period_defaults": payroll_period_defaults,
         "payroll_parameters": payroll_parameters,
         "payroll_employee_arrangements": payroll_employee_arrangements,
+        "payroll_running_balances": payroll_running_balances,
         "cao_settings": cao_settings,
         "selected_cao_setting": selected_cao_setting,
         "show_cao_form": show_cao_form or bool(selected_cao_setting),

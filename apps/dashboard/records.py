@@ -2845,6 +2845,77 @@ def _attach_project_bookings(cursor, projects: list[dict], per_project: int = 5)
         )
 
 
+def list_payroll_running_balances(limit: int = 200) -> list[dict]:
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT a.id,
+                           a.relation_id,
+                           r.name,
+                           a.balance_type,
+                           a.balance_label,
+                           a.balance_year,
+                           a.annual_limit,
+                           COALESCE(SUM(m.amount), 0) AS current_balance,
+                           COUNT(m.id) AS mutation_count,
+                           MAX(m.mutation_date) AS last_mutation_date,
+                           a.status,
+                           a.source
+                    FROM payroll_running_balance_accounts a
+                    JOIN relations r ON r.id = a.relation_id
+                    LEFT JOIN payroll_running_balance_mutations m ON m.account_id = a.id
+                    WHERE COALESCE(a.status, 'active') <> 'archived'
+                    GROUP BY a.id, a.relation_id, r.name, a.balance_type, a.balance_label,
+                             a.balance_year, a.annual_limit, a.status, a.source
+                    ORDER BY r.name ASC,
+                             CASE a.balance_type
+                                 WHEN 'wkr' THEN 1
+                                 WHEN 'loan_advance' THEN 2
+                                 WHEN 'choice_budget' THEN 3
+                                 ELSE 4
+                             END
+                    LIMIT %s;
+                    """,
+                    (limit,),
+                )
+                rows = cursor.fetchall()
+        return [
+            {
+                "id": row[0],
+                "relation_id": row[1],
+                "employee_name": row[2] or "Onbekend",
+                "balance_type": row[3],
+                "balance_label": row[4],
+                "balance_year": row[5] or "doorlopend",
+                "annual_limit": _format_money(row[6]) if row[6] is not None else "-",
+                "current_balance": _format_money(row[7]),
+                "raw_current_balance": Decimal(str(row[7] or 0)),
+                "mutation_count": row[8] or 0,
+                "last_mutation_date": row[9].strftime("%d-%m-%Y") if row[9] else "-",
+                "status": _running_balance_status(row[3], row[6], row[7]),
+                "source": row[11] or "dashboard",
+            }
+            for row in rows
+        ]
+    except Exception:
+        return []
+
+
+def _running_balance_status(balance_type: str, annual_limit, current_balance) -> str:
+    if balance_type != "wkr" or annual_limit in (None, 0):
+        return "actief"
+    limit = Decimal(str(annual_limit))
+    current = Decimal(str(current_balance or 0))
+    if current > limit:
+        return "boven maximum"
+    if current >= limit * Decimal("0.9"):
+        return "let op"
+    return "actief"
+
+
 def list_payroll_employee_arrangements(limit: int = 100) -> list[dict]:
     try:
         ensure_dashboard_tables()
