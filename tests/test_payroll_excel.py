@@ -202,6 +202,26 @@ class PayrollParameterTests(unittest.TestCase):
 
 
 
+class PayrollPhaseStatusTests(unittest.TestCase):
+    def test_phase_status_blocks_without_week_results(self):
+        status = records.payroll_phase_status({"result_count": 0}, {"blocking": 0, "warning": 0, "total": 0})
+
+        self.assertFalse(status["can_approve"])
+        self.assertEqual(status["label"], "Nog niet berekend")
+
+    def test_phase_status_blocks_known_exceptions(self):
+        status = records.payroll_phase_status({"result_count": 4}, {"blocking": 1, "warning": 2, "total": 3})
+
+        self.assertFalse(status["can_approve"])
+        self.assertEqual(status["tone"], "danger")
+
+    def test_phase_status_allows_approval_with_warnings_only(self):
+        status = records.payroll_phase_status({"result_count": 4}, {"blocking": 0, "warning": 1, "total": 1})
+
+        self.assertTrue(status["can_approve"])
+        self.assertEqual(status["label"], "Nalopen voor akkoord")
+
+
 class PayrollExceptionTests(unittest.TestCase):
     def test_exception_summary_counts_severities(self):
         summary = records.summarize_payroll_exceptions([

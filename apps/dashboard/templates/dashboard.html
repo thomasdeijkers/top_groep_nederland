@@ -1497,6 +1497,16 @@ Metadata:
 
                         {% set week_input = selected_payroll_period.week_input_summary %}
                         {% set week_result = selected_payroll_period.week_result_summary %}
+                        {% set phase_status = selected_payroll_period.payroll_phase_status %}
+                        <section class="payroll-phase-status payroll-phase-status--{{ phase_status.tone }}">
+                            <div>
+                                <span>Fase-afronding</span>
+                                <strong>{{ phase_status.label }}</strong>
+                                <small>{{ phase_status.detail }}</small>
+                            </div>
+                            <a class="ghost-button" href="/dashboard/audit#auditspoor">Auditspoor openen</a>
+                        </section>
+
                         <div class="project-detail-summary">
                             <div>
                                 <span>Week-invoer</span>
@@ -1648,7 +1658,7 @@ Metadata:
                                     <a class="payroll-workbook-action" href="/api/periods/{{ selected_payroll_period.id }}/excel/export">Excel downloaden</a>
                                     <a class="payroll-workbook-action" href="/dashboard/audit#auditspoor">Auditspoor</a>
                                     <form class="payroll-workbook-action-form" action="/api/periods/{{ selected_payroll_period.id }}/approve" method="post">
-                                        <button class="payroll-workbook-action" type="submit">Accorderen</button>
+                                        <button class="payroll-workbook-action" type="submit" {% if not selected_payroll_period.payroll_phase_status.can_approve %}disabled title="Los eerst blokkerende payroll-uitzonderingen op."{% endif %}>Accorderen</button>
                                     </form>
                                     <a class="payroll-workbook-action" href="/dashboard/periods#periodes">Sluiten</a>
                                 </div>

@@ -1169,6 +1169,52 @@ h2 {
     margin: 0 12px 12px;
 }
 
+.payroll-phase-status {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 12px 0;
+    padding: 12px;
+    border: 1px solid rgba(127, 209, 160, 0.2);
+    border-radius: 8px;
+    background: rgba(11, 27, 34, 0.56);
+}
+
+.payroll-phase-status--danger {
+    border-color: rgba(255, 136, 136, 0.32);
+    background: rgba(84, 36, 36, 0.24);
+}
+
+.payroll-phase-status--warning {
+    border-color: rgba(255, 210, 122, 0.28);
+    background: rgba(74, 58, 26, 0.22);
+}
+
+.payroll-phase-status--success {
+    border-color: rgba(127, 209, 160, 0.3);
+    background: rgba(26, 61, 54, 0.26);
+}
+
+.payroll-phase-status span,
+.payroll-phase-status small {
+    display: block;
+    color: #9fb0bd;
+    font-size: 0.78rem;
+}
+
+.payroll-phase-status strong {
+    display: block;
+    margin: 3px 0;
+    color: #f6fbff;
+    font-size: 1rem;
+}
+
+.payroll-workbook-action:disabled {
+    cursor: not-allowed;
+    opacity: 0.52;
+}
+
 .payroll-exception-panel {
     border-color: rgba(255, 210, 122, 0.22);
 }
@@ -3331,6 +3377,11 @@ select option:checked {
 }
 
 @media (max-width: 760px) {
+    .payroll-phase-status {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
     .payroll-exception-summary,
     .payroll-exception-row {
         grid-template-columns: 1fr;

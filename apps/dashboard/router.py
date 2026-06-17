@@ -99,7 +99,15 @@ def _relations_url(tab: str = "candidates", edit: int | None = None, q: str = ""
     return f"/dashboard/relations?{urlencode(params)}{anchor}"
 
 
-def _audit(action: str, entity_type: str, entity_id: int | None = None, label: str = "", description: str = "", status: str = "") -> None:
+def _audit(
+    action: str,
+    entity_type: str,
+    entity_id: int | None = None,
+    label: str = "",
+    description: str = "",
+    status: str = "",
+    metadata: dict | None = None,
+) -> None:
     log_audit_event(
         action=action,
         entity_type=entity_type,
@@ -107,6 +115,7 @@ def _audit(action: str, entity_type: str, entity_id: int | None = None, label: s
         entity_label=label,
         description=description,
         status=status,
+        metadata=metadata,
         actor_name="Admin",
     )
 
@@ -950,8 +959,39 @@ def archive_period(period_id: int):
 
 @router.post("/api/periods/{period_id}/approve")
 def approve_period(period_id: int):
+    period = get_payroll_period(period_id)
+    phase_status = (period or {}).get("payroll_phase_status") or {}
+    exception_summary = (period or {}).get("payroll_exception_summary") or {}
+    if not phase_status.get("can_approve"):
+        _audit(
+            "Loonperiode akkoord geblokkeerd",
+            "periode",
+            period_id,
+            (period or {}).get("name") or f"Periode {period_id}",
+            phase_status.get("detail") or "Loonperiode heeft nog blokkerende controlesignalen.",
+            "Controle vereist",
+            metadata={
+                "blocking_exceptions": exception_summary.get("blocking", 0),
+                "warning_exceptions": exception_summary.get("warning", 0),
+                "phase_status": phase_status.get("label", "Controle vereist"),
+            },
+        )
+        return RedirectResponse(f"/dashboard/periods?period={period_id}#periode-verloning", status_code=303)
+
     update_payroll_period_status(period_id, "Akkoord")
-    _audit("Loonperiode geaccordeerd", "periode", period_id, f"Periode {period_id}", "Laatste controle in de loonperiode is akkoord gezet.", "Akkoord")
+    _audit(
+        "Loonperiode geaccordeerd",
+        "periode",
+        period_id,
+        (period or {}).get("name") or f"Periode {period_id}",
+        f"Laatste controle akkoord. Payroll-controle: {phase_status.get('audit_summary', 'geen blokkades')}.",
+        "Akkoord",
+        metadata={
+            "blocking_exceptions": exception_summary.get("blocking", 0),
+            "warning_exceptions": exception_summary.get("warning", 0),
+            "phase_status": phase_status.get("label", "Akkoord"),
+        },
+    )
     return RedirectResponse(f"/dashboard/periods?period={period_id}#periode-verloning", status_code=303)
 
 

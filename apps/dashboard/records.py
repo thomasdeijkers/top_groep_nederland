@@ -1519,6 +1519,7 @@ def get_payroll_period(period_id: int | None) -> dict | None:
         period["week_result_summary"] = get_payroll_week_result_summary(period_id)
         period["payroll_exceptions"] = list_payroll_period_exceptions(period_id)
         period["payroll_exception_summary"] = summarize_payroll_exceptions(period["payroll_exceptions"])
+        period["payroll_phase_status"] = payroll_phase_status(period["week_result_summary"], period["payroll_exception_summary"])
         period["period_settlements"] = list_payroll_period_settlements(period_id)
         period["employee_week_results"] = period["period_settlements"] or list_payroll_employee_week_results(period_id)
         period["payroll_rows"] = list_payroll_period_payroll(period_id)
@@ -1713,6 +1714,47 @@ def get_payroll_week_result_summary(period_id: int) -> dict:
         }
     except Exception:
         return empty
+
+
+def payroll_phase_status(week_result_summary: dict | None, exception_summary: dict | None) -> dict:
+    week_result_summary = week_result_summary or {}
+    exception_summary = exception_summary or {}
+    result_count = int(week_result_summary.get("result_count") or 0)
+    blocking = int(exception_summary.get("blocking") or 0)
+    warning = int(exception_summary.get("warning") or 0)
+    total = int(exception_summary.get("total") or 0)
+
+    if result_count == 0:
+        return {
+            "label": "Nog niet berekend",
+            "tone": "warning",
+            "can_approve": False,
+            "detail": "Er zijn nog geen weekresultaten voor deze periode.",
+            "audit_summary": "geen weekresultaten",
+        }
+    if blocking > 0:
+        return {
+            "label": "Controle vereist",
+            "tone": "danger",
+            "can_approve": False,
+            "detail": f"Los eerst {blocking} blokkerende payroll-uitzondering(en) op.",
+            "audit_summary": f"{blocking} blokkerend, {warning} nalopen",
+        }
+    if warning > 0:
+        return {
+            "label": "Nalopen voor akkoord",
+            "tone": "warning",
+            "can_approve": True,
+            "detail": f"Er zijn {warning} aandachtspunt(en); accorderen kan na inhoudelijke controle.",
+            "audit_summary": f"0 blokkerend, {warning} nalopen",
+        }
+    return {
+        "label": "Controlelaag compleet",
+        "tone": "success",
+        "can_approve": True,
+        "detail": "Er zijn geen bekende payroll-uitzonderingen gevonden.",
+        "audit_summary": f"{total} uitzonderingen",
+    }
 
 
 def list_payroll_period_exceptions(period_id: int, limit: int = 100) -> list[dict]:
