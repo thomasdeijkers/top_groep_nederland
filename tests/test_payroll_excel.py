@@ -97,6 +97,22 @@ class PayrollCalculationTests(unittest.TestCase):
         self.assertEqual(workbook.sheetnames, ["WK17", "Periode", "Loonstrook"])
 
 
+class PayrollEmployeeArrangementTests(unittest.TestCase):
+    def test_arrangement_migration_limits_period_numbers_to_thirteen(self):
+        migration = Path("migrations/032_payroll_employee_arrangements.sql").read_text(encoding="utf-8")
+
+        self.assertIn("valid_from_period_number BETWEEN 1 AND 13", migration)
+        self.assertIn("payroll_employee_rights", migration)
+        self.assertIn("payroll_employee_allowances", migration)
+
+    def test_arrangement_payment_schedule_labels_are_documented(self):
+        migration = Path("migrations/032_payroll_employee_arrangements.sql").read_text(encoding="utf-8")
+
+        self.assertIn("'weekly'", migration)
+        self.assertIn("'four_weekly'", migration)
+
+
+
 class PayrollParameterTests(unittest.TestCase):
     def test_formats_parameter_percentages_for_display(self):
         self.assertEqual(records._format_parameter_value("0.0833", "percentage"), "8.33%")

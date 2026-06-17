@@ -2577,6 +2577,97 @@ def _attach_project_bookings(cursor, projects: list[dict], per_project: int = 5)
         )
 
 
+def list_payroll_employee_arrangements(limit: int = 100) -> list[dict]:
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT a.id,
+                           a.relation_id,
+                           r.name,
+                           a.valid_from_year,
+                           a.valid_from_period_number,
+                           a.valid_until_year,
+                           a.valid_until_period_number,
+                           a.cao_branch,
+                           a.phase,
+                           a.pension_scheme,
+                           a.contract_hours_4w,
+                           a.days_right_code,
+                           a.scale_code,
+                           a.function_name,
+                           a.gross_hourly_wage,
+                           a.net_base_40h,
+                           a.vacation_rate_40h,
+                           a.sickness_rate_40h,
+                           a.holiday_rate_40h,
+                           a.payment_schedule,
+                           a.company_car,
+                           a.license_plate,
+                           a.health_insurance_eligible,
+                           a.status,
+                           a.source,
+                           COALESCE(right_counts.right_count, 0),
+                           COALESCE(allowance_counts.allowance_count, 0),
+                           a.updated_at
+                    FROM payroll_employee_arrangements a
+                    JOIN relations r ON r.id = a.relation_id
+                    LEFT JOIN (
+                        SELECT arrangement_id, COUNT(*) AS right_count
+                        FROM payroll_employee_rights
+                        GROUP BY arrangement_id
+                    ) right_counts ON right_counts.arrangement_id = a.id
+                    LEFT JOIN (
+                        SELECT arrangement_id, COUNT(*) AS allowance_count
+                        FROM payroll_employee_allowances
+                        GROUP BY arrangement_id
+                    ) allowance_counts ON allowance_counts.arrangement_id = a.id
+                    WHERE COALESCE(a.status, 'concept') <> 'archief'
+                    ORDER BY a.valid_from_year DESC,
+                             a.valid_from_period_number DESC,
+                             r.name ASC,
+                             a.id DESC
+                    LIMIT %s;
+                    """,
+                    (limit,),
+                )
+                return [
+                    {
+                        "id": row[0],
+                        "relation_id": row[1],
+                        "employee_name": row[2] or "Onbekend",
+                        "valid_from": f"{row[3]} / P{row[4]}",
+                        "valid_until": f"{row[5]} / P{row[6]}" if row[5] and row[6] else "Doorlopend",
+                        "cao_branch": row[7] or "bouwplaats",
+                        "phase": row[8] or "-",
+                        "pension_scheme": row[9] or "-",
+                        "contract_hours_4w": _format_number(row[10]) if row[10] is not None else "-",
+                        "days_right_code": row[11] or "-",
+                        "scale_code": row[12] or "-",
+                        "function_name": row[13] or "-",
+                        "gross_hourly_wage": _format_money(row[14]) if row[14] is not None else "-",
+                        "net_base_40h": _format_money(row[15]) if row[15] is not None else "-",
+                        "vacation_rate_40h": _format_money(row[16]) if row[16] is not None else "-",
+                        "sickness_rate_40h": _format_money(row[17]) if row[17] is not None else "-",
+                        "holiday_rate_40h": _format_money(row[18]) if row[18] is not None else "-",
+                        "payment_schedule": "4-wekelijks" if row[19] == "four_weekly" else "wekelijks",
+                        "company_car": bool(row[20]),
+                        "license_plate": row[21] or "-",
+                        "health_insurance_eligible": bool(row[22]),
+                        "status": row[23] or "concept",
+                        "source": row[24] or "dashboard",
+                        "right_count": row[25] or 0,
+                        "allowance_count": row[26] or 0,
+                        "updated_at": row[27].strftime("%d-%m-%Y %H:%M") if row[27] else "-",
+                    }
+                    for row in cursor.fetchall()
+                ]
+    except Exception:
+        return []
+
+
 def get_payroll_parameter_values(year: int, period_number: int, branch: str = "build") -> dict[str, Decimal | str | None]:
     branch_key = "uta_value" if str(branch).lower() == "uta" else "build_value"
     try:

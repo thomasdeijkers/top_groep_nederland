@@ -375,6 +375,63 @@
                                 </div>
                             </section>
 
+                            <section class="settings-card settings-card--wide" id="medewerker-inrichting">
+                                <div class="settings-card-heading">
+                                    <div>
+                                        <p class="section-label">Verloning</p>
+                                        <h2>Medewerker-inrichting</h2>
+                                        <p>Per medewerker de periodegebonden rechten, tarieven en betaalinstellingen die straks de weekberekening voeden.</p>
+                                    </div>
+                                </div>
+
+                                <div class="table-wrap payroll-settings-table">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Medewerker</th>
+                                                <th>Geldig</th>
+                                                <th>CAO / fase</th>
+                                                <th>Pensioen</th>
+                                                <th>Contract</th>
+                                                <th>Functie</th>
+                                                <th>Loon</th>
+                                                <th>Betaling</th>
+                                                <th>Rechten</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for arrangement in payroll_employee_arrangements %}
+                                            <tr>
+                                                <td>
+                                                    <strong>{{ arrangement.employee_name }}</strong>
+                                                    <span>{{ arrangement.source }}</span>
+                                                </td>
+                                                <td>{{ arrangement.valid_from }} t/m {{ arrangement.valid_until }}</td>
+                                                <td>{{ arrangement.cao_branch }} / {{ arrangement.phase }}</td>
+                                                <td>{{ arrangement.pension_scheme }}</td>
+                                                <td>{{ arrangement.contract_hours_4w }} uur / 4 weken</td>
+                                                <td>{{ arrangement.function_name }}{% if arrangement.scale_code != '-' %} - {{ arrangement.scale_code }}{% endif %}</td>
+                                                <td>{{ arrangement.gross_hourly_wage }} bruto/u - {{ arrangement.net_base_40h }} netto 40u</td>
+                                                <td>{{ arrangement.payment_schedule }}{% if arrangement.company_car %} - auto {{ arrangement.license_plate }}{% endif %}</td>
+                                                <td>{{ arrangement.days_right_code }} - {{ arrangement.right_count }} regels - {{ arrangement.allowance_count }} vergoedingen</td>
+                                                <td><span class="status-tag">{{ arrangement.status }}</span></td>
+                                            </tr>
+                                            {% else %}
+                                            <tr>
+                                                <td colspan="10">
+                                                    <div class="empty-state">
+                                                        <strong>Nog geen medewerker-inrichting</strong>
+                                                        <span>De migratie neemt bestaande payrollvelden op relaties als concept over zodra die gevuld zijn.</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </section>
+
                             <section class="settings-card settings-card--wide" id="cao-instellingen">
                                 <div class="settings-card-heading">
                                     <div>
