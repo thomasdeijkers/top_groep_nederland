@@ -97,6 +97,24 @@ class PayrollCalculationTests(unittest.TestCase):
         self.assertEqual(workbook.sheetnames, ["WK17", "Periode", "Loonstrook"])
 
 
+class PayrollPeriodSettlementTests(unittest.TestCase):
+    def test_period_settlement_migration_creates_employee_period_totals(self):
+        migration = Path("migrations/035_payroll_period_settlements.sql").read_text(encoding="utf-8")
+
+        self.assertIn("payroll_period_settlements", migration)
+        self.assertIn("advance_weeks_1_3", migration)
+        self.assertIn("week_4_amount", migration)
+        self.assertIn("total_period_amount", migration)
+
+    def test_period_settlement_migration_supports_four_weekly_payment(self):
+        migration = Path("migrations/035_payroll_period_settlements.sql").read_text(encoding="utf-8")
+
+        self.assertIn("payment_schedule", migration)
+        self.assertIn("four_weekly", migration)
+        self.assertIn("total_period_amount", migration)
+
+
+
 class PayrollWeekResultTests(unittest.TestCase):
 
     def test_employee_week_result_status_prioritizes_missing_data(self):

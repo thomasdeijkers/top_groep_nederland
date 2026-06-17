@@ -1517,7 +1517,8 @@ def get_payroll_period(period_id: int | None) -> dict | None:
                 _attach_period_weeks(cursor, [period])
         period["week_input_summary"] = get_payroll_week_input_summary(period_id)
         period["week_result_summary"] = get_payroll_week_result_summary(period_id)
-        period["employee_week_results"] = list_payroll_employee_week_results(period_id)
+        period["period_settlements"] = list_payroll_period_settlements(period_id)
+        period["employee_week_results"] = period["period_settlements"] or list_payroll_employee_week_results(period_id)
         period["payroll_rows"] = list_payroll_period_payroll(period_id)
         period["payroll_totals"] = _payroll_period_totals(period["payroll_rows"])
         stored_totals = list_payroll_period_totals(period_id)
@@ -1542,6 +1543,59 @@ def get_payroll_period(period_id: int | None) -> dict | None:
         return period
     except Exception:
         return None
+
+
+def list_payroll_period_settlements(period_id: int, limit: int = 200) -> list[dict]:
+    if not period_id:
+        return []
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT relation_id,
+                           employee_name,
+                           week_count,
+                           total_worked_hours,
+                           total_km,
+                           net_wage_amount,
+                           travel_amount,
+                           day_allowance_amount,
+                           advance_weeks_1_3,
+                           week_4_amount,
+                           total_period_amount,
+                           payment_schedule,
+                           settlement_status,
+                           status_details
+                    FROM payroll_period_settlements
+                    WHERE payroll_period_id = %s
+                    ORDER BY employee_name ASC
+                    LIMIT %s;
+                    """,
+                    (period_id, limit),
+                )
+                return [
+                    {
+                        "relation_id": row[0],
+                        "employee_name": row[1] or "Onbekend",
+                        "week_count": row[2] or 0,
+                        "worked_hours": _format_number(row[3]),
+                        "total_km": _format_number(row[4]),
+                        "net_wage_amount": _format_money(row[5]),
+                        "travel_amount": _format_money(row[6]),
+                        "day_allowance_amount": _format_money(row[7]),
+                        "advance_weeks_1_3": _format_money(row[8]),
+                        "week_4_amount": _format_money(row[9]),
+                        "net_period_total": _format_money(row[10]),
+                        "payment_schedule": "4-wekelijks" if row[11] == "four_weekly" else "wekelijks",
+                        "status_label": row[12] or "concept",
+                        "status_details": row[13] or {},
+                    }
+                    for row in cursor.fetchall()
+                ]
+    except Exception:
+        return []
 
 
 def list_payroll_employee_week_results(period_id: int, limit: int = 200) -> list[dict]:
