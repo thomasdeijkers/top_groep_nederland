@@ -433,5 +433,20 @@ class PayrollEmptyPeriodCopyTests(unittest.TestCase):
         self.assertIn("gevalideerde uren in deze loonperiode", template)
 
 
+class PayrollTestDataMigrationSafetyTests(unittest.TestCase):
+    def test_period_two_testdata_migration_preserves_validated_statuses(self):
+        migration = Path("migrations/028_payroll_period_02_test_timesheets.sql").read_text(encoding="utf-8-sig")
+
+        self.assertIn("LOWER(REPLACE(COALESCE(w.status, ''), ' ', '_')) IN ('', 'controle', 'te_controleren', 'gematcht', 'matched')", migration)
+        self.assertGreaterEqual(
+            migration.count("LOWER(REPLACE(COALESCE(w.status, ''), ' ', '_')) IN ('', 'controle', 'te_controleren', 'gematcht', 'matched')"),
+            4,
+        )
+        self.assertIn("ELSE w.status", migration)
+        self.assertIn("ELSE w.validated_at", migration)
+        self.assertIn("ELSE w.payroll_sent_at", migration)
+        self.assertNotIn("SET status = 'controle',", migration)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -230,9 +230,18 @@ WITH ordered_test_timesheets AS (
       AND parse_source = 'testdata'
 )
 UPDATE whatsapp_timesheet_inbox w
-SET status = 'controle',
-    validated_at = NULL,
-    payroll_sent_at = NULL,
+SET status = CASE
+        WHEN LOWER(REPLACE(COALESCE(w.status, ''), ' ', '_')) IN ('', 'controle', 'te_controleren', 'gematcht', 'matched') THEN 'controle'
+        ELSE w.status
+    END,
+    validated_at = CASE
+        WHEN LOWER(REPLACE(COALESCE(w.status, ''), ' ', '_')) IN ('', 'controle', 'te_controleren', 'gematcht', 'matched') THEN NULL
+        ELSE w.validated_at
+    END,
+    payroll_sent_at = CASE
+        WHEN LOWER(REPLACE(COALESCE(w.status, ''), ' ', '_')) IN ('', 'controle', 'te_controleren', 'gematcht', 'matched') THEN NULL
+        ELSE w.payroll_sent_at
+    END,
     received_at = (
         COALESCE(w.work_date, DATE '2026-06-01')::timestamp
         + ((8 + ((ordered_test_timesheets.row_number - 1) % 8)) * INTERVAL '1 hour')
@@ -240,12 +249,17 @@ SET status = 'controle',
     ),
     updated_at = NOW()
 FROM ordered_test_timesheets
-WHERE w.id = ordered_test_timesheets.id;
+WHERE w.id = ordered_test_timesheets.id
+  AND LOWER(REPLACE(COALESCE(w.status, ''), ' ', '_')) IN ('', 'controle', 'te_controleren', 'gematcht', 'matched');
 
 UPDATE project_time_bookings b
-SET status = 'controle',
+SET status = CASE
+        WHEN LOWER(REPLACE(COALESCE(b.status, ''), ' ', '_')) IN ('', 'controle', 'te_controleren', 'gematcht', 'matched') THEN 'controle'
+        ELSE b.status
+    END,
     updated_at = NOW()
 FROM whatsapp_timesheet_inbox w
 WHERE b.timesheet_inbox_id = w.id
   AND w.media_filename LIKE 'test-period-02-wk%-relation-%.jpg'
-  AND w.parse_source = 'testdata';
+  AND w.parse_source = 'testdata'
+  AND LOWER(REPLACE(COALESCE(b.status, ''), ' ', '_')) IN ('', 'controle', 'te_controleren', 'gematcht', 'matched');
