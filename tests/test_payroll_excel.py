@@ -449,24 +449,36 @@ class PayrollTestDataMigrationSafetyTests(unittest.TestCase):
 
 
 class PayrollFullYearTestSeedTests(unittest.TestCase):
-    def test_full_year_test_seed_creates_missing_periods_and_live_test_hours(self):
+    def test_full_year_test_seed_creates_missing_periods_and_weeks(self):
         migration = Path("migrations/039_full_year_test_payroll.sql").read_text(encoding="utf-8-sig")
 
         self.assertIn("generate_series(1, 13)", migration)
         self.assertIn("ON CONFLICT (year, period_number)", migration)
-        self.assertIn("testdata_full_year", migration)
-        self.assertIn("loon_te_berekenen", migration)
+        self.assertIn("payroll_period_weeks", migration)
         self.assertIn("WHERE NOT EXISTS", migration)
-        self.assertIn("test-payroll-year-2026", migration)
+        self.assertNotIn("whatsapp_timesheet_inbox", migration)
+        self.assertNotIn("project_time_bookings", migration)
 
     def test_full_year_test_seed_runs_before_week_input_derivations(self):
         data_store = Path("apps/dashboard/data_store.py").read_text(encoding="utf-8-sig")
 
         self.assertIn("migrations/039_full_year_test_payroll.sql", data_store)
+        self.assertIn("migrations/040_one_period_test_hours.sql", data_store)
         self.assertLess(
-            data_store.index("migrations/039_full_year_test_payroll.sql"),
+            data_store.index("migrations/040_one_period_test_hours.sql"),
             data_store.index("migrations/033_payroll_week_inputs.sql"),
         )
+        self.assertIn("040_one_period_test_hours.sql", data_store)
+
+    def test_one_period_test_hours_seed_populates_live_timesheets(self):
+        migration = Path("migrations/040_one_period_test_hours.sql").read_text(encoding="utf-8-sig")
+
+        self.assertIn("testdata_one_period", migration)
+        self.assertIn("loon_te_berekenen", migration)
+        self.assertIn("whatsapp_timesheet_inbox", migration)
+        self.assertIn("project_time_bookings", migration)
+        self.assertIn("test-one-period-2026", migration)
+        self.assertIn("fallback_candidate", migration)
 
 if __name__ == "__main__":
     unittest.main()
