@@ -4,7 +4,7 @@ from datetime import date, datetime
 from pathlib import Path
 from unittest.mock import patch
 
-from apps.dashboard import records
+from apps.dashboard import records, router as dashboard_router
 from apps.dashboard.payroll_calculations import derived_period_total_rows
 from apps.dashboard.payroll_excel import analyze_payroll_workbook, build_payroll_output_workbook
 
@@ -502,6 +502,21 @@ class PayrollDataDiagnosticsTests(unittest.TestCase):
         self.assertIn("Echte tabeldata", template)
         self.assertIn("Projectboekingen", records_source)
         self.assertIn("AI/OCR audit", records_source)
+
+
+class DashboardContextSafetyTests(unittest.TestCase):
+    def test_dashboard_context_sections_fall_back_individually(self):
+        def broken_loader():
+            raise RuntimeError("kapot")
+
+        self.assertEqual(dashboard_router._context_value("periods", "payroll_periods", [], broken_loader), [])
+
+    def test_dashboard_context_logs_named_sections(self):
+        router_source = Path("apps/dashboard/router.py").read_text(encoding="utf-8-sig")
+
+        self.assertIn("DASHBOARD_CONTEXT_SECTION_ERROR", router_source)
+        self.assertIn("selected_payroll_period", router_source)
+        self.assertIn("timesheet_row", router_source)
 
 
 class PayrollPeriodDetailSafetyTests(unittest.TestCase):

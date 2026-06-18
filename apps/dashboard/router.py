@@ -146,6 +146,14 @@ def _audit_changed_fields(corrections: dict) -> str:
     return f"Aangepast: {', '.join(shown)}{suffix}."
 
 
+def _context_value(active_page: str, label: str, fallback, loader):
+    try:
+        return loader()
+    except Exception as exc:
+        print(f"DASHBOARD_CONTEXT_SECTION_ERROR {active_page}.{label}: {type(exc).__name__}: {exc}")
+        return fallback() if callable(fallback) else fallback
+
+
 def _audit_relation_fields(data: dict) -> str:
     labels = {
         "name": "bedrijfsnaam",
@@ -335,7 +343,7 @@ def _dashboard_context(
             ],
         }
 
-    stats = get_dashboard_stats() if data_page == "overview" else get_empty_dashboard_stats()
+    stats = _context_value(data_page, "stats", get_empty_dashboard_stats(), lambda: get_dashboard_stats()) if data_page == "overview" else get_empty_dashboard_stats()
     server_overview = {
         "server_metrics": [],
         "server_system_tiles": [],
@@ -343,29 +351,40 @@ def _dashboard_context(
         "server_otys_tiles": [],
         "scheduled_jobs": [],
     }
-    organizations = list_organizations() if data_page == "overview" else []
+    organizations = _context_value(data_page, "organizations", [], list_organizations) if data_page == "overview" else []
     active_status = status_filter if data_page in {"relations", "vacancies"} else ""
-    relations = list_relations(query=query, status=active_status) if data_page == "relations" else []
-    candidate_relations = list_relations(query=query, relation_type="candidate", status=active_status) if data_page == "relations" else []
-    timesheet_candidate_options = list_relations(limit=200, relation_type="candidate") if data_page == "timesheets" else []
-    principal_relations = list_relations(query=query, relation_type="principal", status=active_status) if data_page == "relations" else []
+    relations = _context_value(data_page, "relations", [], lambda: list_relations(query=query, status=active_status)) if data_page == "relations" else []
+    candidate_relations = _context_value(data_page, "candidate_relations", [], lambda: list_relations(query=query, relation_type="candidate", status=active_status)) if data_page == "relations" else []
+    timesheet_candidate_options = _context_value(data_page, "timesheet_candidate_options", [], lambda: list_relations(limit=200, relation_type="candidate")) if data_page == "timesheets" else []
+    principal_relations = _context_value(data_page, "principal_relations", [], lambda: list_relations(query=query, relation_type="principal", status=active_status)) if data_page == "relations" else []
     principal_limit = 500 if data_page == "timesheets" else 100
-    principals = list_principals(limit=principal_limit, query=query if data_page == "relations" else "") if data_page in {"relations", "vacancies", "projects", "timesheets"} else []
-    imported_candidates = list_candidates(query=query) if data_page == "relations" else []
-    imported_tickets = list_tickets() if data_page == "tickets" else []
-    imported_vacancies = list_vacancies(query=query, status=active_status) if data_page == "vacancies" else []
-    relation_status_options = list_relation_statuses("candidate" if relation_tab == "candidates" else "principal") if data_page == "relations" else []
-    vacancy_status_options = list_vacancy_statuses() if data_page == "vacancies" else []
-    relation_tab_counts = list_relation_tab_counts() if data_page == "relations" else {"candidates": 0, "principals": 0}
+    principals = _context_value(data_page, "principal_options", [], lambda: list_principals(limit=principal_limit, query=query if data_page == "relations" else "")) if data_page in {"relations", "vacancies", "projects", "timesheets"} else []
+    imported_candidates = _context_value(data_page, "imported_candidates", [], lambda: list_candidates(query=query)) if data_page == "relations" else []
+    imported_tickets = _context_value(data_page, "tickets", [], list_tickets) if data_page == "tickets" else []
+    imported_vacancies = _context_value(data_page, "vacancies", [], lambda: list_vacancies(query=query, status=active_status)) if data_page == "vacancies" else []
+    relation_status_options = _context_value(data_page, "relation_status_options", [], lambda: list_relation_statuses("candidate" if relation_tab == "candidates" else "principal")) if data_page == "relations" else []
+    vacancy_status_options = _context_value(data_page, "vacancy_status_options", [], list_vacancy_statuses) if data_page == "vacancies" else []
+    relation_tab_counts = _context_value(data_page, "relation_tab_counts", {"candidates": 0, "principals": 0}, list_relation_tab_counts) if data_page == "relations" else {"candidates": 0, "principals": 0}
     status_tiles = (
-        list_vacancy_status_counts(query if data_page == "vacancies" else "")
+        _context_value(data_page, "vacancy_status_counts", [], lambda: list_vacancy_status_counts(query if data_page == "vacancies" else ""))
         if data_page == "vacancies"
-        else list_relation_status_counts("candidate" if relation_tab == "candidates" else "principal", query if data_page == "relations" else "")
+        else _context_value(data_page, "relation_status_counts", [], lambda: list_relation_status_counts("candidate" if relation_tab == "candidates" else "principal", query if data_page == "relations" else ""))
         if data_page == "relations"
         else []
     )
-    whatsapp_timesheets = list_whatsapp_timesheets() if data_page == "timesheets" else []
-    overview_data = get_overview_data() if data_page == "overview" else {
+    whatsapp_timesheets = _context_value(data_page, "whatsapp_timesheets", [], list_whatsapp_timesheets) if data_page == "timesheets" else []
+    overview_data = _context_value(data_page, "overview_data", {
+        "counts": {
+            "candidates": 0,
+            "principals": 0,
+            "vacancies": 0,
+            "tickets": 0,
+            "whatsapp_timesheet_inbox": 0,
+        },
+        "recent": [],
+        "whatsapp_workflow": [],
+        "weekly_hours_yoy": [],
+    }, get_overview_data) if data_page == "overview" else {
         "counts": {
             "candidates": 0,
             "principals": 0,
@@ -377,55 +396,64 @@ def _dashboard_context(
         "whatsapp_workflow": [],
         "weekly_hours_yoy": [],
     }
-    audit_events = list_audit_events(160 if data_page == "audit" else 8) if data_page in {"overview", "audit", "settings", "periods"} else []
+    audit_events = _context_value(data_page, "audit_events", [], lambda: list_audit_events(160 if data_page == "audit" else 8)) if data_page in {"overview", "audit", "settings", "periods"} else []
     audit_menu_groups = _audit_menu_groups(audit_events) if data_page == "audit" else []
-    openai_api_audit_events = list_openai_api_audit_events(40) if data_page == "audit" else []
-    openai_usage = get_openai_usage_summary()
-    project_options = list_project_options() if data_page in {"timesheets", "projects", "periods"} else []
-    projects = list_projects(query=query) if data_page == "projects" else []
-    selected_project = get_project(project_id) if data_page == "projects" and project_id else None
-    payroll_periods = list_payroll_periods() if data_page == "periods" else []
-    archived_payroll_periods = list_payroll_periods(archived=True) if data_page == "periods" else []
-    payroll_year_overview = list_payroll_year_overview() if data_page == "periods" else []
-    payroll_datamodel_status = list_payroll_datamodel_status(limit=40) if data_page == "periods" else []
-    payroll_data_diagnostics = get_payroll_data_diagnostics() if data_page == "periods" else []
-    payroll_period_defaults = get_payroll_period_defaults() if data_page == "periods" else {}
-    selected_payroll_period = get_payroll_period(period_id) if data_page == "periods" and period_id else None
-    payroll_parameters = list_payroll_parameters() if data_page == "settings" else []
-    payroll_employee_arrangements = list_payroll_employee_arrangements() if data_page == "settings" else []
-    payroll_running_balances = list_payroll_running_balances() if data_page == "settings" else []
-    cao_settings = list_cao_settings() if data_page in {"settings", "periods"} else []
-    selected_cao_setting = get_cao_setting(cao_id) if data_page == "settings" and cao_id else None
-    selected_relation = get_relation(edit_id) if data_page == "relations" and edit_id else None
+    openai_api_audit_events = _context_value(data_page, "openai_api_audit_events", [], lambda: list_openai_api_audit_events(40)) if data_page == "audit" else []
+    openai_usage = _context_value(data_page, "openai_usage", {"month_cost_usd": 0, "month_requests": 0, "month_tokens": 0, "requests": 0, "total_tokens": 0}, get_openai_usage_summary)
+    project_options = _context_value(data_page, "project_options", [], list_project_options) if data_page in {"timesheets", "projects", "periods"} else []
+    projects = _context_value(data_page, "projects", [], lambda: list_projects(query=query)) if data_page == "projects" else []
+    selected_project = _context_value(data_page, "selected_project", None, lambda: get_project(project_id)) if data_page == "projects" and project_id else None
+    payroll_periods = _context_value(data_page, "payroll_periods", [], list_payroll_periods) if data_page == "periods" else []
+    archived_payroll_periods = _context_value(data_page, "archived_payroll_periods", [], lambda: list_payroll_periods(archived=True)) if data_page == "periods" else []
+    payroll_year_overview = _context_value(data_page, "payroll_year_overview", [], list_payroll_year_overview) if data_page == "periods" else []
+    payroll_datamodel_status = _context_value(data_page, "payroll_datamodel_status", [], lambda: list_payroll_datamodel_status(limit=40)) if data_page == "periods" else []
+    payroll_data_diagnostics = _context_value(data_page, "payroll_data_diagnostics", [], get_payroll_data_diagnostics) if data_page == "periods" else []
+    payroll_period_defaults = _context_value(data_page, "payroll_period_defaults", {}, get_payroll_period_defaults) if data_page == "periods" else {}
+    selected_payroll_period = _context_value(data_page, "selected_payroll_period", None, lambda: get_payroll_period(period_id)) if data_page == "periods" and period_id else None
+    payroll_parameters = _context_value(data_page, "payroll_parameters", [], list_payroll_parameters) if data_page == "settings" else []
+    payroll_employee_arrangements = _context_value(data_page, "payroll_employee_arrangements", [], list_payroll_employee_arrangements) if data_page == "settings" else []
+    payroll_running_balances = _context_value(data_page, "payroll_running_balances", [], list_payroll_running_balances) if data_page == "settings" else []
+    cao_settings = _context_value(data_page, "cao_settings", [], list_cao_settings) if data_page in {"settings", "periods"} else []
+    selected_cao_setting = _context_value(data_page, "selected_cao_setting", None, lambda: get_cao_setting(cao_id)) if data_page == "settings" and cao_id else None
+    selected_relation = _context_value(data_page, "selected_relation", None, lambda: get_relation(edit_id)) if data_page == "relations" and edit_id else None
     selected_relation_payroll = None
     if selected_relation and selected_relation.get("relation_type") == "candidate":
-        selected_relation_payroll = get_relation_payroll_context(selected_relation.get("id"))
+        selected_relation_payroll = _context_value(data_page, "selected_relation_payroll", None, lambda: get_relation_payroll_context(selected_relation.get("id")))
     selected_relation_audit_events = []
     if selected_relation:
         relation_audit_types = {"relatie", "candidate", "principal", selected_relation.get("relation_type") or ""}
         relation_id_text = str(selected_relation.get("id"))
         selected_relation_audit_events = [
             item
-            for item in list_audit_events(200)
+            for item in _context_value(data_page, "selected_relation_audit_events", [], lambda: list_audit_events(200))
             if (
                 item.get("entity_id") == selected_relation.get("id")
                 and item.get("entity_type") in relation_audit_types
             )
             or str((item.get("metadata") or {}).get("relation_id") or "") == relation_id_text
         ][:40]
-    selected_vacancy = get_vacancy(edit_id) if data_page == "vacancies" and edit_id else None
+    selected_vacancy = _context_value(data_page, "selected_vacancy", None, lambda: get_vacancy(edit_id)) if data_page == "vacancies" and edit_id else None
     relation_tab = relation_tab if relation_tab in {"candidates", "principals"} else "candidates"
     show_relation_form = show_relation_form or bool(selected_relation)
 
     whatsapp_inbox = whatsapp_timesheets
     for item in whatsapp_inbox:
-        item.setdefault("parsed_map", {field.get("key", field["label"]): field for field in item.get("parsed_fields", [])})
-        item["workflow_stage"] = _timesheet_stage(item.get("status", ""))
-        item["workflow_stage_label"] = {
-            "controle": "Te controleren",
-            "valideren": "Te valideren",
-            "loon": "Loon berekenen",
-        }.get(item["workflow_stage"], "Te controleren")
+        try:
+            item.setdefault("parsed_map", {
+                field.get("key") or field.get("label") or f"field_{index}": field
+                for index, field in enumerate(item.get("parsed_fields", []))
+            })
+            item["workflow_stage"] = _timesheet_stage(item.get("status", ""))
+            item["workflow_stage_label"] = {
+                "controle": "Te controleren",
+                "valideren": "Te valideren",
+                "loon": "Loon berekenen",
+            }.get(item["workflow_stage"], "Te controleren")
+        except Exception as exc:
+            print(f"DASHBOARD_CONTEXT_SECTION_ERROR {data_page}.timesheet_row: {type(exc).__name__}: {exc}")
+            item.setdefault("parsed_map", {})
+            item["workflow_stage"] = "controle"
+            item["workflow_stage_label"] = "Te controleren"
 
     workflow_stage = workflow_stage if workflow_stage in {"all", "controle", "valideren", "loon"} else "all"
     timesheet_tab = timesheet_tab if timesheet_tab in {"overview", "task"} else "overview"
@@ -497,7 +525,7 @@ def _dashboard_context(
         "cao_settings": cao_settings,
         "selected_cao_setting": selected_cao_setting,
         "show_cao_form": show_cao_form or bool(selected_cao_setting),
-        "timesheet_channel_tiles": get_timesheet_channel_tiles() if data_page == "timesheets" else [],
+        "timesheet_channel_tiles": _context_value(data_page, "timesheet_channel_tiles", [], get_timesheet_channel_tiles) if data_page == "timesheets" else [],
         "country_options": [
             "Nederland",
             "Belgie",
