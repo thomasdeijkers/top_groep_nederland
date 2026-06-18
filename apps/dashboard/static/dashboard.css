@@ -487,6 +487,57 @@ h2 {
     min-height: 40px;
 }
 
+.payroll-data-diagnostics {
+    display: grid;
+    gap: 12px;
+    margin: 0 0 14px;
+    padding: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: rgba(14, 26, 36, 0.68);
+}
+
+.payroll-data-diagnostics__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+    gap: 8px;
+}
+
+.payroll-data-tile {
+    display: grid;
+    gap: 4px;
+    min-height: 82px;
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: rgba(9, 20, 29, 0.66);
+}
+
+.payroll-data-tile span,
+.payroll-data-tile small {
+    color: #9fb0bd;
+    font-size: 0.7rem;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.payroll-data-tile strong {
+    color: #ffffff;
+    font-size: 1.25rem;
+}
+
+.payroll-data-tile--green {
+    border-color: rgba(127, 209, 160, 0.32);
+}
+
+.payroll-data-tile--orange {
+    border-color: rgba(255, 184, 77, 0.38);
+}
+
+.payroll-data-tile--red {
+    border-color: rgba(255, 98, 78, 0.38);
+}
+
 .period-tabs {
     display: flex;
     gap: 8px;

@@ -489,6 +489,21 @@ class DashboardVisibleDemoPayrollSeedTests(unittest.TestCase):
         self.assertIn("data-period-panel", script)
         self.assertIn("#periode-archief", script)
 
+class PayrollDataDiagnosticsTests(unittest.TestCase):
+    def test_periods_page_loads_payroll_data_diagnostics(self):
+        router = Path("apps/dashboard/router.py").read_text(encoding="utf-8-sig")
+        template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
+        records_source = Path("apps/dashboard/records.py").read_text(encoding="utf-8-sig")
+
+        self.assertIn("def get_payroll_data_diagnostics", records_source)
+        self.assertIn("get_payroll_data_diagnostics", router)
+        self.assertIn("payroll_data_diagnostics", router)
+        self.assertIn("payroll-data-controle", template)
+        self.assertIn("Echte tabeldata", template)
+        self.assertIn("Projectboekingen", records_source)
+        self.assertIn("AI/OCR audit", records_source)
+
+
 class PayrollFullYearTestSeedTests(unittest.TestCase):
     def test_full_year_test_seed_creates_missing_periods_and_weeks(self):
         migration = Path("migrations/039_full_year_test_payroll.sql").read_text(encoding="utf-8-sig")

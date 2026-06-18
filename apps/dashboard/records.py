@@ -1438,6 +1438,93 @@ def list_payroll_periods(limit: int = 25, archived: bool = False) -> list[dict]:
         return []
 
 
+def get_payroll_data_diagnostics() -> list[dict]:
+    checks = [
+        (
+            "Kandidaten",
+            """
+            SELECT COUNT(*)
+            FROM relations
+            WHERE relation_type = 'candidate'
+              AND archived_at IS NULL
+              AND LOWER(COALESCE(status, '')) NOT IN ('archief', 'gearchiveerd', 'archived')
+            """,
+            "relaties",
+            1,
+        ),
+        (
+            "Opdrachtgevers",
+            """
+            SELECT COUNT(*)
+            FROM relations
+            WHERE relation_type = 'principal'
+              AND archived_at IS NULL
+              AND LOWER(COALESCE(status, '')) NOT IN ('archief', 'gearchiveerd', 'archived')
+            """,
+            "relaties",
+            1,
+        ),
+        (
+            "Loonperiodes 2026",
+            "SELECT COUNT(*) FROM payroll_periods WHERE year = 2026 AND LOWER(COALESCE(status, '')) <> 'archief'",
+            "periodes",
+            PAYROLL_PERIODS_PER_YEAR,
+        ),
+        (
+            "Periodeweken",
+            """
+            SELECT COUNT(*)
+            FROM payroll_period_weeks w
+            JOIN payroll_periods p ON p.id = w.payroll_period_id
+            WHERE p.year = 2026
+            """,
+            "weken",
+            PAYROLL_PERIODS_PER_YEAR * 4,
+        ),
+        ("Urenbriefjes", "SELECT COUNT(*) FROM whatsapp_timesheet_inbox WHERE deleted_at IS NULL AND archived_at IS NULL", "taken", 1),
+        ("Projectboekingen", "SELECT COUNT(*) FROM project_time_bookings", "boekingen", 1),
+        ("Weekinvoer", "SELECT COUNT(*) FROM payroll_week_inputs", "regels", 1),
+        ("Weekresultaten", "SELECT COUNT(*) FROM payroll_week_results", "resultaten", 1),
+        ("Audit", "SELECT COUNT(*) FROM audit_events", "events", 1),
+        ("AI/OCR audit", "SELECT COUNT(*) FROM openai_api_audit_events", "events", 1),
+    ]
+    diagnostics = []
+    try:
+        _ensure_dashboard_tables_for_read()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                for label, query, suffix, target in checks:
+                    try:
+                        cursor.execute(query)
+                        value = int(cursor.fetchone()[0] or 0)
+                        tone = "green" if value >= target else "orange" if value else "red"
+                        diagnostics.append(
+                            {
+                                "label": label,
+                                "value": value,
+                                "suffix": suffix,
+                                "target": target,
+                                "tone": tone,
+                                "status": "gevuld" if value else "leeg",
+                            }
+                        )
+                    except Exception as exc:
+                        conn.rollback()
+                        diagnostics.append(
+                            {
+                                "label": label,
+                                "value": "-",
+                                "suffix": suffix,
+                                "target": target,
+                                "tone": "red",
+                                "status": type(exc).__name__,
+                            }
+                        )
+    except Exception as exc:
+        print(f"PAYROLL_DATA_DIAGNOSTICS_ERROR {type(exc).__name__}: {exc}")
+    return diagnostics
+
+
 def list_payroll_year_overview(limit: int = 5) -> list[dict]:
     try:
         _ensure_dashboard_tables_for_read()
