@@ -1559,6 +1559,36 @@ Metadata:
                             <a class="ghost-button" href="/dashboard/audit#auditspoor">Auditspoor openen</a>
                         </section>
 
+                        {% set datamodel = selected_payroll_period.datamodel_status %}
+                        {% if datamodel %}
+                        <section class="period-datamodel-strip">
+                            <div>
+                                <span>Structuur</span>
+                                <strong>{{ datamodel.week_structure_status }}</strong>
+                                <small>{{ datamodel.week_count }} van 4 weken</small>
+                            </div>
+                            <div>
+                                <span>Weekregels</span>
+                                <strong>{{ datamodel.week_line_count }}</strong>
+                                <small>{{ datamodel.week_input_count }} weekinvoer</small>
+                            </div>
+                            <div>
+                                <span>Berekening</span>
+                                <strong>{{ datamodel.week_result_count }}</strong>
+                                <small>{{ datamodel.period_settlement_count }} afrekeningen</small>
+                            </div>
+                            <div>
+                                <span>Basisdata</span>
+                                <strong>{{ datamodel.employee_arrangement_count }}</strong>
+                                <small>{{ datamodel.parameter_version_count }} parameters &middot; {{ datamodel.running_balance_account_count }} saldi</small>
+                            </div>
+                            <div>
+                                <span>Audit</span>
+                                <strong>{{ datamodel.audit_event_count }}</strong>
+                                <small>{{ datamodel.openai_api_audit_event_count }} AI/OCR</small>
+                            </div>
+                        </section>
+                        {% endif %}
                         <div class="project-detail-summary">
                             <div>
                                 <span>Week-invoer</span>

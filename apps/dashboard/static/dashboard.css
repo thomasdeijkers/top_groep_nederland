@@ -6703,3 +6703,36 @@ body[data-theme="light"] .theme-toggle strong {
     background: rgba(249, 115, 22, 0.15);
     color: #fed7aa;
 }
+.period-datamodel-strip {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 8px;
+    margin: 0 0 14px;
+}
+
+.period-datamodel-strip div {
+    display: grid;
+    gap: 3px;
+    min-height: 76px;
+    padding: 10px;
+    border: 1px solid rgba(127, 209, 160, 0.13);
+    border-radius: 8px;
+    background: rgba(7, 18, 24, 0.62);
+}
+
+.period-datamodel-strip span,
+.period-datamodel-strip small {
+    color: #aebbc8;
+    font-size: 0.74rem;
+}
+
+.period-datamodel-strip strong {
+    color: #f6fbff;
+    font-size: 0.95rem;
+}
+
+@media (max-width: 1000px) {
+    .period-datamodel-strip {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}

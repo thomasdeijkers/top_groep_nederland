@@ -1503,6 +1503,47 @@ def _payroll_datamodel_status_row(row) -> dict:
         "updated_at": row[19].strftime("%d-%m-%Y %H:%M") if row[19] else "-",
     }
 
+def get_payroll_period_datamodel_status(period_id: int | None) -> dict | None:
+    if not period_id:
+        return None
+    try:
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT payroll_period_id,
+                           year,
+                           period_number,
+                           period_name,
+                           start_date,
+                           end_date,
+                           period_status,
+                           week_count,
+                           week_input_count,
+                           week_line_count,
+                           week_result_count,
+                           period_settlement_count,
+                           employee_arrangement_count,
+                           parameter_version_count,
+                           running_balance_account_count,
+                           running_balance_mutation_count,
+                           audit_event_count,
+                           openai_api_audit_event_count,
+                           week_structure_status,
+                           updated_at
+                    FROM payroll_period_datamodel_status
+                    WHERE payroll_period_id = %s
+                    LIMIT 1;
+                    """,
+                    (period_id,),
+                )
+                row = cursor.fetchone()
+        return _payroll_datamodel_status_row(row) if row else None
+    except Exception:
+        return None
+
+
 def get_payroll_period_defaults() -> dict:
     today = date.today()
     fallback_start = today - timedelta(days=today.weekday())
@@ -1653,6 +1694,7 @@ def get_payroll_period(period_id: int | None) -> dict | None:
                     "weeks": [],
                 }
                 _attach_period_weeks(cursor, [period])
+        period["datamodel_status"] = get_payroll_period_datamodel_status(period_id)
         period["week_input_summary"] = get_payroll_week_input_summary(period_id)
         period["week_result_summary"] = get_payroll_week_result_summary(period_id)
         period["payroll_exceptions"] = list_payroll_period_exceptions(period_id)

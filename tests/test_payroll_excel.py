@@ -406,5 +406,22 @@ class PayrollDatamodelDashboardTests(unittest.TestCase):
         self.assertIn("openai_api_audit_event_count", template)
         self.assertIn(".datamodel-check", stylesheet)
 
+class PayrollPeriodDatamodelDetailTests(unittest.TestCase):
+    def test_period_detail_attaches_datamodel_status(self):
+        records_source = Path("apps/dashboard/records.py").read_text(encoding="utf-8-sig")
+
+        self.assertIn("def get_payroll_period_datamodel_status", records_source)
+        self.assertIn('period["datamodel_status"] = get_payroll_period_datamodel_status(period_id)', records_source)
+        self.assertIn("FROM payroll_period_datamodel_status", records_source)
+
+    def test_period_detail_template_shows_datamodel_strip(self):
+        template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
+        stylesheet = Path("apps/dashboard/static/dashboard.css").read_text(encoding="utf-8-sig")
+
+        self.assertIn("period-datamodel-strip", template)
+        self.assertIn("selected_payroll_period.datamodel_status", template)
+        self.assertIn("week_line_count", template)
+        self.assertIn(".period-datamodel-strip", stylesheet)
+
 if __name__ == "__main__":
     unittest.main()
