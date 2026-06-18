@@ -1886,6 +1886,21 @@ h2 {
     border: 1px solid rgba(255, 255, 255, 0.09);
     border-radius: 8px;
     background: rgba(14, 34, 57, 0.58);
+    color: inherit;
+    text-decoration: none;
+    transition: border-color 0.16s ease, transform 0.16s ease, background 0.16s ease;
+}
+
+.hours-yoy-card:hover,
+.hours-yoy-card:focus-visible {
+    border-color: rgba(127, 209, 160, 0.45);
+    background: rgba(18, 43, 69, 0.74);
+    transform: translateY(-1px);
+    outline: none;
+}
+
+.hours-yoy-card--demo {
+    border-style: dashed;
 }
 
 .hours-bars {
@@ -1944,6 +1959,20 @@ h2 {
     color: #ff796b;
 }
 
+.hours-yoy-source {
+    display: inline-flex;
+    width: max-content;
+    max-width: 100%;
+    align-items: center;
+    min-height: 20px;
+    padding: 0 7px;
+    border: 1px solid rgba(255, 184, 77, 0.36);
+    border-radius: 999px;
+    color: #ffcf8a;
+    font-size: 0.68rem;
+    font-weight: 900;
+    text-transform: uppercase;
+}
 .hours-yoy-values {
     display: grid;
     gap: 8px;

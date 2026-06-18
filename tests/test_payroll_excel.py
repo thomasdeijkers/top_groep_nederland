@@ -448,6 +448,22 @@ class PayrollTestDataMigrationSafetyTests(unittest.TestCase):
         self.assertNotIn("SET status = 'controle',", migration)
 
 
+class DashboardOverviewWeeklyHoursTests(unittest.TestCase):
+    def test_demo_weekly_hours_are_marked_and_link_to_periods(self):
+        rows = records._demo_weekly_hours_yoy()
+
+        self.assertTrue(rows)
+        self.assertTrue(all(row["is_demo"] for row in rows))
+        self.assertTrue(all(row["source_label"] == "Demo" for row in rows))
+        self.assertTrue(all(row["href"] == "/dashboard/periods#periodes" for row in rows))
+
+    def test_weekly_hours_cards_are_clickable(self):
+        template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
+
+        self.assertIn("href=\"{{ week.href|default('/dashboard/periods#periodes') }}\"", template)
+        self.assertIn("hours-yoy-card--demo", template)
+        self.assertIn("voorbeelddata", template)
+
 class PayrollFullYearTestSeedTests(unittest.TestCase):
     def test_full_year_test_seed_creates_missing_periods_and_weeks(self):
         migration = Path("migrations/039_full_year_test_payroll.sql").read_text(encoding="utf-8-sig")

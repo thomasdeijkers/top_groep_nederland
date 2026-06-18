@@ -241,7 +241,7 @@
 
                         <div class="hours-yoy-grid">
                             {% for week in overview_data.weekly_hours_yoy %}
-                            <article class="hours-yoy-card">
+                            <a class="hours-yoy-card {% if week.is_demo %}hours-yoy-card--demo{% endif %}" href="{{ week.href|default('/dashboard/periods#periodes') }}" aria-label="{{ week.label }} openen in loonperiodes">
                                 <div class="hours-bars" aria-hidden="true">
                                     <span class="hours-bar hours-bar--previous" style="height: {{ week.previous_height }}%"></span>
                                     <span class="hours-bar hours-bar--current" style="height: {{ week.current_height }}%"></span>
@@ -250,6 +250,9 @@
                                     <strong>{{ week.label }}</strong>
                                     <span class="{% if week.yoy_positive %}hours-yoy-positive{% else %}hours-yoy-negative{% endif %}">{{ week.yoy }} YoY</span>
                                 </div>
+                                {% if week.source_label %}
+                                <small class="hours-yoy-source">{{ week.source_label }}{% if week.is_demo %} - voorbeelddata{% endif %}</small>
+                                {% endif %}
                                 <div class="hours-yoy-values">
                                     <div>
                                         <span>Vorig jaar</span>
@@ -260,7 +263,7 @@
                                         <strong>{{ week.current_hours }} uur</strong>
                                     </div>
                                 </div>
-                            </article>
+                            </a>
                             {% else %}
                             <div class="empty-state empty-state--compact">
                                 <strong>Nog geen weekdata</strong>

@@ -154,6 +154,21 @@ def _weekly_hours_yoy(cursor, weeks_back: int = 8) -> list[dict]:
     totals = {(row[0], row[1]): Decimal(str(row[2] or 0)) for row in cursor.fetchall()}
     current_year = today.isocalendar().year
     previous_year = current_year - 1
+    week_numbers = [start.isocalendar().week for start in week_starts]
+    cursor.execute(
+        """
+        SELECT DISTINCT ON (pw.week_number)
+               pw.week_number,
+               p.id
+        FROM payroll_period_weeks pw
+        JOIN payroll_periods p ON p.id = pw.payroll_period_id
+        WHERE p.year = %s
+          AND pw.week_number = ANY(%s)
+        ORDER BY pw.week_number, p.start_date DESC, p.id DESC;
+        """,
+        (current_year, week_numbers),
+    )
+    period_by_week = {row[0]: row[1] for row in cursor.fetchall()}
     max_hours = max(
         [Decimal("1")]
         + [totals.get((start.isocalendar().year, start.isocalendar().week), Decimal("0")) for start in week_starts]
@@ -174,6 +189,9 @@ def _weekly_hours_yoy(cursor, weeks_back: int = 8) -> list[dict]:
             {
                 "label": f"WK{week_number}",
                 "date_label": start.strftime("%d-%m"),
+                "href": f"/dashboard/periods?period={period_by_week[week_number]}&week=WK{week_number}#periode-verloning" if week_number in period_by_week else "/dashboard/periods#periodes",
+                "is_demo": False,
+                "source_label": "Boekingen",
                 "current_year": current_year,
                 "previous_year": previous_year,
                 "current_hours": _format_number(current_hours),
@@ -199,6 +217,7 @@ def _demo_weekly_hours_yoy() -> list[dict]:
         ("WK25", 327, 662),
         ("WK26", 87, 248),
     ]
+
     max_hours = max(max(previous, current) for _, previous, current in demo)
     rows = []
     for label, previous, current in demo:
@@ -207,6 +226,9 @@ def _demo_weekly_hours_yoy() -> list[dict]:
             {
                 "label": label,
                 "date_label": label,
+                "href": "/dashboard/periods#periodes",
+                "is_demo": True,
+                "source_label": "Demo",
                 "current_year": date.today().year,
                 "previous_year": date.today().year - 1,
                 "current_hours": _format_number(current),
