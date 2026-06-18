@@ -72,6 +72,10 @@ def get_empty_dashboard_stats():
     }
 
 
+def get_database_status():
+    return _database_status()
+
+
 def get_server_overview():
     database = _database_status()
     cpu = _cpu_usage()

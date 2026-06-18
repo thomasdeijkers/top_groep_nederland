@@ -12,7 +12,10 @@ RELATION_PHOTO_DIR = Path("runtime/uploads/relations")
 
 
 def get_relation(relation_id: int) -> dict | None:
-    ensure_dashboard_tables()
+    try:
+        ensure_dashboard_tables()
+    except Exception as exc:
+        print(f"RELATION_READ_SCHEMA_WARNING {type(exc).__name__}: {exc}")
     with get_connection() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cursor:
             cursor.execute("SELECT * FROM relations WHERE id = %s;", (relation_id,))

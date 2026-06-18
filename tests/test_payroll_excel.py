@@ -504,6 +504,21 @@ class PayrollDataDiagnosticsTests(unittest.TestCase):
         self.assertIn("AI/OCR audit", records_source)
 
 
+class DashboardDatabaseStatusTests(unittest.TestCase):
+    def test_non_overview_pages_use_real_database_status(self):
+        router_source = Path("apps/dashboard/router.py").read_text(encoding="utf-8-sig")
+
+        self.assertIn("get_database_status", router_source)
+        self.assertIn('"database": database_status', router_source)
+        self.assertIn('"database_status"', router_source)
+
+    def test_relation_detail_read_continues_after_schema_warning(self):
+        relation_source = Path("apps/dashboard/relations.py").read_text(encoding="utf-8-sig")
+
+        self.assertIn("RELATION_READ_SCHEMA_WARNING", relation_source)
+        self.assertIn("SELECT * FROM relations WHERE id = %s", relation_source)
+
+
 class DashboardContextSafetyTests(unittest.TestCase):
     def test_dashboard_context_sections_fall_back_individually(self):
         def broken_loader():

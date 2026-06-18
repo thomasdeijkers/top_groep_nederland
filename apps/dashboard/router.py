@@ -80,7 +80,7 @@ from apps.dashboard.relations import (
     update_relation,
     update_vacancy,
 )
-from apps.dashboard.stats import get_dashboard_stats, get_empty_dashboard_stats, get_health, get_server_overview
+from apps.dashboard.stats import get_dashboard_stats, get_database_status, get_empty_dashboard_stats, get_health, get_server_overview
 from apps.dashboard.timesheet_corrections import save_field_corrections, send_to_payroll, validate_timesheet
 from apps.dashboard.timesheet_uploads import reparse_timesheet_upload, save_timesheet_upload
 from apps.dashboard.whatsapp_actions import archive_whatsapp_timesheet, delete_whatsapp_timesheet
@@ -344,6 +344,7 @@ def _dashboard_context(
         }
 
     stats = _context_value(data_page, "stats", get_empty_dashboard_stats(), lambda: get_dashboard_stats()) if data_page == "overview" else get_empty_dashboard_stats()
+    database_status = stats["database"] if data_page == "overview" else _context_value(data_page, "database_status", {"status": "unavailable", "meta": "Database status niet beschikbaar"}, get_database_status)
     server_overview = {
         "server_metrics": [],
         "server_system_tiles": [],
@@ -466,7 +467,7 @@ def _dashboard_context(
         "active_page": active_page,
         "auth_enabled": auth_enabled(),
         "stats": stats["cards"],
-        "database": stats["database"],
+        "database": database_status,
         "modules": MODULES,
         "review_items": REVIEW_ITEMS,
         "activity_items": ACTIVITY_ITEMS,
