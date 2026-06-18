@@ -464,11 +464,13 @@ class PayrollFullYearTestSeedTests(unittest.TestCase):
 
         self.assertIn("migrations/039_full_year_test_payroll.sql", data_store)
         self.assertIn("migrations/040_one_period_test_hours.sql", data_store)
+        self.assertIn("migrations/041_dashboard_demo_payroll.sql", data_store)
         self.assertLess(
-            data_store.index("migrations/040_one_period_test_hours.sql"),
+            data_store.index("migrations/041_dashboard_demo_payroll.sql"),
             data_store.index("migrations/033_payroll_week_inputs.sql"),
         )
         self.assertIn("040_one_period_test_hours.sql", data_store)
+        self.assertIn("041_dashboard_demo_payroll.sql", data_store)
 
     def test_one_period_test_hours_seed_populates_live_timesheets(self):
         migration = Path("migrations/040_one_period_test_hours.sql").read_text(encoding="utf-8-sig")
@@ -479,6 +481,18 @@ class PayrollFullYearTestSeedTests(unittest.TestCase):
         self.assertIn("project_time_bookings", migration)
         self.assertIn("test-one-period-2026", migration)
         self.assertIn("fallback_candidate", migration)
+
+    def test_dashboard_demo_seed_populates_visible_relations_period_and_hours(self):
+        migration = Path("migrations/041_dashboard_demo_payroll.sql").read_text(encoding="utf-8-sig")
+
+        self.assertIn("dashboard_demo", migration)
+        self.assertIn("dashboard-demo-candidate-001", migration)
+        self.assertIn("dashboard-demo-principal-001", migration)
+        self.assertIn("dashboard_demo_payroll", migration)
+        self.assertIn("loon_te_berekenen", migration)
+        self.assertIn("payroll_period_id", migration)
+        self.assertIn("project_time_bookings", migration)
+        self.assertIn("whatsapp_timesheet_inbox", migration)
 
 if __name__ == "__main__":
     unittest.main()
