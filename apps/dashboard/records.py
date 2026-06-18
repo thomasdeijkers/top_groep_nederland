@@ -1,5 +1,6 @@
 import json
 from datetime import date, datetime, timedelta
+from pathlib import Path
 from decimal import Decimal
 
 from psycopg2.extras import Json
@@ -21,9 +22,45 @@ from shared.db.connection import get_connection
 PAYROLL_PERIODS_PER_YEAR = 13
 
 
+def ensure_visible_demo_payroll_data() -> None:
+    """Keep the test dashboard usable when the connected database is empty."""
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT
+                        (SELECT COUNT(*) FROM relations WHERE relation_type = 'candidate' AND archived_at IS NULL) AS candidate_count,
+                        (SELECT COUNT(*) FROM relations WHERE relation_type = 'principal' AND archived_at IS NULL) AS principal_count,
+                        (SELECT COUNT(*) FROM payroll_periods WHERE year = 2026) AS period_count,
+                        (
+                            SELECT COUNT(*)
+                            FROM whatsapp_timesheet_inbox
+                            WHERE deleted_at IS NULL
+                              AND archived_at IS NULL
+                              AND LOWER(REPLACE(COALESCE(status, ''), ' ', '_')) IN ('loon_te_berekenen', 'loon_berekenen', 'loon', 'doorgestuurd_naar_loonadministratie', 'verwerkt', 'processed')
+                        ) AS payroll_timesheet_count;
+                    """
+                )
+                candidate_count, principal_count, period_count, payroll_timesheet_count = cursor.fetchone()
+                if candidate_count and principal_count and period_count and payroll_timesheet_count:
+                    return
+                for migration in (
+                    Path("migrations/039_full_year_test_payroll.sql"),
+                    Path("migrations/041_dashboard_demo_payroll.sql"),
+                    Path("migrations/033_payroll_week_inputs.sql"),
+                    Path("migrations/034_payroll_week_results.sql"),
+                    Path("migrations/035_payroll_period_settlements.sql"),
+                ):
+                    cursor.execute(migration.read_text(encoding="utf-8"))
+            conn.commit()
+    except Exception as exc:
+        print(f"DASHBOARD_DEMO_PAYROLL_SEED_ERROR {type(exc).__name__}: {exc}")
+
 def get_overview_data() -> dict:
     try:
         ensure_dashboard_tables()
+        ensure_visible_demo_payroll_data()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 counts = {}
@@ -726,6 +763,7 @@ def list_candidates(limit: int = 25, query: str = "") -> list[dict]:
 def list_relations(limit: int = 15, query: str = "", relation_type: str = "", status: str = "") -> list[dict]:
     try:
         ensure_dashboard_tables()
+        ensure_visible_demo_payroll_data()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 params = []
@@ -1305,6 +1343,7 @@ def _format_money(value) -> str:
 def list_payroll_periods(limit: int = 25, archived: bool = False) -> list[dict]:
     try:
         ensure_dashboard_tables()
+        ensure_visible_demo_payroll_data()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(

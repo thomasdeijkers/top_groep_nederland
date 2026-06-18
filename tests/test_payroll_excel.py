@@ -464,6 +464,17 @@ class DashboardOverviewWeeklyHoursTests(unittest.TestCase):
         self.assertIn("hours-yoy-card--demo", template)
         self.assertIn("voorbeelddata", template)
 
+
+class DashboardVisibleDemoPayrollSeedTests(unittest.TestCase):
+    def test_empty_dashboard_views_trigger_visible_demo_seed(self):
+        source = Path("apps/dashboard/records.py").read_text(encoding="utf-8-sig")
+
+        self.assertIn("def ensure_visible_demo_payroll_data", source)
+        self.assertIn("migrations/039_full_year_test_payroll.sql", source)
+        self.assertIn("migrations/041_dashboard_demo_payroll.sql", source)
+        self.assertIn("migrations/033_payroll_week_inputs.sql", source)
+        self.assertGreaterEqual(source.count("ensure_visible_demo_payroll_data()"), 4)
+
 class PayrollFullYearTestSeedTests(unittest.TestCase):
     def test_full_year_test_seed_creates_missing_periods_and_weeks(self):
         migration = Path("migrations/039_full_year_test_payroll.sql").read_text(encoding="utf-8-sig")
