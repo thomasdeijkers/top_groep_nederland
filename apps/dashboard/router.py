@@ -37,6 +37,8 @@ from apps.dashboard.records import (
     list_cao_settings,
     list_projects,
     list_payroll_periods,
+    list_payroll_year_overview,
+    list_payroll_datamodel_status,
     list_payroll_running_balances,
     list_payroll_employee_arrangements,
     list_payroll_parameters,
@@ -306,6 +308,8 @@ def _dashboard_context(
             "selected_payroll_period": None,
             "payroll_periods": [],
             "archived_payroll_periods": [],
+            "payroll_year_overview": [],
+            "payroll_datamodel_status": [],
             "payroll_period_defaults": {},
             "payroll_parameters": [],
             "payroll_employee_arrangements": [],
@@ -380,6 +384,8 @@ def _dashboard_context(
     selected_project = get_project(project_id) if data_page == "projects" and project_id else None
     payroll_periods = list_payroll_periods() if data_page == "periods" else []
     archived_payroll_periods = list_payroll_periods(archived=True) if data_page == "periods" else []
+    payroll_year_overview = list_payroll_year_overview() if data_page == "periods" else []
+    payroll_datamodel_status = list_payroll_datamodel_status(limit=40) if data_page == "periods" else []
     payroll_period_defaults = get_payroll_period_defaults() if data_page == "periods" else {}
     selected_payroll_period = get_payroll_period(period_id) if data_page == "periods" and period_id else None
     payroll_parameters = list_payroll_parameters() if data_page == "settings" else []
@@ -478,6 +484,8 @@ def _dashboard_context(
         "selected_payroll_period": selected_payroll_period,
         "payroll_periods": payroll_periods,
         "archived_payroll_periods": archived_payroll_periods,
+        "payroll_year_overview": payroll_year_overview,
+        "payroll_datamodel_status": payroll_datamodel_status,
         "payroll_period_defaults": payroll_period_defaults,
         "payroll_parameters": payroll_parameters,
         "payroll_employee_arrangements": payroll_employee_arrangements,

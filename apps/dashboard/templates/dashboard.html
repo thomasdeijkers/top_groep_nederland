@@ -1357,6 +1357,58 @@ Metadata:
                             <a class="period-tab" href="#periode-archief">Archief</a>
                         </div>
 
+                        {% if payroll_year_overview or payroll_datamodel_status %}
+                        <div class="datamodel-check" id="datamodel-controle">
+                            <div class="datamodel-check__header">
+                                <div>
+                                    <p class="section-label">Datamodelcontrole</p>
+                                    <h3>Fundament jaar, periodes en payroll-lagen</h3>
+                                </div>
+                            </div>
+                            {% if payroll_year_overview %}
+                            <div class="datamodel-year-grid">
+                                {% for year in payroll_year_overview %}
+                                <div class="datamodel-year-card">
+                                    <span>{{ year.year }}</span>
+                                    <strong>{{ year.actual_period_count }} / {{ year.expected_period_count }} periodes</strong>
+                                    <small>{{ year.actual_week_count }} weken · verwacht {{ year.expected_weeks_per_period }} per periode</small>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                            {% if payroll_datamodel_status %}
+                            <div class="table-wrap datamodel-table">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Periode</th>
+                                            <th>Structuur</th>
+                                            <th>Invoer</th>
+                                            <th>Berekening</th>
+                                            <th>Basisdata</th>
+                                            <th>Audit</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item in payroll_datamodel_status %}
+                                        <tr>
+                                            <td>
+                                                <strong>{{ item.year }} / P{{ item.period_number }}</strong>
+                                                <span>{{ item.start_date }} t/m {{ item.end_date }}</span>
+                                            </td>
+                                            <td><span class="status-tag datamodel-status--{{ item.week_structure_status|replace(' ', '-') }}">{{ item.week_structure_status }}</span><small>{{ item.week_count }} weken</small></td>
+                                            <td><strong>{{ item.week_input_count }}</strong><span>invoer · {{ item.week_line_count }} regels</span></td>
+                                            <td><strong>{{ item.week_result_count }}</strong><span>weekresultaten · {{ item.period_settlement_count }} afrekeningen</span></td>
+                                            <td><strong>{{ item.employee_arrangement_count }}</strong><span>inrichtingen · {{ item.parameter_version_count }} parameters · {{ item.running_balance_account_count }} saldi</span></td>
+                                            <td><strong>{{ item.audit_event_count }}</strong><span>audit · {{ item.openai_api_audit_event_count }} AI/OCR</span></td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
                         <div class="table-wrap period-table">
                             <table>
                                 <thead>

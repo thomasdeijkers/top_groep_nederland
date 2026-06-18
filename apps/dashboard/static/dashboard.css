@@ -6633,3 +6633,73 @@ body[data-theme="light"] .theme-toggle strong {
         grid-template-columns: 1fr;
     }
 }
+.datamodel-check {
+    display: grid;
+    gap: 12px;
+    margin: 14px 0 18px;
+    padding: 14px;
+    border: 1px solid rgba(127, 209, 160, 0.16);
+    border-radius: 8px;
+    background: rgba(7, 18, 24, 0.58);
+}
+
+.datamodel-check__header h3 {
+    margin: 2px 0 0;
+    color: #f6fbff;
+    font-size: 1rem;
+}
+
+.datamodel-year-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 8px;
+}
+
+.datamodel-year-card {
+    display: grid;
+    gap: 3px;
+    min-height: 82px;
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: rgba(13, 31, 37, 0.78);
+}
+
+.datamodel-year-card span,
+.datamodel-year-card small,
+.datamodel-table td span,
+.datamodel-table td small {
+    color: #aebbc8;
+    font-size: 0.75rem;
+}
+
+.datamodel-year-card strong,
+.datamodel-table td strong {
+    color: #f6fbff;
+    font-size: 0.9rem;
+}
+
+.datamodel-table table {
+    min-width: 980px;
+}
+
+.datamodel-table td {
+    vertical-align: top;
+}
+
+.datamodel-table td span,
+.datamodel-table td small {
+    display: block;
+    margin-top: 3px;
+}
+
+.datamodel-status--ok {
+    background: rgba(127, 209, 160, 0.16);
+    color: #d9ffe8;
+}
+
+.datamodel-status--mist-weken,
+.datamodel-status--onvolledig {
+    background: rgba(249, 115, 22, 0.15);
+    color: #fed7aa;
+}

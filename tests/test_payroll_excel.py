@@ -385,5 +385,26 @@ class PayrollDatamodelRecordTests(unittest.TestCase):
         self.assertEqual(item["expected_weeks_per_period"], 4)
         self.assertEqual(item["actual_week_count"], 8)
         self.assertEqual(item["status"], "active")
+
+
+class PayrollDatamodelDashboardTests(unittest.TestCase):
+    def test_periods_page_loads_datamodel_context(self):
+        router = Path("apps/dashboard/router.py").read_text(encoding="utf-8-sig")
+
+        self.assertIn("list_payroll_year_overview", router)
+        self.assertIn("list_payroll_datamodel_status", router)
+        self.assertIn("payroll_year_overview", router)
+        self.assertIn("payroll_datamodel_status", router)
+
+    def test_periods_template_shows_datamodel_control_section(self):
+        template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
+        stylesheet = Path("apps/dashboard/static/dashboard.css").read_text(encoding="utf-8-sig")
+
+        self.assertIn("datamodel-controle", template)
+        self.assertIn("Fundament jaar, periodes en payroll-lagen", template)
+        self.assertIn("week_line_count", template)
+        self.assertIn("openai_api_audit_event_count", template)
+        self.assertIn(".datamodel-check", stylesheet)
+
 if __name__ == "__main__":
     unittest.main()
