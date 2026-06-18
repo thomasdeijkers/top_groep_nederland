@@ -448,5 +448,25 @@ class PayrollTestDataMigrationSafetyTests(unittest.TestCase):
         self.assertNotIn("SET status = 'controle',", migration)
 
 
+class PayrollFullYearTestSeedTests(unittest.TestCase):
+    def test_full_year_test_seed_creates_missing_periods_and_live_test_hours(self):
+        migration = Path("migrations/039_full_year_test_payroll.sql").read_text(encoding="utf-8-sig")
+
+        self.assertIn("generate_series(1, 13)", migration)
+        self.assertIn("ON CONFLICT (year, period_number)", migration)
+        self.assertIn("testdata_full_year", migration)
+        self.assertIn("loon_te_berekenen", migration)
+        self.assertIn("WHERE NOT EXISTS", migration)
+        self.assertIn("test-payroll-year-2026", migration)
+
+    def test_full_year_test_seed_runs_before_week_input_derivations(self):
+        data_store = Path("apps/dashboard/data_store.py").read_text(encoding="utf-8-sig")
+
+        self.assertIn("migrations/039_full_year_test_payroll.sql", data_store)
+        self.assertLess(
+            data_store.index("migrations/039_full_year_test_payroll.sql"),
+            data_store.index("migrations/033_payroll_week_inputs.sql"),
+        )
+
 if __name__ == "__main__":
     unittest.main()
