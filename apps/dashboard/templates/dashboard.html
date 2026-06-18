@@ -1355,9 +1355,9 @@ Metadata:
                             </form>
                         </div>
 
-                        <div class="period-tabs" aria-label="Periode overzicht">
-                            <a class="period-tab period-tab--active" href="#periodes">Actief</a>
-                            <a class="period-tab" href="#periode-archief">Archief</a>
+                        <div class="period-tabs" aria-label="Periode overzicht" data-period-tabs>
+                            <button class="period-tab period-tab--active" type="button" data-period-tab="active" aria-selected="true">Actief <span>{{ payroll_periods|length }}</span></button>
+                            <button class="period-tab" type="button" data-period-tab="archive" aria-selected="false">Archief <span>{{ archived_payroll_periods|length }}</span></button>
                         </div>
 
                         {% if payroll_year_overview or payroll_datamodel_status %}
@@ -1412,6 +1412,7 @@ Metadata:
                             {% endif %}
                         </div>
                         {% endif %}
+                        <div class="period-tab-panel" data-period-panel="active">
                         <div class="table-wrap period-table">
                             <table>
                                 <thead>
@@ -1472,7 +1473,10 @@ Metadata:
                             </table>
                         </div>
 
-                        <div class="table-wrap period-table period-archive" id="periode-archief">
+                        </div>
+
+                        <div class="period-tab-panel period-archive" data-period-panel="archive" id="periode-archief" hidden>
+                        <div class="table-wrap period-table">
                             <div class="panel-header panel-header--compact">
                                 <div>
                                     <p class="section-label">Archief</p>
@@ -1526,7 +1530,7 @@ Metadata:
                                     </tr>
                                     {% else %}
                                     <tr>
-                                        <td colspan="5">
+                                        <td colspan="4">
                                             <div class="empty-state">
                                                 <strong>Nog geen archief</strong>
                                                 <span>Gearchiveerde loonperiodes blijven hier oproepbaar.</span>
@@ -1536,6 +1540,7 @@ Metadata:
                                     {% endfor %}
                                 </tbody>
                             </table>
+                        </div>
                         </div>
                     </article>
                     {% endif %}

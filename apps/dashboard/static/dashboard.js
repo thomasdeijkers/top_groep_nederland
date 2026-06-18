@@ -20,6 +20,35 @@
         setTheme(themeToggle.checked ? "light" : "dark");
     });
 
+    
+    document.querySelectorAll("[data-period-tabs]").forEach((tabGroup) => {
+        const container = tabGroup.closest(".periods-only") || document;
+        const tabs = Array.from(tabGroup.querySelectorAll("[data-period-tab]"));
+        const panels = Array.from(container.querySelectorAll("[data-period-panel]"));
+        const activateTab = (target) => {
+            tabs.forEach((tab) => {
+                const isActive = tab.dataset.periodTab === target;
+                tab.classList.toggle("period-tab--active", isActive);
+                tab.setAttribute("aria-selected", String(isActive));
+            });
+            panels.forEach((panel) => {
+                panel.hidden = panel.dataset.periodPanel !== target;
+            });
+        };
+        tabs.forEach((tab) => {
+            tab.addEventListener("click", () => {
+                const target = tab.dataset.periodTab || "active";
+                activateTab(target);
+                if (target === "archive") {
+                    window.history.replaceState(null, "", "#periode-archief");
+                } else if (window.location.hash === "#periode-archief") {
+                    window.history.replaceState(null, "", window.location.pathname + window.location.search + "#periodes");
+                }
+            });
+        });
+        activateTab(window.location.hash === "#periode-archief" ? "archive" : "active");
+    });
+
     const sidebar = document.querySelector(".sidebar");
     const mobileMenuToggle = document.querySelector("[data-mobile-menu-toggle]");
     const mobileMenu = document.querySelector("[data-mobile-menu]");

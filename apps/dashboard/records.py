@@ -22,8 +22,22 @@ from shared.db.connection import get_connection
 PAYROLL_PERIODS_PER_YEAR = 13
 
 
+def _ensure_dashboard_tables_for_read() -> None:
+    try:
+        ensure_dashboard_tables()
+    except Exception as exc:
+        print(f"DASHBOARD_SCHEMA_ENSURE_READ_WARNING {type(exc).__name__}: {exc}")
+
+
 def ensure_visible_demo_payroll_data() -> None:
     """Keep the test dashboard usable when the connected database is empty."""
+    migrations = (
+        Path("migrations/039_full_year_test_payroll.sql"),
+        Path("migrations/041_dashboard_demo_payroll.sql"),
+        Path("migrations/033_payroll_week_inputs.sql"),
+        Path("migrations/034_payroll_week_results.sql"),
+        Path("migrations/035_payroll_period_settlements.sql"),
+    )
     try:
         with get_connection() as conn:
             with conn.cursor() as cursor:
@@ -45,21 +59,19 @@ def ensure_visible_demo_payroll_data() -> None:
                 candidate_count, principal_count, period_count, payroll_timesheet_count = cursor.fetchone()
                 if candidate_count and principal_count and period_count and payroll_timesheet_count:
                     return
-                for migration in (
-                    Path("migrations/039_full_year_test_payroll.sql"),
-                    Path("migrations/041_dashboard_demo_payroll.sql"),
-                    Path("migrations/033_payroll_week_inputs.sql"),
-                    Path("migrations/034_payroll_week_results.sql"),
-                    Path("migrations/035_payroll_period_settlements.sql"),
-                ):
-                    cursor.execute(migration.read_text(encoding="utf-8"))
-            conn.commit()
+                for migration in migrations:
+                    try:
+                        cursor.execute(migration.read_text(encoding="utf-8"))
+                        conn.commit()
+                    except Exception as migration_exc:
+                        conn.rollback()
+                        print(f"DASHBOARD_DEMO_PAYROLL_SEED_STEP_ERROR {migration.name}: {type(migration_exc).__name__}: {migration_exc}")
     except Exception as exc:
         print(f"DASHBOARD_DEMO_PAYROLL_SEED_ERROR {type(exc).__name__}: {exc}")
 
 def get_overview_data() -> dict:
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         ensure_visible_demo_payroll_data()
         with get_connection() as conn:
             with conn.cursor() as cursor:
@@ -290,7 +302,7 @@ def log_audit_event(
     actor_name: str = "Admin",
 ) -> None:
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -326,7 +338,7 @@ def log_audit_event(
 
 def list_audit_events(limit: int = 25, entity_type: str = "", entity_id: int | None = None) -> list[dict]:
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 filters = []
@@ -681,7 +693,7 @@ def get_timesheet_channel_tiles() -> list[dict]:
     }
     counts = {key: 0 for key in labels}
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -713,7 +725,7 @@ def get_timesheet_channel_tiles() -> list[dict]:
 
 def list_candidates(limit: int = 25, query: str = "") -> list[dict]:
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 params = []
@@ -762,7 +774,7 @@ def list_candidates(limit: int = 25, query: str = "") -> list[dict]:
 
 def list_relations(limit: int = 15, query: str = "", relation_type: str = "", status: str = "") -> list[dict]:
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         ensure_visible_demo_payroll_data()
         with get_connection() as conn:
             with conn.cursor() as cursor:
@@ -883,7 +895,7 @@ def search_candidate_matches(query: str = "", limit: int = 40) -> list[dict]:
     search = str(query or "").strip()
     limit = max(1, min(int(limit or 40), 80))
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 params = []
@@ -942,7 +954,7 @@ def ensure_relation_for_candidate_match(match_value: str) -> int | None:
 
 def list_principals(limit: int = 25, query: str = "") -> list[dict]:
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 params = []
@@ -990,7 +1002,7 @@ def list_principals(limit: int = 25, query: str = "") -> list[dict]:
 
 def list_project_options(limit: int = 100) -> list[dict]:
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -1034,7 +1046,7 @@ def list_project_options(limit: int = 100) -> list[dict]:
 def list_relation_statuses(relation_type: str = "") -> list[str]:
     defaults = ["Actief", "Nieuw", "Nog beoordelen", "Via Website", "Werknemer ACTIEF", "In Reserve Houden", "Archief"]
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 params = []
@@ -1060,7 +1072,7 @@ def list_relation_statuses(relation_type: str = "") -> list[str]:
 
 def list_projects(limit: int = 100, query: str = "") -> list[dict]:
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 params = []
@@ -1134,7 +1146,7 @@ def get_project(project_id: int | None) -> dict | None:
     if not project_id:
         return None
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -1187,7 +1199,7 @@ def get_project(project_id: int | None) -> dict | None:
 
 def list_project_time_bookings(project_id: int, limit: int = 250) -> list[dict]:
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -1243,7 +1255,7 @@ def list_project_time_bookings(project_id: int, limit: int = 250) -> list[dict]:
 
 
 def create_project(data: dict) -> int:
-    ensure_dashboard_tables()
+    _ensure_dashboard_tables_for_read()
     raw_data = {
         "record_type": "project",
         "source": "dashboard",
@@ -1342,7 +1354,7 @@ def _format_money(value) -> str:
 
 def list_payroll_periods(limit: int = 25, archived: bool = False) -> list[dict]:
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         ensure_visible_demo_payroll_data()
         with get_connection() as conn:
             with conn.cursor() as cursor:
@@ -1428,7 +1440,7 @@ def list_payroll_periods(limit: int = 25, archived: bool = False) -> list[dict]:
 
 def list_payroll_year_overview(limit: int = 5) -> list[dict]:
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -1472,7 +1484,7 @@ def _payroll_year_overview_row(row) -> dict:
 
 def list_payroll_datamodel_status(year: int | None = None, limit: int = 25) -> list[dict]:
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 if year:
@@ -1568,7 +1580,7 @@ def get_payroll_period_datamodel_status(period_id: int | None) -> dict | None:
     if not period_id:
         return None
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -1609,7 +1621,7 @@ def get_payroll_period_defaults() -> dict:
     today = date.today()
     fallback_start = today - timedelta(days=today.weekday())
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -1681,7 +1693,7 @@ def get_payroll_period(period_id: int | None) -> dict | None:
     if not period_id:
         return None
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -1793,7 +1805,7 @@ def list_payroll_period_settlements(period_id: int, limit: int = 200) -> list[di
     if not period_id:
         return []
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -1828,7 +1840,7 @@ def list_payroll_employee_week_results(period_id: int, limit: int = 200) -> list
     if not period_id:
         return []
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -1909,7 +1921,7 @@ def get_payroll_week_result_summary(period_id: int) -> dict:
     if not period_id:
         return empty
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -2002,7 +2014,7 @@ def list_payroll_period_exceptions(period_id: int, limit: int = 100) -> list[dic
     if not period_id:
         return []
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -2157,7 +2169,7 @@ def get_payroll_week_input_summary(period_id: int) -> dict:
     if not period_id:
         return empty
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -2223,7 +2235,7 @@ def get_payroll_week_input_summary(period_id: int) -> dict:
 
 def list_payroll_period_payroll(period_id: int) -> list[dict]:
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -2397,7 +2409,7 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
 
 
 def create_manual_timesheet(data: dict) -> int:
-    ensure_dashboard_tables()
+    _ensure_dashboard_tables_for_read()
     work_date = _date_or_none(data.get("work_date")) or date.today()
     hours = _decimal_or_none(data.get("hours")) or Decimal("0")
     relation_id = _int_or_none(data.get("relation_id"))
@@ -2547,7 +2559,7 @@ def _payroll_period_totals(rows: list[dict]) -> dict:
 
 def list_payroll_period_totals(period_id: int) -> list[dict]:
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -2603,7 +2615,7 @@ def list_payroll_period_totals(period_id: int) -> list[dict]:
 
 def list_payroll_sheet_candidates(limit: int = 250) -> list[dict]:
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -2635,7 +2647,7 @@ def list_payroll_sheet_candidates(limit: int = 250) -> list[dict]:
 
 def list_payroll_workbook_overrides(period_id: int) -> dict[tuple[str, str, str], dict]:
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -2681,7 +2693,7 @@ def apply_payroll_workbook_overrides(period_id: int, tabs: list[dict]) -> None:
 
 
 def save_payroll_workbook_cell(period_id: int, payload: dict) -> dict:
-    ensure_dashboard_tables()
+    _ensure_dashboard_tables_for_read()
     tab_label = str(payload.get("tab_label") or "").strip()
     row_key = str(payload.get("row_key") or "").strip()
     employee_name = str(payload.get("employee_name") or "").strip()
@@ -2764,7 +2776,7 @@ def _payroll_workbook_row_key(row: dict, row_index: int) -> str:
 
 def list_payroll_import_logs(period_id: int, limit: int = 20) -> list[dict]:
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -2796,7 +2808,7 @@ def list_payroll_import_logs(period_id: int, limit: int = 20) -> list[dict]:
 def list_payroll_calculation_rules(limit: int = 50) -> list[dict]:
     ensure_default_payroll_rules()
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -2825,7 +2837,7 @@ def list_payroll_calculation_rules(limit: int = 50) -> list[dict]:
 
 def list_payroll_validation_results(period_id: int, limit: int = 100) -> list[dict]:
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -2856,7 +2868,7 @@ def list_payroll_validation_results(period_id: int, limit: int = 100) -> list[di
 
 def ensure_default_payroll_rules() -> None:
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 for rule in default_calculation_rules():
@@ -2888,7 +2900,7 @@ def ensure_default_payroll_rules() -> None:
 
 
 def record_payroll_excel_analysis(period_id: int, analysis: dict, imported_from: str = "dashboard_upload") -> None:
-    ensure_dashboard_tables()
+    _ensure_dashboard_tables_for_read()
     with get_connection() as conn:
         with conn.cursor() as cursor:
             cursor.execute(
@@ -2920,7 +2932,7 @@ def record_payroll_excel_analysis(period_id: int, analysis: dict, imported_from:
 
 
 def create_payroll_period(data: dict) -> int:
-    ensure_dashboard_tables()
+    _ensure_dashboard_tables_for_read()
     year = _int_or_none(data.get("year")) or date.today().year
     period_number = _int_or_none(data.get("period_number")) or 1
     if period_number < 1 or period_number > PAYROLL_PERIODS_PER_YEAR:
@@ -3015,7 +3027,7 @@ def create_payroll_period_batch(data: dict) -> list[int]:
 
 def _available_payroll_period_numbers(year: int, count: int) -> list[int]:
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -3042,7 +3054,7 @@ def _available_payroll_period_numbers(year: int, count: int) -> list[int]:
 def archive_payroll_period(period_id: int, archived: bool = True) -> None:
     if not period_id:
         return
-    ensure_dashboard_tables()
+    _ensure_dashboard_tables_for_read()
     new_status = "Archief" if archived else "Open"
     with get_connection() as conn:
         with conn.cursor() as cursor:
@@ -3060,7 +3072,7 @@ def archive_payroll_period(period_id: int, archived: bool = True) -> None:
 def delete_payroll_period(period_id: int) -> None:
     if not period_id:
         return
-    ensure_dashboard_tables()
+    _ensure_dashboard_tables_for_read()
     with get_connection() as conn:
         with conn.cursor() as cursor:
             cursor.execute(
@@ -3085,7 +3097,7 @@ def delete_payroll_period(period_id: int) -> None:
 def update_payroll_period_status(period_id: int, status: str) -> None:
     if not period_id:
         return
-    ensure_dashboard_tables()
+    _ensure_dashboard_tables_for_read()
     with get_connection() as conn:
         with conn.cursor() as cursor:
             cursor.execute(
@@ -3259,7 +3271,7 @@ def _attach_project_bookings(cursor, projects: list[dict], per_project: int = 5)
 
 def list_payroll_running_balances(limit: int = 200) -> list[dict]:
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -3303,7 +3315,7 @@ def list_relation_payroll_running_balances(relation_id: int, limit: int = 25) ->
     if not relation_id:
         return []
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -3376,7 +3388,7 @@ def list_relation_payroll_period_settlements(relation_id: int, limit: int = 5) -
     if not relation_id:
         return []
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -3459,7 +3471,7 @@ def _running_balance_status(balance_type: str, annual_limit, current_balance) ->
 
 def list_payroll_employee_arrangements(limit: int = 100) -> list[dict]:
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -3551,7 +3563,7 @@ def list_payroll_employee_arrangements(limit: int = 100) -> list[dict]:
 def get_payroll_parameter_values(year: int, period_number: int, branch: str = "build") -> dict[str, Decimal | str | None]:
     branch_key = "uta_value" if str(branch).lower() == "uta" else "build_value"
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -3592,7 +3604,7 @@ def get_payroll_parameter_values(year: int, period_number: int, branch: str = "b
 
 def list_payroll_parameters(limit: int = 200) -> list[dict]:
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -3681,7 +3693,7 @@ def _format_parameter_value(value, unit: str = "") -> str:
 
 def list_cao_settings(limit: int = 25) -> list[dict]:
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -3748,7 +3760,7 @@ def get_cao_setting(setting_id: int | None) -> dict | None:
 
 
 def create_cao_setting(data: dict) -> int:
-    ensure_dashboard_tables()
+    _ensure_dashboard_tables_for_read()
     with get_connection() as conn:
         with conn.cursor() as cursor:
             cursor.execute(
@@ -3798,7 +3810,7 @@ def create_cao_setting(data: dict) -> int:
 
 
 def update_cao_setting(setting_id: int, data: dict) -> None:
-    ensure_dashboard_tables()
+    _ensure_dashboard_tables_for_read()
     with get_connection() as conn:
         with conn.cursor() as cursor:
             cursor.execute(
@@ -3844,7 +3856,7 @@ def update_cao_setting(setting_id: int, data: dict) -> None:
 
 def list_tickets(limit: int = 25) -> list[dict]:
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -3873,7 +3885,7 @@ def list_tickets(limit: int = 25) -> list[dict]:
 
 def list_vacancies(limit: int = 30, query: str = "", status: str = "") -> list[dict]:
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 params = []
@@ -3933,7 +3945,7 @@ def list_vacancies(limit: int = 30, query: str = "", status: str = "") -> list[d
 def list_vacancy_statuses() -> list[str]:
     defaults = ["Concept", "Lopend", "Open", "Controle", "Afgesloten", "OTYS"]
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -3954,7 +3966,7 @@ def list_vacancy_statuses() -> list[str]:
 def list_relation_status_counts(relation_type: str = "", query: str = "") -> list[dict]:
     relation_type = relation_type if relation_type in {"candidate", "principal"} else "candidate"
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 filters = ["relation_type = %s"]
@@ -3985,7 +3997,7 @@ def list_relation_status_counts(relation_type: str = "", query: str = "") -> lis
 
 def list_relation_tab_counts() -> dict:
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -4008,7 +4020,7 @@ def list_relation_tab_counts() -> dict:
 
 def list_vacancy_status_counts(query: str = "") -> list[dict]:
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 params = []
@@ -4049,7 +4061,7 @@ def _unique_options(values: list[str]) -> list[str]:
 
 def list_whatsapp_timesheets(limit: int = 100) -> list[dict]:
     try:
-        ensure_dashboard_tables()
+        _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(

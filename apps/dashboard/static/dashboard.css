@@ -506,7 +506,28 @@ h2 {
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 8px;
     color: #bdd0dc;
+    background: transparent;
+    cursor: pointer;
+    font: inherit;
     font-weight: 700;
+}
+
+.period-tab span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    min-height: 20px;
+    margin-left: 8px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+    font-size: 0.72rem;
+}
+
+.period-tab-panel[hidden] {
+    display: none !important;
 }
 
 .period-tab--active {

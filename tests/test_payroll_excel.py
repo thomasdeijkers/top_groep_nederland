@@ -469,11 +469,25 @@ class DashboardVisibleDemoPayrollSeedTests(unittest.TestCase):
     def test_empty_dashboard_views_trigger_visible_demo_seed(self):
         source = Path("apps/dashboard/records.py").read_text(encoding="utf-8-sig")
 
+        self.assertIn("def _ensure_dashboard_tables_for_read", source)
+        self.assertIn("DASHBOARD_SCHEMA_ENSURE_READ_WARNING", source)
         self.assertIn("def ensure_visible_demo_payroll_data", source)
         self.assertIn("migrations/039_full_year_test_payroll.sql", source)
         self.assertIn("migrations/041_dashboard_demo_payroll.sql", source)
         self.assertIn("migrations/033_payroll_week_inputs.sql", source)
-        self.assertGreaterEqual(source.count("ensure_visible_demo_payroll_data()"), 4)
+        self.assertIn("DASHBOARD_DEMO_PAYROLL_SEED_STEP_ERROR", source)
+        self.assertGreaterEqual(source.count("_ensure_dashboard_tables_for_read()"), 10)
+
+    def test_payroll_archive_is_a_real_tab_panel(self):
+        template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
+        script = Path("apps/dashboard/static/dashboard.js").read_text(encoding="utf-8-sig")
+
+        self.assertIn("data-period-tabs", template)
+        self.assertIn("data-period-tab=\"archive\"", template)
+        self.assertIn("data-period-panel=\"archive\"", template)
+        self.assertIn("hidden", template)
+        self.assertIn("data-period-panel", script)
+        self.assertIn("#periode-archief", script)
 
 class PayrollFullYearTestSeedTests(unittest.TestCase):
     def test_full_year_test_seed_creates_missing_periods_and_weeks(self):
