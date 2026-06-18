@@ -487,10 +487,53 @@ h2 {
     min-height: 40px;
 }
 
+.payroll-control-details {
+    margin: 0 0 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: rgba(14, 26, 36, 0.68);
+}
+
+.payroll-control-details > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 44px;
+    padding: 0 14px;
+    cursor: pointer;
+    color: #ffffff;
+    font-weight: 900;
+}
+
+.payroll-control-details > summary strong {
+    color: #9fe5b9;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+}
+
+.payroll-detail-warning {
+    display: grid;
+    gap: 4px;
+    margin-bottom: 12px;
+    padding: 12px 14px;
+    border: 1px solid rgba(255, 184, 77, 0.36);
+    border-radius: 8px;
+    background: rgba(65, 43, 12, 0.32);
+}
+
+.payroll-detail-warning strong {
+    color: #ffcf8a;
+}
+
+.payroll-detail-warning span {
+    color: #d8e4ea;
+}
+
 .payroll-data-diagnostics {
     display: grid;
     gap: 12px;
-    margin: 0 0 14px;
+    margin: 0;
     padding: 14px;
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 8px;

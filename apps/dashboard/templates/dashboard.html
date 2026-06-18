@@ -1360,33 +1360,39 @@ Metadata:
                             <button class="period-tab" type="button" data-period-tab="archive" aria-selected="false">Archief <span>{{ archived_payroll_periods|length }}</span></button>
                         </div>
 
-                        {% if payroll_data_diagnostics %}
-                        <div class="payroll-data-diagnostics" id="payroll-data-controle">
-                            <div class="datamodel-check__header">
-                                <div>
-                                    <p class="section-label">Databasecontrole</p>
-                                    <h3>Echte tabeldata</h3>
+                        {% if payroll_data_diagnostics or payroll_year_overview or payroll_datamodel_status %}
+                        <details class="payroll-control-details" id="payroll-data-controle">
+                            <summary>
+                                <span>Controles en datamodel</span>
+                                <strong>{{ payroll_data_diagnostics|length }} checks</strong>
+                            </summary>
+                            {% if payroll_data_diagnostics %}
+                            <div class="payroll-data-diagnostics">
+                                <div class="datamodel-check__header">
+                                    <div>
+                                        <p class="section-label">Databasecontrole</p>
+                                        <h3>Echte tabeldata</h3>
+                                    </div>
+                                </div>
+                                <div class="payroll-data-diagnostics__grid">
+                                    {% for check in payroll_data_diagnostics %}
+                                    <div class="payroll-data-tile payroll-data-tile--{{ check.tone }}">
+                                        <span>{{ check.label }}</span>
+                                        <strong>{{ check.value }}</strong>
+                                        <small>{{ check.suffix }} - {{ check.status }}</small>
+                                    </div>
+                                    {% endfor %}
                                 </div>
                             </div>
-                            <div class="payroll-data-diagnostics__grid">
-                                {% for check in payroll_data_diagnostics %}
-                                <div class="payroll-data-tile payroll-data-tile--{{ check.tone }}">
-                                    <span>{{ check.label }}</span>
-                                    <strong>{{ check.value }}</strong>
-                                    <small>{{ check.suffix }} - {{ check.status }}</small>
+                            {% endif %}
+                            {% if payroll_year_overview or payroll_datamodel_status %}
+                            <div class="datamodel-check" id="datamodel-controle">
+                                <div class="datamodel-check__header">
+                                    <div>
+                                        <p class="section-label">Datamodelcontrole</p>
+                                        <h3>Fundament jaar, periodes en payroll-lagen</h3>
+                                    </div>
                                 </div>
-                                {% endfor %}
-                            </div>
-                        </div>
-                        {% endif %}
-                        {% if payroll_year_overview or payroll_datamodel_status %}
-                        <div class="datamodel-check" id="datamodel-controle">
-                            <div class="datamodel-check__header">
-                                <div>
-                                    <p class="section-label">Datamodelcontrole</p>
-                                    <h3>Fundament jaar, periodes en payroll-lagen</h3>
-                                </div>
-                            </div>
                             {% if payroll_year_overview %}
                             <div class="datamodel-year-grid">
                                 {% for year in payroll_year_overview %}
@@ -1429,7 +1435,9 @@ Metadata:
                                 </table>
                             </div>
                             {% endif %}
-                        </div>
+                            </div>
+                            {% endif %}
+                        </details>
                         {% endif %}
                         <div class="period-tab-panel" data-period-panel="active">
                         <div class="table-wrap period-table">
@@ -1574,6 +1582,12 @@ Metadata:
                             </div>
                         </div>
 
+                        {% if selected_payroll_period.detail_warning %}
+                        <div class="payroll-detail-warning">
+                            <strong>Periode gedeeltelijk geladen</strong>
+                            <span>{{ selected_payroll_period.detail_warning }}</span>
+                        </div>
+                        {% endif %}
                         {% set week_input = selected_payroll_period.week_input_summary %}
                         {% set week_result = selected_payroll_period.week_result_summary %}
                         {% set phase_status = selected_payroll_period.payroll_phase_status %}

@@ -1854,38 +1854,85 @@ def get_payroll_period(period_id: int | None) -> dict | None:
                     "weeks": [],
                 }
                 _attach_period_weeks(cursor, [period])
-        period["datamodel_status"] = get_payroll_period_datamodel_status(period_id)
-        period["week_input_summary"] = get_payroll_week_input_summary(period_id)
-        period["week_result_summary"] = get_payroll_week_result_summary(period_id)
-        period["payroll_exceptions"] = list_payroll_period_exceptions(period_id)
-        period["payroll_exception_summary"] = summarize_payroll_exceptions(period["payroll_exceptions"])
-        period["payroll_phase_status"] = payroll_phase_status(period["week_result_summary"], period["payroll_exception_summary"])
-        period["period_settlements"] = list_payroll_period_settlements(period_id)
-        period["employee_week_results"] = period["period_settlements"] or list_payroll_employee_week_results(period_id)
-        period["payroll_rows"] = list_payroll_period_payroll(period_id)
-        period["payroll_totals"] = _payroll_period_totals(period["payroll_rows"])
-        stored_totals = list_payroll_period_totals(period_id)
-        period["period_calculation_rows"] = stored_totals or derived_period_total_rows(period["payroll_rows"])
-        sheet_candidates = list_payroll_sheet_candidates()
-        period["period_sheet_rows"] = build_period_sheet_rows(sheet_candidates, period["payroll_rows"])
-        period["payslip_sheet_rows"] = build_payslip_sheet_rows(period["period_sheet_rows"], period["period_calculation_rows"])
-        period["workbook_tabs"] = build_workbook_tabs(
-            period["weeks"],
-            sheet_candidates,
-            period["payroll_rows"],
-            period["period_calculation_rows"],
-        )
-        apply_payroll_workbook_overrides(period_id, period["workbook_tabs"])
-        for tab in period["workbook_tabs"]:
-            if tab.get("kind") == "week":
-                tab["summary"] = summarize_week_rows(tab.get("rows", []))
-        period["payroll_totals"] = summarize_workbook_tabs(period["workbook_tabs"])
-        period["payroll_import_logs"] = list_payroll_import_logs(period_id)
-        period["payroll_calculation_rules"] = list_payroll_calculation_rules()
-        period["payroll_validation_results"] = list_payroll_validation_results(period_id)
+        period.update(_empty_payroll_period_detail_defaults())
+        try:
+            period["datamodel_status"] = get_payroll_period_datamodel_status(period_id)
+            period["week_input_summary"] = get_payroll_week_input_summary(period_id)
+            period["week_result_summary"] = get_payroll_week_result_summary(period_id)
+            period["payroll_exceptions"] = list_payroll_period_exceptions(period_id)
+            period["payroll_exception_summary"] = summarize_payroll_exceptions(period["payroll_exceptions"])
+            period["payroll_phase_status"] = payroll_phase_status(period["week_result_summary"], period["payroll_exception_summary"])
+            period["period_settlements"] = list_payroll_period_settlements(period_id)
+            period["employee_week_results"] = period["period_settlements"] or list_payroll_employee_week_results(period_id)
+            period["payroll_rows"] = list_payroll_period_payroll(period_id)
+            period["payroll_totals"] = _payroll_period_totals(period["payroll_rows"])
+            stored_totals = list_payroll_period_totals(period_id)
+            period["period_calculation_rows"] = stored_totals or derived_period_total_rows(period["payroll_rows"])
+            sheet_candidates = list_payroll_sheet_candidates()
+            period["period_sheet_rows"] = build_period_sheet_rows(sheet_candidates, period["payroll_rows"])
+            period["payslip_sheet_rows"] = build_payslip_sheet_rows(period["period_sheet_rows"], period["period_calculation_rows"])
+            period["workbook_tabs"] = build_workbook_tabs(
+                period["weeks"],
+                sheet_candidates,
+                period["payroll_rows"],
+                period["period_calculation_rows"],
+            )
+            apply_payroll_workbook_overrides(period_id, period["workbook_tabs"])
+            for tab in period["workbook_tabs"]:
+                if tab.get("kind") == "week":
+                    tab["summary"] = summarize_week_rows(tab.get("rows", []))
+            period["payroll_totals"] = summarize_workbook_tabs(period["workbook_tabs"])
+            period["payroll_import_logs"] = list_payroll_import_logs(period_id)
+            period["payroll_calculation_rules"] = list_payroll_calculation_rules()
+            period["payroll_validation_results"] = list_payroll_validation_results(period_id)
+        except Exception as exc:
+            print(f"PAYROLL_PERIOD_DETAIL_WARNING {period_id}: {type(exc).__name__}: {exc}")
+            period["detail_warning"] = "Niet alle detailgegevens konden worden geladen. De basisgegevens van deze periode blijven zichtbaar."
         return period
     except Exception:
         return None
+
+
+def _empty_payroll_period_detail_defaults() -> dict:
+    empty_summary = {
+        "input_count": 0,
+        "day_count": 0,
+        "project_count": 0,
+        "total_hours": "0",
+        "total_km": "0",
+        "with_arrangement": 0,
+        "without_arrangement": 0,
+        "status_counts": [],
+    }
+    empty_result_summary = {
+        "result_count": 0,
+        "total_net_week": "? 0,00",
+        "concept_count": 0,
+        "missing_arrangement_count": 0,
+        "missing_wage_count": 0,
+        "status_counts": [],
+    }
+    empty_exceptions = {"total": 0, "blocking": 0, "warning": 0}
+    return {
+        "datamodel_status": None,
+        "week_input_summary": empty_summary,
+        "week_result_summary": empty_result_summary,
+        "payroll_exceptions": [],
+        "payroll_exception_summary": empty_exceptions,
+        "payroll_phase_status": payroll_phase_status(empty_result_summary, empty_exceptions),
+        "period_settlements": [],
+        "employee_week_results": [],
+        "payroll_rows": [],
+        "payroll_totals": _payroll_period_totals([]),
+        "period_calculation_rows": [],
+        "period_sheet_rows": [],
+        "payslip_sheet_rows": [],
+        "workbook_tabs": [],
+        "payroll_import_logs": [],
+        "payroll_calculation_rules": [],
+        "payroll_validation_results": [],
+        "detail_warning": "",
+    }
 
 
 def list_payroll_period_settlements(period_id: int, limit: int = 200) -> list[dict]:

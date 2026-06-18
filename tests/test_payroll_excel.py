@@ -504,6 +504,26 @@ class PayrollDataDiagnosticsTests(unittest.TestCase):
         self.assertIn("AI/OCR audit", records_source)
 
 
+class PayrollPeriodDetailSafetyTests(unittest.TestCase):
+    def test_period_detail_uses_safe_defaults_and_warning(self):
+        records_source = Path("apps/dashboard/records.py").read_text(encoding="utf-8-sig")
+        template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
+
+        self.assertIn("def _empty_payroll_period_detail_defaults", records_source)
+        self.assertIn("PAYROLL_PERIOD_DETAIL_WARNING", records_source)
+        self.assertIn("detail_warning", records_source)
+        self.assertIn("payroll-detail-warning", template)
+
+    def test_period_controls_are_collapsible(self):
+        template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
+        stylesheet = Path("apps/dashboard/static/dashboard.css").read_text(encoding="utf-8-sig")
+
+        self.assertIn("payroll-control-details", template)
+        self.assertIn("<summary>", template)
+        self.assertIn("Controles en datamodel", template)
+        self.assertIn(".payroll-control-details", stylesheet)
+
+
 class PayrollFullYearTestSeedTests(unittest.TestCase):
     def test_full_year_test_seed_creates_missing_periods_and_weeks(self):
         migration = Path("migrations/039_full_year_test_payroll.sql").read_text(encoding="utf-8-sig")
