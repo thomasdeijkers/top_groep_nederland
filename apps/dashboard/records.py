@@ -1909,8 +1909,8 @@ def payroll_phase_status(week_result_summary: dict | None, exception_summary: di
             "label": "Nog niet berekend",
             "tone": "warning",
             "can_approve": False,
-            "detail": "Er zijn nog geen weekresultaten voor deze periode.",
-            "audit_summary": "geen weekresultaten",
+            "detail": "Er zijn nog geen gevalideerde uren of weekresultaten voor deze periode.",
+            "audit_summary": "geen gevalideerde uren",
         }
     if blocking > 0:
         return {

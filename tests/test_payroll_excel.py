@@ -209,6 +209,7 @@ class PayrollPhaseStatusTests(unittest.TestCase):
 
         self.assertFalse(status["can_approve"])
         self.assertEqual(status["label"], "Nog niet berekend")
+        self.assertIn("geen gevalideerde uren", status["detail"])
 
     def test_phase_status_blocks_known_exceptions(self):
         status = records.payroll_phase_status({"result_count": 4}, {"blocking": 1, "warning": 2, "total": 3})
@@ -422,6 +423,15 @@ class PayrollPeriodDatamodelDetailTests(unittest.TestCase):
         self.assertIn("selected_payroll_period.datamodel_status", template)
         self.assertIn("week_line_count", template)
         self.assertIn(".period-datamodel-strip", stylesheet)
+
+class PayrollEmptyPeriodCopyTests(unittest.TestCase):
+    def test_empty_period_copy_explains_missing_validated_hours(self):
+        template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
+
+        self.assertIn("Nog geen gevalideerde uren", template)
+        self.assertIn("Valideer eerst urenbriefjes", template)
+        self.assertIn("gevalideerde uren in deze loonperiode", template)
+
 
 if __name__ == "__main__":
     unittest.main()

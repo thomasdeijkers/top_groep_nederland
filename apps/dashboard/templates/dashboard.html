@@ -1626,7 +1626,7 @@ Metadata:
 
                         {% set exception_summary = selected_payroll_period.payroll_exception_summary %}
                         <details class="period-import-log payroll-exception-panel" open>
-                            <summary>Payroll-uitzonderingen{% if exception_summary.total %} &middot; {{ exception_summary.blocking }} blokkerend &middot; {{ exception_summary.warning }} nalopen{% endif %}</summary>
+                            <summary>{% if week_input.input_count|int == 0 %}Nog geen gevalideerde uren{% else %}Payroll-uitzonderingen{% if exception_summary.total %} &middot; {{ exception_summary.blocking }} blokkerend &middot; {{ exception_summary.warning }} nalopen{% endif %}{% endif %}</summary>
                             <div class="payroll-exception-summary">
                                 <div>
                                     <span>Totaal</span>
@@ -1662,8 +1662,8 @@ Metadata:
                                 </article>
                                 {% else %}
                                 <div class="empty-state empty-state--compact">
-                                    <strong>Geen payroll-uitzonderingen</strong>
-                                    <span>De bekende blokkades voor medewerkerinrichting, netto basisloon, kandidaatkoppeling, ontbrekende weken en projectregels zijn niet gevonden.</span>
+                                    <strong>{% if week_input.input_count|int == 0 %}Nog geen gevalideerde uren{% else %}Geen payroll-uitzonderingen{% endif %}</strong>
+                                    <span>{% if week_input.input_count|int == 0 %}Zodra urenbriefjes zijn gevalideerd en doorgestuurd naar loonberekening, worden hier de payroll-controles en eventuele blokkades zichtbaar.{% else %}De bekende blokkades voor medewerkerinrichting, netto basisloon, kandidaatkoppeling, ontbrekende weken en projectregels zijn niet gevonden.{% endif %}</span>
                                 </div>
                                 {% endfor %}
                             </div>
@@ -1715,8 +1715,8 @@ Metadata:
                                         <tr>
                                             <td colspan="12">
                                                 <div class="empty-state empty-state--compact">
-                                                    <strong>Nog geen periode-afrekening per medewerker</strong>
-                                                    <span>Deze tabel vult zodra weekresultaten tot een periode-afrekening worden samengevoegd.</span>
+                                                    <strong>{% if week_input.input_count|int == 0 %}Nog geen gevalideerde uren{% else %}Nog geen periode-afrekening per medewerker{% endif %}</strong>
+                                                    <span>{% if week_input.input_count|int == 0 %}Valideer eerst urenbriefjes en stuur ze door naar loonberekening. Daarna verschijnen hier de medewerkerregels.{% else %}Deze tabel vult zodra weekresultaten tot een periode-afrekening worden samengevoegd.{% endif %}</span>
                                                 </div>
                                             </td>
                                         </tr>
@@ -1792,8 +1792,8 @@ Metadata:
                                             <tr>
                                                 <td colspan="{{ tab.columns|length }}">
                                                     <div class="empty-state empty-state--compact">
-                                                        <strong>Nog geen regels</strong>
-                                                        <span>Dit tabblad wordt gevuld met echte kandidaten en dummydata zodra de periode openstaat.</span>
+                                                        <strong>{% if week_input.input_count|int == 0 %}Nog geen gevalideerde uren{% else %}Nog geen regels{% endif %}</strong>
+                                                        <span>{% if week_input.input_count|int == 0 %}Dit tabblad wordt gevuld zodra gevalideerde uren in deze loonperiode beschikbaar zijn.{% else %}Dit tabblad wordt gevuld met echte kandidaten en dummydata zodra de periode openstaat.{% endif %}</span>
                                                     </div>
                                                 </td>
                                             </tr>
