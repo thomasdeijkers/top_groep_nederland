@@ -35,7 +35,7 @@ BEGIN
         SELECT 1
         FROM audit_events
         WHERE entity_type = 'payroll_test_reset'
-          AND metadata->>'source_channel' = 'deploy_reset_043'
+          AND metadata->>'source_channel' = 'deploy_reset_044'
     ) THEN
         RETURN;
     END IF;
@@ -66,10 +66,10 @@ BEGIN
         'Testfase uren en loonperiodes geleegd',
         'payroll_test_reset',
         'Urenbriefjes en loonperiodes',
-        'Eenmalige deploy-reset heeft de testdataset geleegd.',
+        'Snelle deploy-reset heeft de testdataset opnieuw geleegd.',
         'Verwijderd',
-        jsonb_build_object('source_channel', 'deploy_reset_043'),
-        'deploy_reset_043',
+        jsonb_build_object('source_channel', 'deploy_reset_044'),
+        'deploy_reset_044',
         NOW()
     );
 END $$;

@@ -52,18 +52,12 @@ def ensure_dashboard_tables():
         Path("migrations/017_project_cao_link.sql"),
         Path("migrations/018_payroll_periods.sql"),
         Path("migrations/021_audit_events.sql"),
-        Path("migrations/019_demo_seed_data.sql"),
-        Path("migrations/020_demo_payroll_period.sql"),
         Path("migrations/022_otys_staging_tables.sql"),
         Path("migrations/023_otys_api_usage.sql"),
         Path("migrations/024_otys_relations_backfill.sql"),
         Path("migrations/025_dashboard_performance_indexes.sql"),
         Path("migrations/026_payroll_excel_reference.sql"),
         Path("migrations/027_payroll_workbook_cell_overrides.sql"),
-        Path("migrations/028_payroll_period_02_test_timesheets.sql"),
-        Path("migrations/039_full_year_test_payroll.sql"),
-        Path("migrations/040_one_period_test_hours.sql"),
-        Path("migrations/041_dashboard_demo_payroll.sql"),
         Path("migrations/029_relation_payroll_settings.sql"),
         Path("migrations/030_openai_api_audit_events.sql"),
         Path("migrations/031_payroll_parameters.sql"),
@@ -76,29 +70,13 @@ def ensure_dashboard_tables():
         Path("migrations/038_payroll_datamodel_views.sql"),
         Path("migrations/042_payroll_audit_context.sql"),
         Path("migrations/043_reset_payroll_test_dataset_once.sql"),
+        Path("migrations/044_fast_reset_payroll_test_dataset_once.sql"),
     ]
 
-    optional_migrations = {
-        "019_demo_seed_data.sql",
-        "020_demo_payroll_period.sql",
-        "028_payroll_period_02_test_timesheets.sql",
-        "039_full_year_test_payroll.sql",
-        "040_one_period_test_hours.sql",
-        "041_dashboard_demo_payroll.sql",
-    }
-    payroll_test_seed_migrations = {
-        "019_demo_seed_data.sql",
-        "020_demo_payroll_period.sql",
-        "028_payroll_period_02_test_timesheets.sql",
-        "039_full_year_test_payroll.sql",
-        "040_one_period_test_hours.sql",
-        "041_dashboard_demo_payroll.sql",
-    }
+    optional_migrations = set()
 
     with get_connection() as conn:
         for migration in migrations:
-            if migration.name in payroll_test_seed_migrations and _payroll_test_seed_is_suppressed(conn):
-                continue
             try:
                 with conn.cursor() as cursor:
                     cursor.execute(migration.read_text(encoding="utf-8"))

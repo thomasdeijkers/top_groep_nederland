@@ -3278,20 +3278,30 @@ def _available_payroll_period_numbers(year: int, count: int) -> list[int]:
     return numbers
 
 
-def _delete_existing_table(cursor, table_name: str) -> int:
+def _count_existing_table(cursor, table_name: str) -> int:
     cursor.execute("SELECT to_regclass(%s);", (f"public.{table_name}",))
     if not cursor.fetchone()[0]:
         return 0
-    cursor.execute(f"DELETE FROM {table_name};")
-    return cursor.rowcount
+    cursor.execute(f"SELECT COUNT(*) FROM {table_name};")
+    return cursor.fetchone()[0]
+
+
+def _truncate_existing_tables(cursor, table_names: tuple[str, ...]) -> None:
+    existing = []
+    for table_name in table_names:
+        cursor.execute("SELECT to_regclass(%s);", (f"public.{table_name}",))
+        if cursor.fetchone()[0]:
+            existing.append(table_name)
+    if existing:
+        quoted_tables = ", ".join(f'"{table_name}"' for table_name in existing)
+        cursor.execute(f"TRUNCATE TABLE {quoted_tables} RESTART IDENTITY CASCADE;")
 
 
 def clear_payroll_test_workspace() -> dict:
     _ensure_dashboard_tables_for_read()
     with get_connection() as conn:
         with conn.cursor() as cursor:
-            deleted_counts = {}
-            for table_name in (
+            reset_tables = (
                 "payroll_workbook_cell_overrides",
                 "openai_api_audit_events",
                 "openai_usage_events",
@@ -3318,8 +3328,11 @@ def clear_payroll_test_workspace() -> dict:
                 "payroll_periods",
                 "payroll_employees",
                 "audit_log",
-            ):
-                deleted_counts[table_name] = _delete_existing_table(cursor, table_name)
+            )
+            deleted_counts = {}
+            for table_name in reset_tables:
+                deleted_counts[table_name] = _count_existing_table(cursor, table_name)
+            _truncate_existing_tables(cursor, reset_tables)
             deleted_bookings = deleted_counts.get("project_time_bookings", 0)
             deleted_timesheets = deleted_counts.get("whatsapp_timesheet_inbox", 0)
             deleted_periods = deleted_counts.get("payroll_periods", 0)

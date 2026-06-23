@@ -594,7 +594,8 @@ class CompletePeriodTimesheetImportTests(unittest.TestCase):
         self.assertIn("Alles legen", template)
         self.assertIn("def clear_payroll_workspace_for_testing", router_source)
         self.assertIn("clear_payroll_test_workspace", router_source)
-        self.assertIn("def _delete_existing_table", records_source)
+        self.assertIn("def _truncate_existing_tables", records_source)
+        self.assertIn("TRUNCATE TABLE", records_source)
         self.assertIn("project_time_bookings", records_source)
         self.assertIn("whatsapp_timesheet_inbox", records_source)
         self.assertIn("payroll_periods", records_source)
@@ -620,15 +621,21 @@ class CompletePeriodTimesheetImportTests(unittest.TestCase):
     def test_test_seeds_are_suppressed_after_reset_and_deploy_clears_once(self):
         data_store = Path("apps/dashboard/data_store.py").read_text(encoding="utf-8-sig")
         migration = Path("migrations/043_reset_payroll_test_dataset_once.sql").read_text(encoding="utf-8-sig")
+        fast_migration = Path("migrations/044_fast_reset_payroll_test_dataset_once.sql").read_text(encoding="utf-8-sig")
 
         self.assertIn("_payroll_test_seed_is_suppressed", data_store)
         self.assertLess(
             data_store.index("migrations/021_audit_events.sql"),
-            data_store.index("migrations/019_demo_seed_data.sql"),
+            data_store.index("migrations/022_otys_staging_tables.sql"),
         )
         self.assertIn("043_reset_payroll_test_dataset_once.sql", data_store)
-        self.assertIn("payroll_test_seed_migrations", data_store)
+        self.assertIn("044_fast_reset_payroll_test_dataset_once.sql", data_store)
+        self.assertNotIn("migrations/019_demo_seed_data.sql", data_store)
+        self.assertNotIn("migrations/040_one_period_test_hours.sql", data_store)
         self.assertIn("deploy_reset_043", migration)
+        self.assertIn("deploy_reset_044", fast_migration)
+        self.assertIn("TRUNCATE TABLE", migration)
+        self.assertIn("TRUNCATE TABLE", fast_migration)
         self.assertIn("whatsapp_timesheet_inbox", migration)
         self.assertIn("payroll_periods", migration)
         self.assertIn("openai_api_audit_events", migration)
@@ -713,15 +720,10 @@ class PayrollFullYearTestSeedTests(unittest.TestCase):
     def test_full_year_test_seed_runs_before_week_input_derivations(self):
         data_store = Path("apps/dashboard/data_store.py").read_text(encoding="utf-8-sig")
 
-        self.assertIn("migrations/039_full_year_test_payroll.sql", data_store)
-        self.assertIn("migrations/040_one_period_test_hours.sql", data_store)
-        self.assertIn("migrations/041_dashboard_demo_payroll.sql", data_store)
-        self.assertLess(
-            data_store.index("migrations/041_dashboard_demo_payroll.sql"),
-            data_store.index("migrations/033_payroll_week_inputs.sql"),
-        )
-        self.assertIn("040_one_period_test_hours.sql", data_store)
-        self.assertIn("041_dashboard_demo_payroll.sql", data_store)
+        self.assertNotIn("migrations/039_full_year_test_payroll.sql", data_store)
+        self.assertNotIn("migrations/040_one_period_test_hours.sql", data_store)
+        self.assertNotIn("migrations/041_dashboard_demo_payroll.sql", data_store)
+        self.assertIn("migrations/033_payroll_week_inputs.sql", data_store)
 
     def test_one_period_test_hours_seed_populates_live_timesheets(self):
         migration = Path("migrations/040_one_period_test_hours.sql").read_text(encoding="utf-8-sig")
