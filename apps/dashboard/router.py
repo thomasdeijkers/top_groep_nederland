@@ -82,7 +82,7 @@ from apps.dashboard.relations import (
     update_vacancy,
 )
 from apps.dashboard.stats import get_dashboard_stats, get_database_status, get_empty_dashboard_stats, get_health, get_server_overview
-from apps.dashboard.timesheet_corrections import save_field_corrections, send_to_payroll, validate_timesheet
+from apps.dashboard.timesheet_corrections import TimesheetValidationError, save_field_corrections, send_to_payroll, validate_timesheet
 from apps.dashboard.timesheet_uploads import import_complete_period_timesheets, reparse_timesheet_upload, save_timesheet_upload
 from apps.dashboard.whatsapp_actions import archive_whatsapp_timesheet, delete_whatsapp_timesheet
 from jobs.imports.otys_export import import_otys_organizations, parse_otys_csv
@@ -154,6 +154,15 @@ def _audit_changed_fields(corrections: dict) -> str:
     shown = changed[:6]
     suffix = f" en {len(changed) - len(shown)} extra velden" if len(changed) > len(shown) else ""
     return f"Aangepast: {', '.join(shown)}{suffix}."
+
+
+def _split_candidate_name(name: str) -> tuple[str, str]:
+    parts = str(name or "").strip().split()
+    if not parts:
+        return "", ""
+    if len(parts) == 1:
+        return parts[0], ""
+    return parts[0], " ".join(parts[1:])
 
 
 def _context_value(active_page: str, label: str, fallback, loader):
@@ -826,6 +835,39 @@ def search_candidates(q: str = "", limit: int = Query(40, ge=1, le=80)):
     return {"results": search_candidate_matches(q, limit)}
 
 
+@router.post("/api/whatsapp/timesheet/{timesheet_id}/candidate")
+def create_candidate_from_timesheet(
+    timesheet_id: int,
+    candidate_name: str = Form(""),
+    phone: str = Form(""),
+    city: str = Form(""),
+    email: str = Form(""),
+):
+    first_name, last_name = _split_candidate_name(candidate_name)
+    record_id = create_candidate(
+        {
+            "first_name": first_name,
+            "last_name": last_name,
+            "email": email,
+            "phone": phone,
+            "city": city,
+            "status": "Nieuw",
+            "source": "Urenbriefje",
+            "notes": f"Aangemaakt vanuit urenbriefje {timesheet_id}.",
+        }
+    )
+    save_field_corrections(
+        timesheet_id,
+        {
+            "employee_name": candidate_name,
+            "employee_phone": phone,
+        },
+        matched_relation_id=record_id,
+    )
+    _audit("Kandidaat aangemaakt", "candidate", record_id, candidate_name or "Kandidaat", f"Aangemaakt en gekoppeld vanuit urenbriefje {timesheet_id}.", "Relaties")
+    return RedirectResponse(f"/dashboard/timesheets?tab=task&stage=valideren&timesheet={timesheet_id}&candidate_created={record_id}#digital-timesheet", status_code=303)
+
+
 @router.get("/api/principals/search")
 def search_principals(q: str = "", limit: int = Query(120, ge=1, le=500)):
     return {"results": list_principals(limit=limit, query=q)}
@@ -844,8 +886,12 @@ def validate_whatsapp_timesheet(
     principal_id: int | None = Form(None),
     project_id: int | None = Form(None),
 ):
-    validate_timesheet(timesheet_id, principal_id, project_id)
-    _audit("Urenbriefje gevalideerd", "urenbriefje", timesheet_id, f"Urenbriefje {timesheet_id}", "Uren zijn gekoppeld aan opdrachtgever en project.", "Loon berekenen")
+    try:
+        validate_timesheet(timesheet_id, principal_id, project_id)
+    except TimesheetValidationError as exc:
+        query = urlencode({"tab": "task", "stage": "valideren", "timesheet": timesheet_id, "validate_error": str(exc)})
+        return RedirectResponse(f"/dashboard/timesheets?{query}#digital-timesheet", status_code=303)
+    _audit("Urenbriefje gevalideerd", "urenbriefje", timesheet_id, f"Urenbriefje {timesheet_id}", "Uren zijn gekoppeld aan kandidaat, opdrachtgever en project.", "Loon berekenen")
     return RedirectResponse(f"/dashboard/timesheets?stage=loon&timesheet={timesheet_id}", status_code=303)
 
 

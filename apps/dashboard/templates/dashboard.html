@@ -2388,6 +2388,17 @@ Metadata:
                                         </span>
                                     </div>
                                 </div>
+                                {% if request.query_params.get('validate_error') %}
+                                <div class="inline-alert inline-alert--warning">
+                                    <strong>Valideren nog niet mogelijk</strong>
+                                    <span>{{ request.query_params.get('validate_error') }}</span>
+                                </div>
+                                {% elif request.query_params.get('candidate_created') %}
+                                <div class="inline-alert inline-alert--success">
+                                    <strong>Kandidaat gekoppeld</strong>
+                                    <span>De nieuwe kandidaat is aan dit urenbriefje gekoppeld.</span>
+                                </div>
+                                {% endif %}
                                 <details class="review-message-actions compact-actions message-tools">
                                     <summary>Berichtopties</summary>
                                     <div>
@@ -2553,6 +2564,18 @@ Metadata:
                                                             </select>
                                                         </div>
                                                     </div>
+                                                    {% if not selected_message.matched_relation_id %}
+                                                    <div class="candidate-create-panel">
+                                                        <div>
+                                                            <small>Nog geen kandidaat?</small>
+                                                            <strong>Maak kandidaat aan vanuit dit urenbriefje</strong>
+                                                        </div>
+                                                        <input form="timesheet-create-candidate-form" name="candidate_name" value="{{ parsed_employee_name or selected_message.employee_name or selected_message.sender_name }}" placeholder="Naam kandidaat" required>
+                                                        <input form="timesheet-create-candidate-form" name="phone" value="{{ parsed_employee_phone or selected_message.sender_phone }}" placeholder="Telefoon">
+                                                        <input form="timesheet-create-candidate-form" name="city" value="{{ selected_message.employee_city or '' }}" placeholder="Plaats">
+                                                        <button class="test-action-button test-action-button--primary" form="timesheet-create-candidate-form" type="submit">Kandidaat aanmaken</button>
+                                                    </div>
+                                                    {% endif %}
                                                 </div>
                                                 <label class="search-select-field"><span class="field-title">Opdrachtgever {{ confidence_light(selected_message.parsed_map.principal_name) }}</span>
                                                     <input type="search" placeholder="Zoek opdrachtgever..." data-principal-search autocomplete="off">
@@ -2688,11 +2711,15 @@ Metadata:
 
                                             <button class="sr-only" type="submit">Opslaan</button>
                                 </form>
+                                <form id="timesheet-create-candidate-form" action="/api/whatsapp/timesheet/{{ selected_message.id }}/candidate" method="post"></form>
                                 <div class="workflow-action-row">
                                 <form class="workflow-actions" action="/api/whatsapp/timesheet/{{ selected_message.id }}/validate" method="post">
                                     <input type="hidden" name="principal_id" value="{{ selected_message.selected_principal_id or '' }}" data-workflow-principal-id>
                                     <input type="hidden" name="project_id" value="{{ selected_message.selected_project_id or '' }}" data-workflow-project-id>
-                                    <button class="ghost-button" type="submit">Valideren</button>
+                                    <button class="ghost-button" type="submit" {% if not selected_message.matched_relation_id %}disabled title="Koppel eerst een kandidaat"{% endif %}>Valideren</button>
+                                    {% if not selected_message.matched_relation_id %}
+                                    <span class="workflow-action-note">Koppel of maak eerst een kandidaat aan.</span>
+                                    {% endif %}
                                 </form>
                                 </div>
                                 </div>

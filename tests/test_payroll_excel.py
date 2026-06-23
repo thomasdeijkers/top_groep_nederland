@@ -729,6 +729,28 @@ class DashboardDatabaseStatusTests(unittest.TestCase):
         self.assertIn("SELECT * FROM relations WHERE id = %s", relation_source)
 
 
+class TimesheetCandidateValidationTests(unittest.TestCase):
+    def test_timesheet_validation_requires_candidate_and_inline_creation(self):
+        template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
+        router_source = Path("apps/dashboard/router.py").read_text(encoding="utf-8-sig")
+        corrections_source = Path("apps/dashboard/timesheet_corrections.py").read_text(encoding="utf-8-sig")
+        stylesheet = Path("apps/dashboard/static/dashboard.css").read_text(encoding="utf-8-sig")
+
+        self.assertIn("Koppel eerst een kandidaat", template)
+        self.assertIn("Kandidaat aanmaken", template)
+        self.assertIn("/api/whatsapp/timesheet/{{ selected_message.id }}/candidate", template)
+        self.assertIn("timesheet-create-candidate-form", template)
+        self.assertIn("@router.post(\"/api/whatsapp/timesheet/{timesheet_id}/candidate\")", router_source)
+        self.assertIn("create_candidate(", router_source)
+        self.assertIn("save_field_corrections(", router_source)
+        self.assertIn("TimesheetValidationError", corrections_source)
+        self.assertIn("Koppel eerst een kandidaat", corrections_source)
+        self.assertIn("relation_type = 'candidate'", corrections_source)
+        self.assertIn("validate_error", router_source)
+        self.assertIn(".candidate-create-panel", stylesheet)
+        self.assertIn(".workflow-action-note", stylesheet)
+
+
 class DashboardContextSafetyTests(unittest.TestCase):
     def test_dashboard_context_sections_fall_back_individually(self):
         def broken_loader():

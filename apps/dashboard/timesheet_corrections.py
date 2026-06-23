@@ -5,6 +5,10 @@ from apps.dashboard.data_store import ensure_dashboard_tables
 from shared.db.connection import get_connection
 
 
+class TimesheetValidationError(ValueError):
+    pass
+
+
 def save_field_corrections(
     timesheet_id: int,
     corrections: dict[str, str],
@@ -136,6 +140,20 @@ def validate_timesheet(timesheet_id: int, principal_id: int | None, project_id: 
                 return
 
             relation_id, work_date, hours, parsed_fields = row
+            if not relation_id:
+                raise TimesheetValidationError("Koppel eerst een kandidaat voordat je dit urenbriefje valideert.")
+            cursor.execute(
+                """
+                SELECT 1
+                FROM relations
+                WHERE id = %s
+                  AND relation_type = 'candidate'
+                  AND archived_at IS NULL;
+                """,
+                (relation_id,),
+            )
+            if not cursor.fetchone():
+                raise TimesheetValidationError("De gekoppelde kandidaat bestaat niet meer of is gearchiveerd.")
             parsed_fields = parsed_fields or {}
             hours = hours or _hours_from_fields(parsed_fields)
             payroll_cao_setting_id = _project_cao_setting_id(cursor, project_id)
