@@ -2565,7 +2565,7 @@ Metadata:
                                                         </div>
                                                     </div>
                                                     {% if not selected_message.matched_relation_id %}
-                                                    <div class="candidate-create-panel">
+                                                    <div class="candidate-create-panel" data-candidate-create-panel>
                                                         <div>
                                                             <small>Nog geen kandidaat?</small>
                                                             <strong>Maak kandidaat aan vanuit dit urenbriefje</strong>
@@ -2714,11 +2714,12 @@ Metadata:
                                 <form id="timesheet-create-candidate-form" action="/api/whatsapp/timesheet/{{ selected_message.id }}/candidate" method="post"></form>
                                 <div class="workflow-action-row">
                                 <form class="workflow-actions" action="/api/whatsapp/timesheet/{{ selected_message.id }}/validate" method="post">
+                                    <input type="hidden" name="matched_relation_id" value="{{ selected_message.matched_relation_id or '' }}" data-workflow-candidate-id>
                                     <input type="hidden" name="principal_id" value="{{ selected_message.selected_principal_id or '' }}" data-workflow-principal-id>
                                     <input type="hidden" name="project_id" value="{{ selected_message.selected_project_id or '' }}" data-workflow-project-id>
-                                    <button class="ghost-button" type="submit" {% if not selected_message.matched_relation_id %}disabled title="Koppel eerst een kandidaat"{% endif %}>Valideren</button>
+                                    <button class="ghost-button" type="submit" data-workflow-validate-button {% if not selected_message.matched_relation_id %}disabled title="Koppel eerst een kandidaat"{% endif %}>Valideren</button>
                                     {% if not selected_message.matched_relation_id %}
-                                    <span class="workflow-action-note">Koppel of maak eerst een kandidaat aan.</span>
+                                    <span class="workflow-action-note" data-workflow-candidate-note>Koppel of maak eerst een kandidaat aan.</span>
                                     {% endif %}
                                 </form>
                                 </div>

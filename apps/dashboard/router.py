@@ -883,10 +883,14 @@ def reparse_whatsapp_timesheet(timesheet_id: int):
 @router.post("/api/whatsapp/timesheet/{timesheet_id}/validate")
 def validate_whatsapp_timesheet(
     timesheet_id: int,
+    matched_relation_id: str = Form(""),
     principal_id: int | None = Form(None),
     project_id: int | None = Form(None),
 ):
     try:
+        selected_candidate_id = ensure_relation_for_candidate_match(matched_relation_id)
+        if selected_candidate_id:
+            save_field_corrections(timesheet_id, {}, matched_relation_id=selected_candidate_id)
         validate_timesheet(timesheet_id, principal_id, project_id)
     except TimesheetValidationError as exc:
         query = urlencode({"tab": "task", "stage": "valideren", "timesheet": timesheet_id, "validate_error": str(exc)})

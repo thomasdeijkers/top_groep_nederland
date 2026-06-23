@@ -777,6 +777,8 @@ class TimesheetCandidateValidationTests(unittest.TestCase):
 
         self.assertIn("Koppel eerst een kandidaat", template)
         self.assertIn("Kandidaat aanmaken", template)
+        self.assertIn("data-workflow-candidate-id", template)
+        self.assertIn("data-workflow-validate-button", template)
         self.assertIn("/api/whatsapp/timesheet/{{ selected_message.id }}/candidate", template)
         self.assertIn("timesheet-create-candidate-form", template)
         self.assertIn("@router.post(\"/api/whatsapp/timesheet/{timesheet_id}/candidate\")", router_source)
@@ -786,8 +788,17 @@ class TimesheetCandidateValidationTests(unittest.TestCase):
         self.assertIn("Koppel eerst een kandidaat", corrections_source)
         self.assertIn("relation_type = 'candidate'", corrections_source)
         self.assertIn("validate_error", router_source)
+        self.assertIn("matched_relation_id: str = Form(\"\")", router_source)
         self.assertIn(".candidate-create-panel", stylesheet)
         self.assertIn(".workflow-action-note", stylesheet)
+
+    def test_candidate_selection_enables_validation_button(self):
+        script = Path("apps/dashboard/static/dashboard.js").read_text(encoding="utf-8-sig")
+
+        self.assertIn("data-workflow-candidate-id", script)
+        self.assertIn("data-workflow-validate-button", script)
+        self.assertIn("validateButton.disabled = false", script)
+        self.assertIn("workflowCandidateTarget.value = option.value", script)
 
 
 class DashboardContextSafetyTests(unittest.TestCase):

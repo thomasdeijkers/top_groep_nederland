@@ -632,6 +632,10 @@
         const employeePhoneInput = form?.querySelector('[name="field_employee_phone"]');
         const suggestionsTarget = form?.querySelector("[data-candidate-suggestions]");
         const summaryTarget = form?.querySelector("[data-candidate-match-summary]");
+        const workflowCandidateTarget = document.querySelector("[data-workflow-candidate-id]");
+        const validateButton = document.querySelector("[data-workflow-validate-button]");
+        const candidateNote = document.querySelector("[data-workflow-candidate-note]");
+        const createCandidatePanel = document.querySelector("[data-candidate-create-panel]");
         const searchUrl = select.dataset.candidateSearchUrl;
         let candidateSearchTimer = null;
         let candidateSearchSequence = 0;
@@ -695,6 +699,19 @@
         const applySelectedCandidate = () => {
             const option = select.selectedOptions[0];
             if (!option || !option.value) {
+                if (workflowCandidateTarget) {
+                    workflowCandidateTarget.value = "";
+                }
+                if (validateButton) {
+                    validateButton.disabled = true;
+                    validateButton.title = "Koppel eerst een kandidaat";
+                }
+                if (candidateNote) {
+                    candidateNote.hidden = false;
+                }
+                if (createCandidatePanel) {
+                    createCandidatePanel.hidden = false;
+                }
                 if (summaryTarget) {
                     summaryTarget.classList.remove("accordion-metric--green", "accordion-metric--orange");
                     summaryTarget.classList.add("accordion-metric--red");
@@ -712,6 +729,19 @@
             }
             if (searchInput && option.dataset.name) {
                 searchInput.value = option.dataset.name;
+            }
+            if (workflowCandidateTarget) {
+                workflowCandidateTarget.value = option.value;
+            }
+            if (validateButton) {
+                validateButton.disabled = false;
+                validateButton.removeAttribute("title");
+            }
+            if (candidateNote) {
+                candidateNote.hidden = true;
+            }
+            if (createCandidatePanel) {
+                createCandidatePanel.hidden = true;
             }
             if (summaryTarget) {
                 summaryTarget.classList.remove("accordion-metric--red", "accordion-metric--orange");
