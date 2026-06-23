@@ -303,30 +303,69 @@
 
         workbook.querySelectorAll("[data-payroll-cell]").forEach((input) => {
             let saveTimer = null;
-            const recalculatePayslipRow = () => {
-                if (input.dataset.tabLabel !== "Loonstrook") {
-                    return;
+            const row = input.closest("tr");
+            const field = (key) => row?.querySelector(`.payroll-col-${key} [data-payroll-cell]`);
+            const parseNumber = (value) => {
+                let normalized = String(value || "")
+                    .replace(/[^\d,.-]/g, "")
+                    .trim();
+                if (normalized.includes(",") && normalized.includes(".")) {
+                    normalized = normalized.replace(/\./g, "").replace(",", ".");
+                } else if (normalized.includes(",")) {
+                    normalized = normalized.replace(",", ".");
                 }
-                const row = input.closest("tr");
+                const parsed = Number.parseFloat(normalized);
+                return Number.isFinite(parsed) ? parsed : 0;
+            };
+            const formatNumber = (value) => new Intl.NumberFormat("nl-NL", {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 2,
+            }).format(value);
+            const formatMoney = (value) => new Intl.NumberFormat("nl-NL", {
+                style: "currency",
+                currency: "EUR",
+            }).format(Math.max(value, 0));
+            const setFieldValue = (key, value) => {
+                const target = field(key);
+                if (target && target !== input) {
+                    target.value = value;
+                    target.classList.add("payroll-cell-input--dirty");
+                }
+            };
+            const recalculateWorkbookRow = () => {
                 if (!row) {
                     return;
                 }
+                if (input.dataset.tabLabel.startsWith("WK")) {
+                    const workedHours = parseNumber(field("worked-hours")?.value);
+                    const workedDays = parseNumber(field("worked-days")?.value);
+                    const singleTripKm = parseNumber(field("single-trip-km")?.value);
+                    const workKm = parseNumber(field("work-km")?.value);
+                    let commuteKm = parseNumber(field("commute-km")?.value);
+                    if (input.dataset.columnKey === "single_trip_km" && singleTripKm && workedDays) {
+                        commuteKm = singleTripKm * workedDays * 2;
+                        setFieldValue("commute-km", formatNumber(commuteKm));
+                    }
+                    setFieldValue("net-amount", formatMoney(workedHours * 13.75));
+                    setFieldValue("total-km", formatNumber(commuteKm + workKm));
+                    return;
+                }
+                if (input.dataset.tabLabel === "Periode") {
+                    const contractHours = parseNumber(field("contract-hours")?.value);
+                    const grossHourlyWage = parseNumber(field("gross-hourly-wage")?.value);
+                    const grossTotal = contractHours * grossHourlyWage;
+                    setFieldValue("gross-total", formatMoney(grossTotal));
+                    setFieldValue("labor-cost-margin", formatMoney(grossTotal * 0.18));
+                    setFieldValue("net-period-basis", formatMoney(grossTotal * 0.62));
+                    return;
+                }
                 const field = (key) => row.querySelector(`.payroll-col-${key} [data-payroll-cell]`);
-                const parseMoney = (value) => {
-                    const normalized = String(value || "")
-                        .replace(/[^\d,.-]/g, "")
-                        .replace(/\./g, "")
-                        .replace(",", ".");
-                    const parsed = Number.parseFloat(normalized);
-                    return Number.isFinite(parsed) ? parsed : 0;
-                };
-                const formatMoney = (value) => new Intl.NumberFormat("nl-NL", {
-                    style: "currency",
-                    currency: "EUR",
-                }).format(Math.max(value, 0));
-                const periodTotal = parseMoney(field("period-total")?.value);
-                const alreadyReceived = parseMoney(field("already-received-net")?.value);
-                const payslipAdvance = parseMoney(field("payslip-advance")?.value);
+                if (input.dataset.tabLabel !== "Loonstrook") {
+                    return;
+                }
+                const periodTotal = parseNumber(field("period-total")?.value);
+                const alreadyReceived = parseNumber(field("already-received-net")?.value);
+                const payslipAdvance = parseNumber(field("payslip-advance")?.value);
                 const netToReceive = formatMoney(periodTotal - alreadyReceived - payslipAdvance);
                 ["net-to-receive", "net-total"].forEach((key) => {
                     const target = field(key);
@@ -366,7 +405,7 @@
                     input.dataset.previousValue = result.previous_value || "";
                     input.dataset.originalValue = result.value || value;
                     input.classList.remove("payroll-cell-input--error");
-                    recalculatePayslipRow();
+                    recalculateWorkbookRow();
                     const meta = input.parentElement?.querySelector("[data-cell-meta]");
                     if (meta) {
                         meta.textContent = `Vorig: ${result.previous_value || "-"} · Mutatie: ${result.updated_at || "-"}`;
@@ -379,13 +418,13 @@
             };
             input.addEventListener("input", () => {
                 input.classList.add("payroll-cell-input--dirty");
-                recalculatePayslipRow();
+                recalculateWorkbookRow();
                 window.clearTimeout(saveTimer);
                 saveTimer = window.setTimeout(save, 650);
             });
             input.addEventListener("change", () => {
                 input.classList.add("payroll-cell-input--dirty");
-                recalculatePayslipRow();
+                recalculateWorkbookRow();
                 window.clearTimeout(saveTimer);
                 save();
             });

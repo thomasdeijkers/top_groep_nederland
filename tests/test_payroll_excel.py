@@ -54,6 +54,13 @@ class PayrollExcelAnalysisTests(unittest.TestCase):
 
 
 class PayrollCalculationTests(unittest.TestCase):
+    def test_decimal_hours_keep_fraction_with_dot_or_comma(self):
+        from apps.dashboard import payroll_calculations
+
+        self.assertEqual(payroll_calculations._decimal("37.5"), payroll_calculations.Decimal("37.5"))
+        self.assertEqual(payroll_calculations._decimal("37,5"), payroll_calculations.Decimal("37.5"))
+        self.assertEqual(payroll_calculations._decimal("5.156,25"), payroll_calculations.Decimal("5156.25"))
+
     def test_derives_period_totals_from_existing_payroll_rows(self):
         rows = derived_period_total_rows(
             [
@@ -116,6 +123,30 @@ class PayrollCalculationTests(unittest.TestCase):
         self.assertEqual(rows[0]["timesheet_link"], "Open")
         self.assertIn("payroll-workbook-link", template)
         self.assertIn("timesheet={{ row.timesheet_id }}", template)
+
+    def test_workbook_editable_fields_recalculate_like_excel(self):
+        week_row = {
+            "worked_hours": "37.5",
+            "worked_days": "5",
+            "commute_km": "150",
+            "work_km": "12,5",
+            "single_trip_km": "15",
+        }
+        records._recalculate_payroll_derived_cells({"kind": "week"}, week_row)
+        self.assertEqual(week_row["worked_hours"], "37.5")
+        self.assertEqual(week_row["net_amount"], f"{chr(8364)} 515,63")
+        self.assertEqual(week_row["total_km"], "162.5")
+
+        period_row = {"contract_hours": "40", "gross_hourly_wage": f"{chr(8364)} 21,50"}
+        records._recalculate_payroll_derived_cells({"kind": "period"}, period_row)
+        self.assertEqual(period_row["gross_total"], f"{chr(8364)} 860,00")
+        self.assertEqual(period_row["labor_cost_margin"], f"{chr(8364)} 154,80")
+
+        script = Path("apps/dashboard/static/dashboard.js").read_text(encoding="utf-8-sig")
+        self.assertIn("input.dataset.tabLabel.startsWith(\"WK\")", script)
+        self.assertIn("gross-total", script)
+        self.assertIn("normalized.includes(\",\") && normalized.includes(\".\")", script)
+
 
 
 class PayrollRunningBalanceTests(unittest.TestCase):

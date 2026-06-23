@@ -1,4 +1,4 @@
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 
 WEEK_SHEET_COLUMNS = [
@@ -455,7 +455,11 @@ def compare_values(excel_value, dashboard_value, tolerance=Decimal("0.05")) -> d
 def _decimal(value) -> Decimal:
     if isinstance(value, Decimal):
         return value
-    text = str(value or "0").replace("€", "").replace(" ", "").replace(".", "").replace(",", ".")
+    text = str(value or "0").replace("€", "").replace(" ", "").strip()
+    if "," in text and "." in text:
+        text = text.replace(".", "").replace(",", ".")
+    elif "," in text:
+        text = text.replace(",", ".")
     try:
         return Decimal(text)
     except (InvalidOperation, ValueError):
@@ -482,4 +486,4 @@ def _format_number(value: Decimal) -> str:
 
 
 def _format_money(value: Decimal) -> str:
-    return f"€ {value.quantize(Decimal('0.01'))}".replace(".", ",")
+    return f"€ {value.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)}".replace(".", ",")

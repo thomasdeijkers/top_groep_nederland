@@ -1,7 +1,7 @@
 import json
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 from psycopg2.extras import Json
 
@@ -1492,7 +1492,7 @@ def _format_number(value) -> str:
 def _format_money(value) -> str:
     if value is None:
         return "€ 0,00"
-    amount = Decimal(str(value)).quantize(Decimal("0.01"))
+    amount = Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     text = f"{amount:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     return f"€ {text}"
 
@@ -2961,12 +2961,46 @@ def list_payroll_workbook_overrides(period_id: int) -> dict[tuple[str, str, str]
 
 
 def _payroll_money_decimal(value) -> Decimal:
-    clean_value = str(value or "").replace(chr(8364), "").replace("?", "")
+    clean_value = str(value or "").replace(chr(8364), "").replace("?", "").replace(" ", "").strip()
+    if "," in clean_value and "." in clean_value:
+        clean_value = clean_value.replace(".", "").replace(",", ".")
+    elif "," in clean_value:
+        clean_value = clean_value.replace(",", ".")
+    return _decimal_or_none(clean_value) or Decimal("0")
+
+
+def _payroll_number_decimal(value) -> Decimal:
+    clean_value = str(value or "").replace(chr(8364), "").replace("?", "").replace(" ", "").strip()
+    if "," in clean_value and "." in clean_value:
+        clean_value = clean_value.replace(".", "").replace(",", ".")
+    elif "," in clean_value:
+        clean_value = clean_value.replace(",", ".")
     return _decimal_or_none(clean_value) or Decimal("0")
 
 
 def _recalculate_payroll_derived_cells(tab: dict, row: dict) -> None:
-    if tab.get("kind") != "payslip":
+    kind = tab.get("kind")
+    if kind == "week":
+        worked_hours = _payroll_number_decimal(row.get("worked_hours"))
+        worked_days = _payroll_number_decimal(row.get("worked_days"))
+        commute_km = _payroll_number_decimal(row.get("commute_km"))
+        work_km = _payroll_number_decimal(row.get("work_km"))
+        single_trip_km = _payroll_number_decimal(row.get("single_trip_km"))
+        if single_trip_km and worked_days:
+            commute_km = single_trip_km * worked_days * Decimal("2")
+            row["commute_km"] = _format_number(commute_km)
+        row["net_amount"] = _format_money(worked_hours * Decimal("13.75"))
+        row["total_km"] = _format_number(commute_km + work_km)
+        return
+    if kind == "period":
+        contract_hours = _payroll_number_decimal(row.get("contract_hours"))
+        gross_hourly_wage = _payroll_money_decimal(row.get("gross_hourly_wage"))
+        gross_total = contract_hours * gross_hourly_wage
+        row["gross_total"] = _format_money(gross_total)
+        row["labor_cost_margin"] = _format_money(gross_total * Decimal("0.18"))
+        row["net_period_basis"] = _format_money(gross_total * Decimal("0.62"))
+        return
+    if kind != "payslip":
         return
     period_total = _payroll_money_decimal(row.get("period_total"))
     already_received = _payroll_money_decimal(row.get("already_received_net"))
