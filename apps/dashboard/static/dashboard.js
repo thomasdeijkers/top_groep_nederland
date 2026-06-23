@@ -303,6 +303,38 @@
 
         workbook.querySelectorAll("[data-payroll-cell]").forEach((input) => {
             let saveTimer = null;
+            const recalculatePayslipRow = () => {
+                if (input.dataset.tabLabel !== "Loonstrook") {
+                    return;
+                }
+                const row = input.closest("tr");
+                if (!row) {
+                    return;
+                }
+                const field = (key) => row.querySelector(`.payroll-col-${key} [data-payroll-cell]`);
+                const parseMoney = (value) => {
+                    const normalized = String(value || "")
+                        .replace(/[^\d,.-]/g, "")
+                        .replace(/\./g, "")
+                        .replace(",", ".");
+                    const parsed = Number.parseFloat(normalized);
+                    return Number.isFinite(parsed) ? parsed : 0;
+                };
+                const formatMoney = (value) => new Intl.NumberFormat("nl-NL", {
+                    style: "currency",
+                    currency: "EUR",
+                }).format(Math.max(value, 0));
+                const periodTotal = parseMoney(field("period-total")?.value);
+                const alreadyReceived = parseMoney(field("already-received-net")?.value);
+                const payslipAdvance = parseMoney(field("payslip-advance")?.value);
+                const netToReceive = formatMoney(periodTotal - alreadyReceived - payslipAdvance);
+                ["net-to-receive", "net-total"].forEach((key) => {
+                    const target = field(key);
+                    if (target) {
+                        target.value = netToReceive;
+                    }
+                });
+            };
             const save = async () => {
                 const value = input.value;
                 const originalValue = input.dataset.originalValue || "";
@@ -334,6 +366,7 @@
                     input.dataset.previousValue = result.previous_value || "";
                     input.dataset.originalValue = result.value || value;
                     input.classList.remove("payroll-cell-input--error");
+                    recalculatePayslipRow();
                     const meta = input.parentElement?.querySelector("[data-cell-meta]");
                     if (meta) {
                         meta.textContent = `Vorig: ${result.previous_value || "-"} · Mutatie: ${result.updated_at || "-"}`;
@@ -346,11 +379,13 @@
             };
             input.addEventListener("input", () => {
                 input.classList.add("payroll-cell-input--dirty");
+                recalculatePayslipRow();
                 window.clearTimeout(saveTimer);
                 saveTimer = window.setTimeout(save, 650);
             });
             input.addEventListener("change", () => {
                 input.classList.add("payroll-cell-input--dirty");
+                recalculatePayslipRow();
                 window.clearTimeout(saveTimer);
                 save();
             });

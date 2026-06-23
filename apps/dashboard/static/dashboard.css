@@ -4714,6 +4714,15 @@ body[data-theme="light"] .theme-toggle strong {
     color: #9fe5b9;
 }
 
+.timesheet-import-notice--danger {
+    border-color: rgba(237, 125, 102, 0.34);
+    background: rgba(84, 36, 30, 0.34);
+}
+
+.timesheet-import-notice--danger strong {
+    color: #ffb6a8;
+}
+
 .timesheet-import-notice span {
     color: #d8e4ea;
 }
@@ -4744,10 +4753,21 @@ body[data-theme="light"] .theme-toggle strong {
 .timesheet-entry-actions {
     justify-self: end;
     display: grid;
-    grid-template-columns: auto minmax(420px, 620px);
+    grid-template-columns: auto minmax(420px, 620px) auto;
     align-items: stretch;
     gap: 10px;
-    width: min(100%, 780px);
+    width: min(100%, 960px);
+}
+
+.period-clear-form,
+.timesheet-clear-form {
+    display: flex;
+}
+
+.period-clear-form .ghost-button,
+.timesheet-clear-form .ghost-button {
+    min-height: 38px;
+    white-space: nowrap;
 }
 
 .timesheet-manual-button {

@@ -2867,6 +2867,22 @@ def list_payroll_workbook_overrides(period_id: int) -> dict[tuple[str, str, str]
         return {}
 
 
+def _payroll_money_decimal(value) -> Decimal:
+    clean_value = str(value or "").replace(chr(8364), "").replace("?", "")
+    return _decimal_or_none(clean_value) or Decimal("0")
+
+
+def _recalculate_payroll_derived_cells(tab: dict, row: dict) -> None:
+    if tab.get("kind") != "payslip":
+        return
+    period_total = _payroll_money_decimal(row.get("period_total"))
+    already_received = _payroll_money_decimal(row.get("already_received_net"))
+    payslip_advance = _payroll_money_decimal(row.get("payslip_advance"))
+    net_to_receive = max(period_total - already_received - payslip_advance, Decimal("0"))
+    row["net_to_receive"] = _format_money(net_to_receive)
+    row["net_total"] = _format_money(net_to_receive)
+
+
 def apply_payroll_workbook_overrides(period_id: int, tabs: list[dict]) -> None:
     overrides = list_payroll_workbook_overrides(period_id)
     for tab in tabs:
@@ -2880,6 +2896,7 @@ def apply_payroll_workbook_overrides(period_id: int, tabs: list[dict]) -> None:
                 if override:
                     row[column["key"]] = override["value"]
                     row["_mutations"][column["key"]] = override
+            _recalculate_payroll_derived_cells(tab, row)
 
 
 def save_payroll_workbook_cell(period_id: int, payload: dict) -> dict:
@@ -3239,6 +3256,45 @@ def _available_payroll_period_numbers(year: int, count: int) -> list[int]:
             numbers.append(candidate)
         candidate += 1
     return numbers
+
+
+def clear_payroll_test_workspace() -> dict:
+    _ensure_dashboard_tables_for_read()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("DELETE FROM project_time_bookings;")
+            deleted_bookings = cursor.rowcount
+            cursor.execute(
+                """
+                UPDATE whatsapp_timesheet_inbox
+                SET deleted_at = COALESCE(deleted_at, NOW()),
+                    archived_at = COALESCE(archived_at, NOW()),
+                    updated_at = NOW()
+                WHERE deleted_at IS NULL;
+                """
+            )
+            deleted_timesheets = cursor.rowcount
+            cursor.execute("DELETE FROM payroll_periods;")
+            deleted_periods = cursor.rowcount
+        conn.commit()
+    log_audit_event(
+        action="Testfase uren en loonperiodes geleegd",
+        entity_type="payroll_test_reset",
+        entity_label="Urenbriefjes en loonperiodes",
+        description=f"{deleted_timesheets} urenbriefjes verwijderd, {deleted_bookings} projectboekingen verwijderd en {deleted_periods} loonperiodes verwijderd.",
+        status="Verwijderd",
+        metadata={
+            "deleted_timesheets": deleted_timesheets,
+            "deleted_project_bookings": deleted_bookings,
+            "deleted_payroll_periods": deleted_periods,
+            "source_channel": "test_reset",
+        },
+    )
+    return {
+        "deleted_timesheets": deleted_timesheets,
+        "deleted_project_bookings": deleted_bookings,
+        "deleted_payroll_periods": deleted_periods,
+    }
 
 
 def archive_payroll_period(period_id: int, archived: bool = True) -> None:

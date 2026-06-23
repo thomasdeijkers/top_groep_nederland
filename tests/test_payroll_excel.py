@@ -585,6 +585,33 @@ class CompletePeriodTimesheetImportTests(unittest.TestCase):
         self.assertIn("replace_complete_period_import", upload_source)
         self.assertIn("project_time_bookings", upload_source)
 
+    def test_payroll_test_workspace_can_be_cleared_from_ui(self):
+        template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
+        router_source = Path("apps/dashboard/router.py").read_text(encoding="utf-8-sig")
+        records_source = Path("apps/dashboard/records.py").read_text(encoding="utf-8-sig")
+
+        self.assertIn("/api/test/payroll-workspace/clear", template)
+        self.assertIn("Testomgeving legen", template)
+        self.assertIn("def clear_payroll_workspace_for_testing", router_source)
+        self.assertIn("clear_payroll_test_workspace", router_source)
+        self.assertIn("DELETE FROM project_time_bookings", records_source)
+        self.assertIn("UPDATE whatsapp_timesheet_inbox", records_source)
+        self.assertIn("DELETE FROM payroll_periods", records_source)
+
+    def test_payslip_manual_net_received_recalculates_remaining_net(self):
+        row = {
+            "period_total": f"{chr(8364)} 1707,06",
+            "already_received_net": "500",
+            "payslip_advance": f"{chr(8364)} 0,00",
+            "net_to_receive": f"{chr(8364)} 1707,06",
+            "net_total": f"{chr(8364)} 1707,06",
+        }
+
+        records._recalculate_payroll_derived_cells({"kind": "payslip"}, row)
+
+        self.assertEqual(row["net_to_receive"], f"{chr(8364)} 1.207,06")
+        self.assertEqual(row["net_total"], f"{chr(8364)} 1.207,06")
+
 
 class DashboardDatabaseStatusTests(unittest.TestCase):
     def test_non_overview_pages_use_real_database_status(self):

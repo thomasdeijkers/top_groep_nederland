@@ -24,6 +24,7 @@ from apps.dashboard.records import (
     create_project,
     create_payroll_period,
     create_payroll_period_batch,
+    clear_payroll_test_workspace,
     delete_payroll_period,
     get_cao_setting,
     get_payroll_period,
@@ -748,6 +749,21 @@ async def import_complete_period_timesheet_set(
     )
     return RedirectResponse(
         f"/dashboard/timesheets?tab=overview&stage=all&complete_imported={result['imported']}&complete_replaced={result['replaced']}&complete_skipped={len(result['skipped'])}#timesheet-inbox",
+        status_code=303,
+    )
+
+
+@router.post("/api/test/payroll-workspace/clear")
+def clear_payroll_workspace_for_testing(return_to: str = Form("timesheets")):
+    result = clear_payroll_test_workspace()
+    query = f"cleared_timesheets={result['deleted_timesheets']}&cleared_periods={result['deleted_payroll_periods']}"
+    target = (
+        f"/dashboard/periods?{query}#periodes"
+        if return_to == "periods"
+        else f"/dashboard/timesheets?tab=overview&stage=all&{query}#timesheet-inbox"
+    )
+    return RedirectResponse(
+        target,
         status_code=303,
     )
 

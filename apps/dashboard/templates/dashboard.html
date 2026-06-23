@@ -1307,6 +1307,10 @@ Metadata:
                                 <p>Het systeem kiest automatisch de volgende vierweekse periode. Pas alleen de startdatum of het aantal blokken aan als de kalender afwijkt.</p>
                             </div>
                             <button class="ghost-button" type="button" data-period-create-open>Periode aanmaken</button>
+                            <form class="period-clear-form" action="/api/test/payroll-workspace/clear" method="post" onsubmit="return confirm('Alle urenbriefjes, projectboekingen en loonperiodes voor deze testomgeving legen? Relaties en instellingen blijven staan.');">
+                                <input type="hidden" name="return_to" value="periods">
+                                <button class="ghost-button danger-button" type="submit">Testomgeving legen</button>
+                            </form>
                         </div>
 
                         <div class="period-create-modal modal-backdrop" data-period-create-modal hidden>
@@ -1354,6 +1358,13 @@ Metadata:
                                 {% endif %}
                             </form>
                         </div>
+
+                        {% if request.query_params.get('cleared_timesheets') %}
+                        <div class="timesheet-import-notice timesheet-import-notice--danger">
+                            <strong>Testomgeving geleegd</strong>
+                            <span>{{ request.query_params.get('cleared_timesheets') }} urenbriefjes en {{ request.query_params.get('cleared_periods') or 0 }} loonperiodes verwijderd.</span>
+                        </div>
+                        {% endif %}
 
                         <div class="period-tabs" aria-label="Periode overzicht" data-period-tabs>
                             <button class="period-tab period-tab--active" type="button" data-period-tab="active" aria-selected="true">Actief <span>{{ payroll_periods|length }}</span></button>
@@ -2169,6 +2180,10 @@ Metadata:
                                     </label>
                                     <button class="ghost-button" type="submit">Testset vervangen</button>
                                 </form>
+                                <form class="timesheet-clear-form" action="/api/test/payroll-workspace/clear" method="post" onsubmit="return confirm('Alle urenbriefjes, projectboekingen en loonperiodes voor deze testomgeving legen? Relaties en instellingen blijven staan.');">
+                                    <input type="hidden" name="return_to" value="timesheets">
+                                    <button class="ghost-button danger-button" type="submit">Testomgeving legen</button>
+                                </form>
                             </div>
                             {% endif %}
                         </div>
@@ -2241,6 +2256,13 @@ Metadata:
                         <div class="timesheet-import-notice">
                             <strong>Complete loonperiode geladen</strong>
                             <span>{{ request.query_params.get('complete_imported') }} taken aangemaakt, {{ request.query_params.get('complete_replaced') or 0 }} oude testtaken vervangen, {{ request.query_params.get('complete_skipped') or 0 }} bestanden overgeslagen.</span>
+                        </div>
+                        {% endif %}
+
+                        {% if request.query_params.get('cleared_timesheets') %}
+                        <div class="timesheet-import-notice timesheet-import-notice--danger">
+                            <strong>Testomgeving geleegd</strong>
+                            <span>{{ request.query_params.get('cleared_timesheets') }} urenbriefjes en {{ request.query_params.get('cleared_periods') or 0 }} loonperiodes verwijderd.</span>
                         </div>
                         {% endif %}
 
