@@ -2353,21 +2353,6 @@ def list_payroll_period_exceptions(period_id: int, limit: int = 100) -> list[dic
 
                         UNION ALL
 
-                        SELECT 'incomplete_period' AS exception_key,
-                               'waarschuwing' AS severity,
-                               s.relation_id,
-                               s.employee_name,
-                               GREATEST(4 - COALESCE(s.week_count, 0), 0) AS occurrence_count,
-                               '-' AS week_numbers,
-                               'Periode niet compleet' AS title,
-                               'Deze medewerker heeft minder dan vier weekregels in deze periode.' AS detail,
-                               'Week-invoer controleren' AS next_step
-                        FROM payroll_period_settlements s
-                        WHERE s.payroll_period_id = %s
-                          AND COALESCE(s.week_count, 0) < 4
-
-                        UNION ALL
-
                         SELECT 'missing_project_booking' AS exception_key,
                                'waarschuwing' AS severity,
                                i.relation_id,
@@ -2392,7 +2377,7 @@ def list_payroll_period_exceptions(period_id: int, limit: int = 100) -> list[dic
                              employee_name ASC, title ASC
                     LIMIT %s;
                     """,
-                    (period_id, period_id, period_id, period_id, period_id, limit),
+                    (period_id, period_id, period_id, period_id, limit),
                 )
                 rows = cursor.fetchall()
         return [

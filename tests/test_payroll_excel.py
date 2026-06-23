@@ -1,5 +1,6 @@
 import tempfile
 import zipfile
+import inspect
 from io import BytesIO
 import unittest
 from datetime import date, datetime
@@ -331,6 +332,12 @@ class PayrollExceptionTests(unittest.TestCase):
         self.assertEqual(records._payroll_exception_severity_label("blokkerend"), "Blokkeert")
         self.assertEqual(records._payroll_exception_severity_label("waarschuwing"), "Nalopen")
         self.assertEqual(records._payroll_exception_severity_label("anders"), "Info")
+
+    def test_partial_period_is_not_a_payroll_exception(self):
+        source = inspect.getsource(records.list_payroll_period_exceptions)
+
+        self.assertNotIn("incomplete_period", source)
+        self.assertNotIn("Periode niet compleet", source)
 
 
 class RelationPayrollContextTests(unittest.TestCase):
