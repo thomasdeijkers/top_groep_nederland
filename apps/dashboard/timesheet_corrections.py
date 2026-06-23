@@ -1,5 +1,6 @@
 from psycopg2.extras import Json
 from decimal import Decimal
+from datetime import datetime
 
 from apps.dashboard.data_store import ensure_dashboard_tables
 from shared.db.connection import get_connection
@@ -94,6 +95,8 @@ def save_field_corrections(
 
             _apply_absence_code_to_day_codes(parsed_fields)
             _recalculate_total_checks(parsed_fields, original_totals)
+            materialized_work_date = _date_from_fields(parsed_fields)
+            materialized_hours = _decimal_or_none((parsed_fields.get("total_hours") or {}).get("value"))
             cursor.execute(
                 """
                 UPDATE whatsapp_timesheet_inbox
@@ -102,6 +105,8 @@ def save_field_corrections(
                     matched_candidate_name = CASE WHEN %s THEN NULL ELSE COALESCE(%s, matched_candidate_name) END,
                     employee_name = COALESCE(%s, NULLIF(%s, ''), employee_name),
                     sender_phone = COALESCE(%s, NULLIF(%s, ''), sender_phone),
+                    work_date = COALESCE(%s, work_date),
+                    hours = COALESCE(%s, hours),
                     overall_confidence = LEAST(98, GREATEST(COALESCE(overall_confidence, 0), 80)),
                     status = 'goed_te_keuren',
                     updated_at = NOW()
@@ -117,6 +122,8 @@ def save_field_corrections(
                     corrections.get("employee_name", ""),
                     matched_candidate_phone,
                     corrections.get("employee_phone", ""),
+                    materialized_work_date,
+                    materialized_hours,
                     timesheet_id,
                 ),
             )
@@ -155,7 +162,9 @@ def validate_timesheet(timesheet_id: int, principal_id: int | None, project_id: 
             if not cursor.fetchone():
                 raise TimesheetValidationError("De gekoppelde kandidaat bestaat niet meer of is gearchiveerd.")
             parsed_fields = parsed_fields or {}
-            hours = hours or _hours_from_fields(parsed_fields)
+            _recalculate_total_checks(parsed_fields)
+            work_date = _date_from_fields(parsed_fields) or work_date
+            hours = _decimal_or_none((parsed_fields.get("total_hours") or {}).get("value")) or hours or _hours_from_fields(parsed_fields)
             payroll_cao_setting_id = _project_cao_setting_id(cursor, project_id)
 
             cursor.execute(
@@ -163,12 +172,15 @@ def validate_timesheet(timesheet_id: int, principal_id: int | None, project_id: 
                 UPDATE whatsapp_timesheet_inbox
                 SET selected_principal_id = %s,
                     selected_project_id = %s,
+                    parsed_fields = %s,
+                    work_date = COALESCE(%s, work_date),
+                    hours = COALESCE(%s, hours),
                     status = 'loon_te_berekenen',
                     validated_at = NOW(),
                     updated_at = NOW()
                 WHERE id = %s;
                 """,
-                (principal_id, project_id, timesheet_id),
+                (principal_id, project_id, Json(parsed_fields), work_date, hours, timesheet_id),
             )
             cursor.execute(
                 """
@@ -264,6 +276,18 @@ def _decimal_or_none(value):
         return None
 
 
+def _date_from_fields(parsed_fields: dict):
+    value = str((parsed_fields.get("date") or {}).get("value") or "").strip()
+    if not value:
+        return None
+    for pattern in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%d-%m-%y", "%d/%m/%y"):
+        try:
+            return datetime.strptime(value, pattern).date()
+        except ValueError:
+            continue
+    return None
+
+
 def _format_decimal(value: Decimal) -> str:
     text = format(value.normalize(), "f")
     return text.rstrip("0").rstrip(".") if "." in text else text
@@ -331,7 +355,18 @@ def _recalculate_sum_check(
         "verified": all_days_verified,
     }
     if stated_total is None:
-        parsed_fields[check_key] = {"value": missing_message, "confidence": 60, "corrected": True, "verified": False}
+        parsed_fields[total_key] = {
+            "value": calculated_text,
+            "confidence": calculated_confidence,
+            "corrected": True,
+            "verified": all_days_verified,
+        }
+        parsed_fields[check_key] = {
+            "value": "klopt",
+            "confidence": calculated_confidence,
+            "corrected": True,
+            "verified": all_days_verified,
+        }
     elif stated_total == calculated:
         parsed_fields[total_key] = {
             "value": _format_decimal(stated_total),

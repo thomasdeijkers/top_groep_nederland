@@ -1025,9 +1025,12 @@
             calculatedField.value = formatHours(calculated);
             const stated = parseHours(totalField?.value);
             if (stated === null) {
-                checkField.value = missingMessage;
-                setSummaryMetric(totalField?.name?.replace("field_", ""), "", "red");
-                setSummaryMetric(checkField.name.replace("field_", ""), checkField.value, "red");
+                if (totalField) {
+                    totalField.value = formatHours(calculated);
+                }
+                checkField.value = "klopt";
+                setSummaryMetric(totalField?.name?.replace("field_", ""), totalField?.value || "", "green");
+                setSummaryMetric(checkField.name.replace("field_", ""), checkField.value, "green");
                 setSummaryMetric(calculatedField.name.replace("field_", ""), calculatedField.value, "green");
                 return;
             }

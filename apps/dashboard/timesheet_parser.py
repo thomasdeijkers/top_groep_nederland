@@ -410,7 +410,8 @@ def _check_total_km(fields: dict) -> None:
     fields["calculated_total_km"] = {"value": _format_decimal(calculated), "confidence": min(98, day_confidence)}
     stated_total = _decimal_or_none(fields.get("total_km", {}).get("value", ""))
     if stated_total is None:
-        fields["total_km_check"] = {"value": "totaal km ontbreekt", "confidence": min(60, day_confidence)}
+        fields["total_km"] = {"value": _format_decimal(calculated), "confidence": min(98, day_confidence)}
+        fields["total_km_check"] = {"value": "klopt", "confidence": min(98, day_confidence)}
         return
 
     difference = calculated - stated_total

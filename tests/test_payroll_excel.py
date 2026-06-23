@@ -6,7 +6,7 @@ from datetime import date, datetime
 from pathlib import Path
 from unittest.mock import patch
 
-from apps.dashboard import openai_usage, records, router as dashboard_router, timesheet_uploads
+from apps.dashboard import openai_usage, records, router as dashboard_router, timesheet_corrections, timesheet_parser, timesheet_uploads
 from apps.dashboard.payroll_calculations import derived_period_total_rows
 from apps.dashboard.payroll_excel import analyze_payroll_workbook, build_payroll_output_workbook
 
@@ -176,6 +176,45 @@ class PayrollWeekInputTests(unittest.TestCase):
 
         for day_name in ["maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag", "zondag"]:
             self.assertIn(day_name, migration)
+
+    def test_week_input_uses_calculated_km_when_total_is_missing(self):
+        migration = Path("migrations/033_payroll_week_inputs.sql").read_text(encoding="utf-8")
+
+        self.assertIn("calculated_total_km", migration)
+        self.assertLess(
+            migration.index("w.parsed_fields->'total_km'"),
+            migration.index("w.parsed_fields->'calculated_total_km'"),
+        )
+
+    def test_parser_fills_total_km_from_day_km_when_total_missing(self):
+        fields = {
+            "monday_km": {"value": "34", "confidence": 98},
+            "tuesday_km": {"value": "", "confidence": 0},
+            "wednesday_km": {"value": "", "confidence": 0},
+            "thursday_km": {"value": "", "confidence": 0},
+            "friday_km": {"value": "", "confidence": 0},
+            "saturday_km": {"value": "", "confidence": 0},
+            "sunday_km": {"value": "", "confidence": 0},
+            "total_km": {"value": "", "confidence": 0},
+        }
+
+        timesheet_parser._check_total_km(fields)
+
+        self.assertEqual(fields["calculated_total_km"]["value"], "34")
+        self.assertEqual(fields["total_km"]["value"], "34")
+        self.assertEqual(fields["total_km_check"]["value"], "klopt")
+
+    def test_corrections_materialize_missing_km_total_from_day_km(self):
+        fields = {
+            "monday_km": {"value": "34", "confidence": 98, "verified": True},
+            "total_km": {"value": "", "confidence": 0},
+        }
+
+        timesheet_corrections._recalculate_total_checks(fields)
+
+        self.assertEqual(fields["calculated_total_km"]["value"], "34")
+        self.assertEqual(fields["total_km"]["value"], "34")
+        self.assertEqual(fields["total_km_check"]["value"], "klopt")
 
 
 

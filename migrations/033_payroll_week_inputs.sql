@@ -98,7 +98,17 @@ WITH booking_context AS (
            CASE
                WHEN COALESCE(w.parsed_fields->'total_km'->>'value', '') ~ '^[0-9]+([,.][0-9]+)?$'
                THEN REPLACE(w.parsed_fields->'total_km'->>'value', ',', '.')::numeric
-               ELSE 0
+               WHEN COALESCE(w.parsed_fields->'calculated_total_km'->>'value', '') ~ '^[0-9]+([,.][0-9]+)?$'
+               THEN REPLACE(w.parsed_fields->'calculated_total_km'->>'value', ',', '.')::numeric
+               ELSE (
+                   CASE WHEN COALESCE(w.parsed_fields->'monday_km'->>'value', '') ~ '^[0-9]+([,.][0-9]+)?$' THEN REPLACE(w.parsed_fields->'monday_km'->>'value', ',', '.')::numeric ELSE 0 END
+                 + CASE WHEN COALESCE(w.parsed_fields->'tuesday_km'->>'value', '') ~ '^[0-9]+([,.][0-9]+)?$' THEN REPLACE(w.parsed_fields->'tuesday_km'->>'value', ',', '.')::numeric ELSE 0 END
+                 + CASE WHEN COALESCE(w.parsed_fields->'wednesday_km'->>'value', '') ~ '^[0-9]+([,.][0-9]+)?$' THEN REPLACE(w.parsed_fields->'wednesday_km'->>'value', ',', '.')::numeric ELSE 0 END
+                 + CASE WHEN COALESCE(w.parsed_fields->'thursday_km'->>'value', '') ~ '^[0-9]+([,.][0-9]+)?$' THEN REPLACE(w.parsed_fields->'thursday_km'->>'value', ',', '.')::numeric ELSE 0 END
+                 + CASE WHEN COALESCE(w.parsed_fields->'friday_km'->>'value', '') ~ '^[0-9]+([,.][0-9]+)?$' THEN REPLACE(w.parsed_fields->'friday_km'->>'value', ',', '.')::numeric ELSE 0 END
+                 + CASE WHEN COALESCE(w.parsed_fields->'saturday_km'->>'value', '') ~ '^[0-9]+([,.][0-9]+)?$' THEN REPLACE(w.parsed_fields->'saturday_km'->>'value', ',', '.')::numeric ELSE 0 END
+                 + CASE WHEN COALESCE(w.parsed_fields->'sunday_km'->>'value', '') ~ '^[0-9]+([,.][0-9]+)?$' THEN REPLACE(w.parsed_fields->'sunday_km'->>'value', ',', '.')::numeric ELSE 0 END
+               )
            END AS total_km,
            jsonb_build_object(
                'monday', COALESCE(w.parsed_fields->'monday_code'->>'value', ''),
