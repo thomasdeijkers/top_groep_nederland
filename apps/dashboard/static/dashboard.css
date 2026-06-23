@@ -4673,24 +4673,10 @@ body[data-theme="light"] .theme-toggle strong {
 
 
 .timesheet-batch-import {
-    display: grid;
-    grid-template-columns: minmax(260px, 1fr) auto;
-    gap: 10px;
-    align-items: center;
-    min-width: 0;
+    display: flex;
 }
 
-.timesheet-batch-import label {
-    display: grid;
-    gap: 6px;
-    min-width: 0;
-    color: #b8c8d0;
-    font-size: 0.78rem;
-    font-weight: 800;
-    text-transform: uppercase;
-}
-
-.test-file-picker__input {
+.test-file-input {
     display: none;
 }
 
@@ -4755,10 +4741,9 @@ body[data-theme="light"] .theme-toggle strong {
 
 .test-data-panel {
     grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: minmax(190px, 0.7fr) minmax(440px, 1.5fr) auto;
-    gap: 14px;
+    display: flex;
     align-items: center;
+    gap: 12px;
     padding: 16px;
     border: 1px solid rgba(245, 158, 11, 0.5);
     border-radius: 8px;
@@ -4767,6 +4752,7 @@ body[data-theme="light"] .theme-toggle strong {
 }
 
 .test-data-panel__heading {
+    flex: 1 1 auto;
     min-width: 0;
 }
 
@@ -4774,42 +4760,6 @@ body[data-theme="light"] .theme-toggle strong {
     margin: 2px 0 0;
     color: #fff3df;
     font-size: 1rem;
-}
-
-.test-file-picker {
-    display: grid;
-    gap: 6px;
-}
-
-.test-file-picker__control {
-    display: grid;
-    grid-template-columns: auto minmax(140px, 1fr);
-    align-items: center;
-    min-height: 44px;
-    overflow: hidden;
-    border: 1px solid rgba(245, 158, 11, 0.34);
-    border-radius: 8px;
-    background: rgba(10, 20, 28, 0.42);
-}
-
-.test-file-picker__button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 44px;
-    padding: 0 14px;
-    background: rgba(245, 158, 11, 0.18);
-    color: #fff3df;
-    font-weight: 800;
-}
-
-.test-file-picker__text {
-    min-width: 0;
-    overflow: hidden;
-    padding: 0 12px;
-    color: #d8e4ea;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
 .period-clear-form,
@@ -6539,9 +6489,9 @@ body[data-theme="light"] .theme-toggle strong {
         width: 100%;
     }
 
-    .test-data-panel,
-    .timesheet-batch-import {
-        grid-template-columns: 1fr;
+    .test-data-panel {
+        align-items: stretch;
+        flex-direction: column;
     }
 
     .timesheet-dropzone--compact {

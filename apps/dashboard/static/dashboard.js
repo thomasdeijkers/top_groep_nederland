@@ -1283,13 +1283,10 @@
     });
 
     document.querySelectorAll("[data-test-file-input]").forEach((input) => {
-        const label = input.closest(".test-file-picker")?.querySelector("[data-test-file-label]");
         input.addEventListener("change", () => {
-            if (!label) {
-                return;
+            if (input.files?.length && input.form) {
+                input.form.requestSubmit ? input.form.requestSubmit() : input.form.submit();
             }
-            const count = input.files?.length || 0;
-            label.textContent = count === 1 ? input.files[0].name : `${count || "Geen"} bestanden gekozen`;
         });
     });
 
