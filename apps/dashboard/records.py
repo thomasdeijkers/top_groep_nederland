@@ -41,6 +41,8 @@ def ensure_visible_demo_payroll_data() -> None:
     try:
         with get_connection() as conn:
             with conn.cursor() as cursor:
+                if _payroll_demo_seed_is_suppressed(cursor):
+                    return
                 cursor.execute(
                     """
                     SELECT
@@ -68,6 +70,24 @@ def ensure_visible_demo_payroll_data() -> None:
                         print(f"DASHBOARD_DEMO_PAYROLL_SEED_STEP_ERROR {migration.name}: {type(migration_exc).__name__}: {migration_exc}")
     except Exception as exc:
         print(f"DASHBOARD_DEMO_PAYROLL_SEED_ERROR {type(exc).__name__}: {exc}")
+
+
+def _payroll_demo_seed_is_suppressed(cursor) -> bool:
+    try:
+        cursor.execute(
+            """
+            SELECT EXISTS (
+                SELECT 1
+                FROM audit_events
+                WHERE entity_type = 'payroll_test_reset'
+                  AND action = 'Testfase uren en loonperiodes geleegd'
+            );
+            """
+        )
+        return bool(cursor.fetchone()[0])
+    except Exception:
+        return False
+
 
 def get_overview_data() -> dict:
     try:
@@ -3266,11 +3286,7 @@ def clear_payroll_test_workspace() -> dict:
             deleted_bookings = cursor.rowcount
             cursor.execute(
                 """
-                UPDATE whatsapp_timesheet_inbox
-                SET deleted_at = COALESCE(deleted_at, NOW()),
-                    archived_at = COALESCE(archived_at, NOW()),
-                    updated_at = NOW()
-                WHERE deleted_at IS NULL;
+                DELETE FROM whatsapp_timesheet_inbox;
                 """
             )
             deleted_timesheets = cursor.rowcount

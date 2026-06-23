@@ -595,8 +595,9 @@ class CompletePeriodTimesheetImportTests(unittest.TestCase):
         self.assertIn("def clear_payroll_workspace_for_testing", router_source)
         self.assertIn("clear_payroll_test_workspace", router_source)
         self.assertIn("DELETE FROM project_time_bookings", records_source)
-        self.assertIn("UPDATE whatsapp_timesheet_inbox", records_source)
+        self.assertIn("DELETE FROM whatsapp_timesheet_inbox", records_source)
         self.assertIn("DELETE FROM payroll_periods", records_source)
+        self.assertIn("_payroll_demo_seed_is_suppressed", records_source)
 
     def test_payslip_manual_net_received_recalculates_remaining_net(self):
         row = {
