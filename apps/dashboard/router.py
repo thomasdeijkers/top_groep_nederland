@@ -773,7 +773,6 @@ def clear_payroll_workspace_for_testing(return_to: str = Form("timesheets")):
     result = clear_payroll_test_workspace()
     query = (
         f"cleared_timesheets={result['deleted_timesheets']}"
-        f"&cleared_periods={result['deleted_payroll_periods']}"
         f"&cleared_payroll_rows={result['deleted_payroll_rows']}"
     )
     target = (

@@ -1307,7 +1307,7 @@ Metadata:
                                 <p>Het systeem kiest automatisch de volgende vierweekse periode. Pas alleen de startdatum of het aantal blokken aan als de kalender afwijkt.</p>
                             </div>
                             <button class="ghost-button" type="button" data-period-create-open>Periode aanmaken</button>
-                            <form class="period-clear-form" action="/api/test/payroll-workspace/clear" method="post" onsubmit="return confirm('Alle urenbriefjes, projectboekingen en loonperiodes voor deze testomgeving legen? Relaties en instellingen blijven staan.');">
+                            <form class="period-clear-form" action="/api/test/payroll-workspace/clear" method="post" onsubmit="return confirm('Alle urenbriefjes, projectboekingen en loonverwerking leegmaken? De loonperiodes, relaties, projecten en instellingen blijven staan.');">
                                 <input type="hidden" name="return_to" value="periods">
                                 <button class="ghost-button danger-button" type="submit">Testomgeving legen</button>
                             </form>
@@ -2189,7 +2189,7 @@ Metadata:
                                         </label>
                                         <button class="test-action-button test-action-button--primary" type="submit">Testset vervangen</button>
                                     </form>
-                                    <form class="timesheet-clear-form" action="/api/test/payroll-workspace/clear" method="post" onsubmit="return confirm('Alle urenbriefjes, projectboekingen, payrollregels en loonperiodes voor deze testomgeving legen? Relaties, projecten en instellingen blijven staan.');">
+                                    <form class="timesheet-clear-form" action="/api/test/payroll-workspace/clear" method="post" onsubmit="return confirm('Alle urenbriefjes, projectboekingen en invulling van de loonperiodes leegmaken? De loonperiodes zelf blijven staan.');">
                                         <input type="hidden" name="return_to" value="timesheets">
                                         <button class="test-action-button test-action-button--danger" type="submit">Alles legen</button>
                                     </form>
