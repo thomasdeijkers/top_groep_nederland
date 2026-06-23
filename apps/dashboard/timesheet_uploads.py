@@ -159,7 +159,6 @@ def save_timesheet_upload(
                 source_channel,
                 status,
                 matched_relation_id,
-                matched_candidate_id,
                 matched_candidate_name,
                 employee_name,
                 employee_address,
@@ -173,7 +172,7 @@ def save_timesheet_upload(
                 parsed_fields,
                 overall_confidence
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NULL, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id;
             """,
             (

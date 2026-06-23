@@ -603,10 +603,22 @@ class CompletePeriodTimesheetImportTests(unittest.TestCase):
         upload_source = Path("apps/dashboard/timesheet_uploads.py").read_text(encoding="utf-8-sig")
 
         self.assertIn("from psycopg2.errors import ForeignKeyViolation", upload_source)
-        self.assertIn("matched_candidate_id,", upload_source)
-        self.assertIn("NULL, %s", upload_source)
+        insert_block = upload_source.split("INSERT INTO whatsapp_timesheet_inbox", 1)[1].split("RETURNING id", 1)[0]
+        self.assertNotIn("matched_candidate_id", insert_block)
         self.assertIn("except ForeignKeyViolation", upload_source)
         self.assertIn('status = "te_controleren"', upload_source)
+
+    def test_legacy_timesheet_candidate_fk_is_removed_by_migration(self):
+        data_store = Path("apps/dashboard/data_store.py").read_text(encoding="utf-8-sig")
+        migration = Path("migrations/046_clear_legacy_timesheet_candidate_fk.sql").read_text(encoding="utf-8-sig")
+        router_source = Path("apps/dashboard/router.py").read_text(encoding="utf-8-sig")
+
+        self.assertIn("046_clear_legacy_timesheet_candidate_fk.sql", data_store)
+        self.assertIn("whatsapp_timesheet_inbox", migration)
+        self.assertIn("matched_candidate_id", migration)
+        self.assertIn("DROP CONSTRAINT", migration)
+        self.assertIn("_db_error_detail", router_source)
+        self.assertIn("constraint_name", router_source)
 
     def test_payroll_test_workspace_can_be_cleared_from_ui(self):
         template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")

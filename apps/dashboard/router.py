@@ -124,6 +124,15 @@ def _audit(
     )
 
 
+def _db_error_detail(exc: Exception) -> str:
+    diag = getattr(exc, "diag", None)
+    table_name = getattr(diag, "table_name", "") if diag else ""
+    constraint_name = getattr(diag, "constraint_name", "") if diag else ""
+    pgerror = str(getattr(exc, "pgerror", "") or "").strip()
+    parts = [part for part in (table_name, constraint_name, pgerror or str(exc)) if part]
+    return " | ".join(parts)
+
+
 def _audit_changed_fields(corrections: dict) -> str:
     labels = {
         "employee_name": "naam werknemer",
@@ -725,7 +734,7 @@ async def upload_whatsapp_timesheet(
         _audit("Urenbriefje geupload", "urenbriefje", record_id, file.filename or "urenbriefje.jpg", "Nieuw urenbriefje ontvangen en klaargezet voor controle.", "Urenverwerking")
         return RedirectResponse(f"/dashboard/timesheets?tab=overview&stage=all&uploaded={record_id}#timesheet-inbox", status_code=303)
     except Exception as exc:
-        print(f"TIMESHEET_UPLOAD_ERROR {type(exc).__name__}: {exc}")
+        print(f"TIMESHEET_UPLOAD_ERROR {type(exc).__name__}: {_db_error_detail(exc)}")
         query = urlencode({"tab": "overview", "stage": "all", "upload_error": type(exc).__name__})
         return RedirectResponse(f"/dashboard/timesheets?{query}#timesheet-inbox", status_code=303)
 
@@ -763,7 +772,7 @@ async def import_complete_period_timesheet_set(
             status_code=303,
         )
     except Exception as exc:
-        print(f"COMPLETE_PERIOD_IMPORT_ERROR {type(exc).__name__}: {exc}")
+        print(f"COMPLETE_PERIOD_IMPORT_ERROR {type(exc).__name__}: {_db_error_detail(exc)}")
         query = urlencode({"tab": "overview", "stage": "all", "import_error": type(exc).__name__})
         return RedirectResponse(f"/dashboard/timesheets?{query}#timesheet-inbox", status_code=303)
 
