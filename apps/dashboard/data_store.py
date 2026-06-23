@@ -6,6 +6,27 @@ from shared.db.connection import get_connection
 _TABLES_READY = False
 
 
+def _payroll_test_seed_is_suppressed(conn) -> bool:
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT to_regclass('public.audit_events');")
+            if not cursor.fetchone()[0]:
+                return False
+            cursor.execute(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM audit_events
+                    WHERE entity_type = 'payroll_test_reset'
+                      AND action = 'Testfase uren en loonperiodes geleegd'
+                );
+                """
+            )
+            return bool(cursor.fetchone()[0])
+    except Exception:
+        return False
+
+
 def ensure_dashboard_tables():
     global _TABLES_READY
     if _TABLES_READY:
@@ -30,9 +51,9 @@ def ensure_dashboard_tables():
         Path("migrations/016_payroll_cao_settings.sql"),
         Path("migrations/017_project_cao_link.sql"),
         Path("migrations/018_payroll_periods.sql"),
+        Path("migrations/021_audit_events.sql"),
         Path("migrations/019_demo_seed_data.sql"),
         Path("migrations/020_demo_payroll_period.sql"),
-        Path("migrations/021_audit_events.sql"),
         Path("migrations/022_otys_staging_tables.sql"),
         Path("migrations/023_otys_api_usage.sql"),
         Path("migrations/024_otys_relations_backfill.sql"),
@@ -54,17 +75,30 @@ def ensure_dashboard_tables():
         Path("migrations/037_payroll_datamodel_foundation.sql"),
         Path("migrations/038_payroll_datamodel_views.sql"),
         Path("migrations/042_payroll_audit_context.sql"),
+        Path("migrations/043_reset_payroll_test_dataset_once.sql"),
     ]
 
     optional_migrations = {
         "019_demo_seed_data.sql",
         "020_demo_payroll_period.sql",
         "028_payroll_period_02_test_timesheets.sql",
+        "039_full_year_test_payroll.sql",
         "040_one_period_test_hours.sql",
+        "041_dashboard_demo_payroll.sql",
+    }
+    payroll_test_seed_migrations = {
+        "019_demo_seed_data.sql",
+        "020_demo_payroll_period.sql",
+        "028_payroll_period_02_test_timesheets.sql",
+        "039_full_year_test_payroll.sql",
+        "040_one_period_test_hours.sql",
+        "041_dashboard_demo_payroll.sql",
     }
 
     with get_connection() as conn:
         for migration in migrations:
+            if migration.name in payroll_test_seed_migrations and _payroll_test_seed_is_suppressed(conn):
+                continue
             try:
                 with conn.cursor() as cursor:
                     cursor.execute(migration.read_text(encoding="utf-8"))

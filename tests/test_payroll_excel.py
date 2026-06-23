@@ -591,7 +591,7 @@ class CompletePeriodTimesheetImportTests(unittest.TestCase):
         records_source = Path("apps/dashboard/records.py").read_text(encoding="utf-8-sig")
 
         self.assertIn("/api/test/payroll-workspace/clear", template)
-        self.assertIn("Testomgeving legen", template)
+        self.assertIn("Alles legen", template)
         self.assertIn("def clear_payroll_workspace_for_testing", router_source)
         self.assertIn("clear_payroll_test_workspace", router_source)
         self.assertIn("def _delete_existing_table", records_source)
@@ -610,8 +610,29 @@ class CompletePeriodTimesheetImportTests(unittest.TestCase):
         stylesheet = Path("apps/dashboard/static/dashboard.css").read_text(encoding="utf-8-sig")
 
         self.assertIn("test-data-panel", template)
+        self.assertIn("test-file-picker", template)
+        self.assertIn("test-action-button--primary", template)
+        self.assertIn("test-action-button--danger", template)
         self.assertIn("Alles legen", template)
         self.assertIn(".test-data-panel", stylesheet)
+        self.assertIn(".test-file-picker__control", stylesheet)
+
+    def test_test_seeds_are_suppressed_after_reset_and_deploy_clears_once(self):
+        data_store = Path("apps/dashboard/data_store.py").read_text(encoding="utf-8-sig")
+        migration = Path("migrations/043_reset_payroll_test_dataset_once.sql").read_text(encoding="utf-8-sig")
+
+        self.assertIn("_payroll_test_seed_is_suppressed", data_store)
+        self.assertLess(
+            data_store.index("migrations/021_audit_events.sql"),
+            data_store.index("migrations/019_demo_seed_data.sql"),
+        )
+        self.assertIn("043_reset_payroll_test_dataset_once.sql", data_store)
+        self.assertIn("payroll_test_seed_migrations", data_store)
+        self.assertIn("deploy_reset_043", migration)
+        self.assertIn("whatsapp_timesheet_inbox", migration)
+        self.assertIn("payroll_periods", migration)
+        self.assertIn("openai_api_audit_events", migration)
+        self.assertIn("Testfase uren en loonperiodes geleegd", migration)
 
     def test_payslip_manual_net_received_recalculates_remaining_net(self):
         row = {

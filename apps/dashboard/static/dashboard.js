@@ -1282,6 +1282,17 @@
         });
     });
 
+    document.querySelectorAll("[data-test-file-input]").forEach((input) => {
+        const label = input.closest(".test-file-picker")?.querySelector("[data-test-file-label]");
+        input.addEventListener("change", () => {
+            if (!label) {
+                return;
+            }
+            const count = input.files?.length || 0;
+            label.textContent = count === 1 ? input.files[0].name : `${count || "Geen"} bestanden gekozen`;
+        });
+    });
+
     uploadModalForm?.addEventListener("submit", (event) => {
         event.preventDefault();
         if (!activeDropzone) {

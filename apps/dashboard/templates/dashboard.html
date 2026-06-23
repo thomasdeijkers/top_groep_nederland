@@ -2179,15 +2179,19 @@ Metadata:
                                     <form class="timesheet-batch-import" action="/api/whatsapp/complete-period-import" method="post" enctype="multipart/form-data">
                                         <input type="hidden" name="replace_existing" value="true">
                                         <input type="hidden" name="allow_openai" value="false">
-                                        <label>
+                                        <label class="test-file-picker">
                                             <span>Bestanden</span>
-                                            <input type="file" name="files" accept=".zip,image/*,.pdf" multiple>
+                                            <input type="file" name="files" accept=".zip,image/*,.pdf" multiple data-test-file-input>
+                                            <span class="test-file-picker__control">
+                                                <span class="test-file-picker__button">Bestanden kiezen</span>
+                                                <span class="test-file-picker__text" data-test-file-label>Geen bestanden gekozen</span>
+                                            </span>
                                         </label>
-                                        <button class="ghost-button" type="submit">Testset vervangen</button>
+                                        <button class="test-action-button test-action-button--primary" type="submit">Testset vervangen</button>
                                     </form>
                                     <form class="timesheet-clear-form" action="/api/test/payroll-workspace/clear" method="post" onsubmit="return confirm('Alle urenbriefjes, projectboekingen, payrollregels en loonperiodes voor deze testomgeving legen? Relaties, projecten en instellingen blijven staan.');">
                                         <input type="hidden" name="return_to" value="timesheets">
-                                        <button class="ghost-button danger-button" type="submit">Alles legen</button>
+                                        <button class="test-action-button test-action-button--danger" type="submit">Alles legen</button>
                                     </form>
                                 </div>
                             </div>
