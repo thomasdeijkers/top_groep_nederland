@@ -1226,11 +1226,12 @@ h2 {
     display: inline-block;
     color: #9ee6b6;
     font-weight: 900;
-    text-decoration: none;
+    text-decoration: underline;
+    text-underline-offset: 3px;
 }
 
 .payroll-relation-link:hover {
-    text-decoration: underline;
+    color: #dfffee;
 }
 
 .payroll-workbook-link {

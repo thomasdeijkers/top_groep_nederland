@@ -113,16 +113,18 @@ class PayrollCalculationTests(unittest.TestCase):
         rows = build_week_sheet_rows(
             "WK18",
             [{"id": 7, "name": "Thomas"}],
-            [{"employee_name": "Thomas", "week_hours": ["8", "0", "0", "0"], "week_timesheet_ids": [[44], [], [], []]}],
+            [{"employee_name": "Thomas", "relation_id": 7, "week_hours": ["8", "0", "0", "0"], "week_timesheet_ids": [[44], [], [], []]}],
             week,
         )
         template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
 
         self.assertIn({"label": "Urenbriefje", "key": "timesheet_link"}, WEEK_SHEET_COLUMNS)
+        self.assertEqual(rows[0]["relation_id"], 7)
         self.assertEqual(rows[0]["timesheet_id"], 44)
         self.assertEqual(rows[0]["timesheet_link"], "Open")
         self.assertIn("payroll-workbook-link", template)
         self.assertIn("timesheet={{ row.timesheet_id }}", template)
+        self.assertIn("/dashboard/relations?tab=candidates&edit={{ row.relation_id }}", template)
 
     def test_workbook_editable_fields_recalculate_like_excel(self):
         week_row = {
@@ -848,6 +850,17 @@ class TimesheetCandidateValidationTests(unittest.TestCase):
         self.assertIn("data-workflow-validate-button", script)
         self.assertIn("validateButton.disabled = false", script)
         self.assertIn("workflowCandidateTarget.value = option.value", script)
+
+    def test_timesheet_validation_replaces_existing_project_booking(self):
+        correction_source = Path("apps/dashboard/timesheet_corrections.py").read_text(encoding="utf-8-sig")
+        data_store = Path("apps/dashboard/data_store.py").read_text(encoding="utf-8-sig")
+        migration = Path("migrations/047_deduplicate_project_time_bookings.sql").read_text(encoding="utf-8-sig")
+
+        self.assertIn("DELETE FROM project_time_bookings", correction_source)
+        self.assertIn("WHERE timesheet_inbox_id = %s", correction_source)
+        self.assertIn("047_deduplicate_project_time_bookings.sql", data_store)
+        self.assertIn("ROW_NUMBER() OVER", migration)
+        self.assertIn("idx_project_time_bookings_unique_timesheet", migration)
 
 
 class DashboardContextSafetyTests(unittest.TestCase):

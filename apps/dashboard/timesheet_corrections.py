@@ -184,6 +184,13 @@ def validate_timesheet(timesheet_id: int, principal_id: int | None, project_id: 
             )
             cursor.execute(
                 """
+                DELETE FROM project_time_bookings
+                WHERE timesheet_inbox_id = %s;
+                """,
+                (timesheet_id,),
+            )
+            cursor.execute(
+                """
                 INSERT INTO project_time_bookings (
                     timesheet_inbox_id, relation_id, principal_id, project_id,
                     payroll_cao_setting_id, work_date, hours, status, updated_at

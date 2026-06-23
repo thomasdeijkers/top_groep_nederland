@@ -180,7 +180,7 @@ def build_week_sheet_rows(sheet_label: str, candidates: list[dict], payroll_rows
                 "employee_name": employee_name,
                 "timesheet_id": timesheet_ids[0] if timesheet_ids else "",
                 "timesheet_link": timesheet_label if timesheet_ids else "-",
-                "relation_id": candidate.get("id"),
+                "relation_id": payroll_row.get("relation_id") or candidate.get("id"),
                 "contract_hours": payroll_row.get("standard_week_hours") or "40",
                 "worked_days": _format_number(worked_days),
                 "worked_hours": _format_number(worked_hours),
