@@ -1821,6 +1821,12 @@ Metadata:
                                                 <td class="payroll-col-{{ column.key|replace('_', '-') }} {% if column.hidden_in_excel %}excel-hidden-column{% endif %}" data-sort-value="{{ cell_value }}">
                                                     {% if column.key == 'employee_name' and row.relation_id %}
                                                         <a class="payroll-relation-link" href="/dashboard/relations?tab=candidates&edit={{ row.relation_id }}#relatie-formulier">{{ cell_value }}</a>
+                                                    {% elif column.key == 'timesheet_link' %}
+                                                        {% if row.timesheet_id %}
+                                                        <a class="payroll-workbook-link" href="/dashboard/timesheets?tab=task&stage=loon&timesheet={{ row.timesheet_id }}#timesheet-tabs">{{ cell_value }}</a>
+                                                        {% else %}
+                                                        <span class="payroll-muted">-</span>
+                                                        {% endif %}
                                                     {% elif column.options is defined %}
                                                         <select class="payroll-cell-input" data-payroll-cell data-save-url="/api/periods/{{ selected_payroll_period.id }}/workbook-cell" data-tab-label="{{ tab.label }}" data-row-key="{{ row._row_key }}" data-employee-name="{{ row.employee_name }}" data-relation-id="{{ row.relation_id or '' }}" data-column-key="{{ column.key }}" data-column-label="{{ column.label }}" data-original-value="{{ cell_value }}" data-previous-value="{{ cell_mutation.previous_value if cell_mutation else cell_value }}" aria-label="{{ column.label }} {{ row.employee_name }}">
                                                             {% for option in column.options %}

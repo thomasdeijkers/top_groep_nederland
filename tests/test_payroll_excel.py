@@ -99,6 +99,24 @@ class PayrollCalculationTests(unittest.TestCase):
 
         self.assertEqual(workbook.sheetnames, ["WK17", "Periode", "Loonstrook"])
 
+    def test_week_workbook_rows_link_to_timesheets(self):
+        from apps.dashboard.payroll_calculations import WEEK_SHEET_COLUMNS, build_week_sheet_rows
+
+        week = {"week_index": 1, "week_number": 18}
+        rows = build_week_sheet_rows(
+            "WK18",
+            [{"id": 7, "name": "Thomas"}],
+            [{"employee_name": "Thomas", "week_hours": ["8", "0", "0", "0"], "week_timesheet_ids": [[44], [], [], []]}],
+            week,
+        )
+        template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
+
+        self.assertIn({"label": "Urenbriefje", "key": "timesheet_link"}, WEEK_SHEET_COLUMNS)
+        self.assertEqual(rows[0]["timesheet_id"], 44)
+        self.assertEqual(rows[0]["timesheet_link"], "Open")
+        self.assertIn("payroll-workbook-link", template)
+        self.assertIn("timesheet={{ row.timesheet_id }}", template)
+
 
 class PayrollRunningBalanceTests(unittest.TestCase):
     def test_running_balance_migration_tracks_required_balance_types(self):

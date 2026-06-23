@@ -3,6 +3,7 @@ from decimal import Decimal, InvalidOperation
 
 WEEK_SHEET_COLUMNS = [
     {"label": "Werknemer", "key": "employee_name"},
+    {"label": "Urenbriefje", "key": "timesheet_link"},
     {"label": "Contract uren", "key": "contract_hours"},
     {"label": "Dagen gewerkt", "key": "worked_days"},
     {"label": "Uren gewerkt", "key": "worked_hours"},
@@ -167,6 +168,9 @@ def build_week_sheet_rows(sheet_label: str, candidates: list[dict], payroll_rows
         worked_hours = _decimal(weekly_hours[week_index - 1] if len(weekly_hours) >= week_index else "")
         if not worked_hours:
             continue
+        week_timesheet_ids = payroll_row.get("week_timesheet_ids", [])
+        timesheet_ids = week_timesheet_ids[week_index - 1] if len(week_timesheet_ids) >= week_index else []
+        timesheet_label = "Open" if len(timesheet_ids) <= 1 else f"Open ({len(timesheet_ids)})"
         worked_days = Decimal("5") if worked_hours >= 32 else Decimal("4")
         single_trip_km = Decimal(10 + ((index + week_index) % 18))
         total_km = single_trip_km * worked_days * 2
@@ -174,6 +178,8 @@ def build_week_sheet_rows(sheet_label: str, candidates: list[dict], payroll_rows
         rows.append(
             {
                 "employee_name": employee_name,
+                "timesheet_id": timesheet_ids[0] if timesheet_ids else "",
+                "timesheet_link": timesheet_label if timesheet_ids else "-",
                 "relation_id": candidate.get("id"),
                 "contract_hours": payroll_row.get("standard_week_hours") or "40",
                 "worked_days": _format_number(worked_days),

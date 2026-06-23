@@ -1233,6 +1233,30 @@ h2 {
     text-decoration: underline;
 }
 
+.payroll-workbook-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 32px;
+    padding: 0 10px;
+    border: 1px solid rgba(127, 209, 160, 0.34);
+    border-radius: 7px;
+    background: rgba(37, 91, 72, 0.38);
+    color: #eafff3;
+    font-weight: 900;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.payroll-workbook-link:hover {
+    border-color: rgba(157, 255, 202, 0.55);
+    background: rgba(37, 91, 72, 0.62);
+}
+
+.payroll-muted {
+    color: #93a2ad;
+}
+
 .payroll-sort-header {
     width: 100%;
     padding: 0;

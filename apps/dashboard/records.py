@@ -2622,6 +2622,7 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                             "booking_count": 0,
                             "total_hours_raw": Decimal("0"),
                             "week_hours_raw": [Decimal("0"), Decimal("0"), Decimal("0"), Decimal("0")],
+                            "week_timesheet_ids": [[], [], [], []],
                             "relation_id": row[1],
                             "payroll_license_plate": row[13] or "",
                             "payroll_choice_budget": row[14] or "",
@@ -2645,6 +2646,7 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                         for week_index, week_start, week_end in weeks:
                             if week_start <= row[10] <= week_end and 1 <= week_index <= 4:
                                 item["week_hours_raw"][week_index - 1] += hours
+                                item["week_timesheet_ids"][week_index - 1].append(row[0])
                                 break
                 rows = []
                 for item in aggregates.values():
@@ -2666,6 +2668,7 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                             "worked_days": len(item["dates"]),
                             "total_hours": _format_number(item["total_hours_raw"]),
                             "week_hours": [_format_number(value) for value in item["week_hours_raw"]],
+                            "week_timesheet_ids": item["week_timesheet_ids"],
                             "normal_hours": _format_number(normal_hours),
                             "overtime_hours": _format_number(overtime_hours),
                             "hourly_wage": _format_money(wage),
