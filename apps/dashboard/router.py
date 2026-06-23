@@ -82,7 +82,7 @@ from apps.dashboard.relations import (
 )
 from apps.dashboard.stats import get_dashboard_stats, get_database_status, get_empty_dashboard_stats, get_health, get_server_overview
 from apps.dashboard.timesheet_corrections import save_field_corrections, send_to_payroll, validate_timesheet
-from apps.dashboard.timesheet_uploads import reparse_timesheet_upload, save_timesheet_upload
+from apps.dashboard.timesheet_uploads import import_complete_period_timesheets, reparse_timesheet_upload, save_timesheet_upload
 from apps.dashboard.whatsapp_actions import archive_whatsapp_timesheet, delete_whatsapp_timesheet
 from jobs.imports.otys_export import import_otys_organizations, parse_otys_csv
 from jobs.imports.table_import import import_candidates, import_principals, import_vacancies, parse_csv
@@ -722,6 +722,34 @@ async def upload_whatsapp_timesheet(
     )
     _audit("Urenbriefje geupload", "urenbriefje", record_id, file.filename or "urenbriefje.jpg", "Nieuw urenbriefje ontvangen en klaargezet voor controle.", "Urenverwerking")
     return RedirectResponse(f"/dashboard/timesheets?tab=overview&stage=all&uploaded={record_id}#timesheet-inbox", status_code=303)
+
+
+@router.post("/api/whatsapp/complete-period-import")
+async def import_complete_period_timesheet_set(
+    files: list[UploadFile] = File(...),
+    replace_existing: bool = Form(True),
+    allow_openai: bool = Form(False),
+):
+    uploads = [(file.filename or "urenbriefje.zip", await file.read()) for file in files]
+    result = import_complete_period_timesheets(uploads, replace_existing=replace_existing, allow_openai=allow_openai)
+    _audit(
+        "Complete loonperiode geimporteerd",
+        "urenbriefje",
+        None,
+        "Complete loonperiode",
+        f"{result['imported']} urenbriefjes geimporteerd; {result['replaced']} oude testtaken vervangen.",
+        "Urenverwerking",
+        metadata={
+            "source_channel": "complete_payroll_period_import",
+            "imported": result["imported"],
+            "replaced": result["replaced"],
+            "skipped": len(result["skipped"]),
+        },
+    )
+    return RedirectResponse(
+        f"/dashboard/timesheets?tab=overview&stage=all&complete_imported={result['imported']}&complete_replaced={result['replaced']}&complete_skipped={len(result['skipped'])}#timesheet-inbox",
+        status_code=303,
+    )
 
 
 @router.post("/api/whatsapp/timesheet/{timesheet_id}/corrections")

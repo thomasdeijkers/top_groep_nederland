@@ -1,10 +1,12 @@
 import tempfile
+import zipfile
+from io import BytesIO
 import unittest
 from datetime import date, datetime
 from pathlib import Path
 from unittest.mock import patch
 
-from apps.dashboard import openai_usage, records, router as dashboard_router
+from apps.dashboard import openai_usage, records, router as dashboard_router, timesheet_uploads
 from apps.dashboard.payroll_calculations import derived_period_total_rows
 from apps.dashboard.payroll_excel import analyze_payroll_workbook, build_payroll_output_workbook
 
@@ -556,6 +558,32 @@ class PayrollDataDiagnosticsTests(unittest.TestCase):
         self.assertIn("Echte tabeldata", template)
         self.assertIn("Projectboekingen", records_source)
         self.assertIn("AI/OCR audit", records_source)
+
+
+class CompletePeriodTimesheetImportTests(unittest.TestCase):
+    def test_zip_import_iterates_supported_documents_only(self):
+        buffer = BytesIO()
+        with zipfile.ZipFile(buffer, "w") as archive:
+            archive.writestr("deel/A weekstaat 21 2026.jpeg", b"image")
+            archive.writestr("deel/B weekstaat 21 2026.pdf", b"pdf")
+            archive.writestr("deel/notitie.docx", b"docx")
+
+        docs = list(timesheet_uploads._iter_import_documents("periode.zip", buffer.getvalue()))
+
+        self.assertEqual(len(docs), 2)
+        self.assertTrue(docs[0][0].startswith("periode/"))
+        self.assertTrue(any(name.endswith(".pdf") for name, _ in docs))
+
+    def test_complete_period_import_ui_and_route_are_present(self):
+        template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
+        router_source = Path("apps/dashboard/router.py").read_text(encoding="utf-8-sig")
+        upload_source = Path("apps/dashboard/timesheet_uploads.py").read_text(encoding="utf-8-sig")
+
+        self.assertIn("/api/whatsapp/complete-period-import", template)
+        self.assertIn("Testset vervangen", template)
+        self.assertIn("complete-period-import", router_source)
+        self.assertIn("replace_complete_period_import", upload_source)
+        self.assertIn("project_time_bookings", upload_source)
 
 
 class DashboardDatabaseStatusTests(unittest.TestCase):

@@ -1,5 +1,7 @@
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from uuid import uuid4
+import zipfile
+from io import BytesIO
 
 from psycopg2.extras import Json
 
@@ -11,6 +13,106 @@ from shared.db.connection import get_connection
 
 
 UPLOAD_DIR = Path("runtime/uploads/timesheets")
+
+
+COMPLETE_PERIOD_SOURCE_CHANNEL = "complete_payroll_period_import"
+SUPPORTED_TIMESHEET_IMPORT_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".pdf"}
+
+
+def replace_complete_period_import(source_channel: str = COMPLETE_PERIOD_SOURCE_CHANNEL) -> int:
+    ensure_dashboard_tables()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                DELETE FROM project_time_bookings b
+                USING whatsapp_timesheet_inbox w
+                WHERE b.timesheet_inbox_id = w.id
+                  AND w.source_channel = %s;
+                """,
+                (source_channel,),
+            )
+            cursor.execute(
+                """
+                UPDATE whatsapp_timesheet_inbox
+                SET deleted_at = NOW(),
+                    archived_at = NOW(),
+                    updated_at = NOW()
+                WHERE source_channel = %s
+                  AND deleted_at IS NULL;
+                """,
+                (source_channel,),
+            )
+            replaced = cursor.rowcount
+        conn.commit()
+    return replaced
+
+
+def import_complete_period_timesheets(
+    uploads: list[tuple[str, bytes]],
+    source_channel: str = COMPLETE_PERIOD_SOURCE_CHANNEL,
+    replace_existing: bool = True,
+    allow_openai: bool = False,
+) -> dict:
+    replaced = replace_complete_period_import(source_channel) if replace_existing else 0
+    imported_ids: list[int] = []
+    skipped: list[str] = []
+
+    for filename, content in uploads:
+        try:
+            documents = list(_iter_import_documents(filename, content))
+        except zipfile.BadZipFile:
+            skipped.append(f"{filename}: zip niet leesbaar")
+            continue
+        except Exception as exc:
+            skipped.append(f"{filename}: {type(exc).__name__}")
+            continue
+
+        for item_name, item_content in documents:
+            try:
+                record_id = save_timesheet_upload(
+                    content=item_content,
+                    filename=item_name,
+                    sender_name="Complete loonperiode",
+                    sender_phone="testset",
+                    source_channel=source_channel,
+                    allow_openai=allow_openai,
+                )
+                imported_ids.append(record_id)
+            except Exception as exc:
+                skipped.append(f"{item_name}: {type(exc).__name__}")
+        if not _is_supported_archive_or_document(filename):
+            skipped.append(f"{filename}: niet ondersteund")
+        elif not documents:
+            skipped.append(f"{filename}: geen ondersteunde urenbriefjes")
+
+    return {
+        "replaced": replaced,
+        "imported": len(imported_ids),
+        "imported_ids": imported_ids,
+        "skipped": skipped,
+    }
+
+
+def _iter_import_documents(filename: str, content: bytes):
+    suffix = Path(filename).suffix.lower()
+    if suffix == ".zip":
+        with zipfile.ZipFile(BytesIO(content)) as archive:
+            for info in archive.infolist():
+                if info.is_dir():
+                    continue
+                entry_name = PurePosixPath(info.filename).name
+                if Path(entry_name).suffix.lower() not in SUPPORTED_TIMESHEET_IMPORT_EXTENSIONS:
+                    continue
+                yield f"{Path(filename).stem}/{entry_name}", archive.read(info)
+        return
+    if suffix in SUPPORTED_TIMESHEET_IMPORT_EXTENSIONS:
+        yield Path(filename).name, content
+
+
+def _is_supported_archive_or_document(filename: str) -> bool:
+    suffix = Path(filename).suffix.lower()
+    return suffix == ".zip" or suffix in SUPPORTED_TIMESHEET_IMPORT_EXTENSIONS
 
 
 def _match_candidate(sender_phone: str, parsed: dict) -> dict | None:

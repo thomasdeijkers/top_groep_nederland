@@ -4671,6 +4671,53 @@ body[data-theme="light"] .theme-toggle strong {
     min-height: 38px;
 }
 
+
+.timesheet-batch-import {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) auto;
+    gap: 10px;
+    align-items: end;
+    min-width: 340px;
+    padding: 12px;
+    border: 1px solid rgba(127, 209, 160, 0.22);
+    border-radius: 8px;
+    background: rgba(16, 38, 38, 0.58);
+}
+
+.timesheet-batch-import label {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+    color: #b8c8d0;
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.timesheet-batch-import input[type="file"] {
+    max-width: 100%;
+    color: #d8e4ea;
+    font-size: 0.82rem;
+}
+
+.timesheet-import-notice {
+    display: grid;
+    gap: 4px;
+    margin: 0 0 12px;
+    padding: 12px 14px;
+    border: 1px solid rgba(127, 209, 160, 0.28);
+    border-radius: 8px;
+    background: rgba(28, 68, 56, 0.38);
+}
+
+.timesheet-import-notice strong {
+    color: #9fe5b9;
+}
+
+.timesheet-import-notice span {
+    color: #d8e4ea;
+}
+
 .timesheet-dropzone {
     display: grid;
     grid-template-columns: 40px minmax(0, 1fr) auto;

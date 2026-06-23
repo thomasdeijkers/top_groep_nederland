@@ -2160,6 +2160,15 @@ Metadata:
                                     <small>Afbeelding of PDF wordt direct een taak.</small>
                                     <button class="ghost-button" type="button" data-timesheet-drop-button>Bestand kiezen</button>
                                 </form>
+                                <form class="timesheet-batch-import" action="/api/whatsapp/complete-period-import" method="post" enctype="multipart/form-data">
+                                    <input type="hidden" name="replace_existing" value="true">
+                                    <input type="hidden" name="allow_openai" value="false">
+                                    <label>
+                                        <span>Complete loonperiode</span>
+                                        <input type="file" name="files" accept=".zip,image/*,.pdf" multiple>
+                                    </label>
+                                    <button class="ghost-button" type="submit">Testset vervangen</button>
+                                </form>
                             </div>
                             {% endif %}
                         </div>
@@ -2227,6 +2236,13 @@ Metadata:
                             </div>
                             <div class="processing-status__bar" aria-hidden="true"><span></span></div>
                         </div>
+
+                        {% if request.query_params.get('complete_imported') %}
+                        <div class="timesheet-import-notice">
+                            <strong>Complete loonperiode geladen</strong>
+                            <span>{{ request.query_params.get('complete_imported') }} taken aangemaakt, {{ request.query_params.get('complete_replaced') or 0 }} oude testtaken vervangen, {{ request.query_params.get('complete_skipped') or 0 }} bestanden overgeslagen.</span>
+                        </div>
+                        {% endif %}
 
                         <div class="timesheet-inbox-layout" id="timesheet-inbox">
                             {% if active_timesheet_tab == 'overview' %}
