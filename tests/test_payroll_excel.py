@@ -599,6 +599,15 @@ class CompletePeriodTimesheetImportTests(unittest.TestCase):
         self.assertIn("replace_complete_period_import", upload_source)
         self.assertIn("project_time_bookings", upload_source)
 
+    def test_timesheet_upload_falls_back_when_candidate_fk_is_stale(self):
+        upload_source = Path("apps/dashboard/timesheet_uploads.py").read_text(encoding="utf-8-sig")
+
+        self.assertIn("from psycopg2.errors import ForeignKeyViolation", upload_source)
+        self.assertIn("matched_candidate_id,", upload_source)
+        self.assertIn("NULL, %s", upload_source)
+        self.assertIn("except ForeignKeyViolation", upload_source)
+        self.assertIn('status = "te_controleren"', upload_source)
+
     def test_payroll_test_workspace_can_be_cleared_from_ui(self):
         template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
         router_source = Path("apps/dashboard/router.py").read_text(encoding="utf-8-sig")
