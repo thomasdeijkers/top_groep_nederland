@@ -12,37 +12,67 @@ UPDATE audit_events e
 SET relation_id = COALESCE(e.relation_id, NULLIF(e.metadata->>'relation_id', '')::integer)
 WHERE e.relation_id IS NULL
   AND e.metadata ? 'relation_id'
-  AND (e.metadata->>'relation_id') ~ '^[0-9]+$';
+  AND (e.metadata->>'relation_id') ~ '^[0-9]+$'
+  AND EXISTS (
+      SELECT 1
+      FROM relations r
+      WHERE r.id = NULLIF(e.metadata->>'relation_id', '')::integer
+  );
 
 UPDATE audit_events e
 SET timesheet_inbox_id = e.entity_id
 WHERE e.timesheet_inbox_id IS NULL
   AND e.entity_type IN ('urenbriefje', 'whatsapp_timesheet')
-  AND e.entity_id IS NOT NULL;
+  AND e.entity_id IS NOT NULL
+  AND EXISTS (
+      SELECT 1
+      FROM whatsapp_timesheet_inbox w
+      WHERE w.id = e.entity_id
+  );
 
 UPDATE audit_events e
 SET relation_id = e.entity_id
 WHERE e.relation_id IS NULL
   AND e.entity_type IN ('relatie', 'candidate', 'principal')
-  AND e.entity_id IS NOT NULL;
+  AND e.entity_id IS NOT NULL
+  AND EXISTS (
+      SELECT 1
+      FROM relations r
+      WHERE r.id = e.entity_id
+  );
 
 UPDATE audit_events e
 SET payroll_period_id = e.entity_id
 WHERE e.payroll_period_id IS NULL
   AND e.entity_type IN ('periode', 'payroll_period')
-  AND e.entity_id IS NOT NULL;
+  AND e.entity_id IS NOT NULL
+  AND EXISTS (
+      SELECT 1
+      FROM payroll_periods p
+      WHERE p.id = e.entity_id
+  );
 
 UPDATE audit_events e
 SET payroll_period_id = NULLIF(e.metadata->>'payroll_period_id', '')::integer
 WHERE e.payroll_period_id IS NULL
   AND e.metadata ? 'payroll_period_id'
-  AND (e.metadata->>'payroll_period_id') ~ '^[0-9]+$';
+  AND (e.metadata->>'payroll_period_id') ~ '^[0-9]+$'
+  AND EXISTS (
+      SELECT 1
+      FROM payroll_periods p
+      WHERE p.id = NULLIF(e.metadata->>'payroll_period_id', '')::integer
+  );
 
 UPDATE audit_events e
 SET payroll_week_input_id = NULLIF(e.metadata->>'payroll_week_input_id', '')::integer
 WHERE e.payroll_week_input_id IS NULL
   AND e.metadata ? 'payroll_week_input_id'
-  AND (e.metadata->>'payroll_week_input_id') ~ '^[0-9]+$';
+  AND (e.metadata->>'payroll_week_input_id') ~ '^[0-9]+$'
+  AND EXISTS (
+      SELECT 1
+      FROM payroll_week_inputs i
+      WHERE i.id = NULLIF(e.metadata->>'payroll_week_input_id', '')::integer
+  );
 
 UPDATE audit_events e
 SET payroll_period_id = i.payroll_period_id,
@@ -69,7 +99,12 @@ UPDATE openai_api_audit_events a
 SET purpose = COALESCE(a.purpose, 'timesheet_ocr'),
     timesheet_inbox_id = COALESCE(a.timesheet_inbox_id, a.source_id)
 WHERE a.source IN ('whatsapp_timesheet', 'whatsapp_timesheet_reparse')
-  AND a.source_id IS NOT NULL;
+  AND a.source_id IS NOT NULL
+  AND EXISTS (
+      SELECT 1
+      FROM whatsapp_timesheet_inbox w
+      WHERE w.id = a.source_id
+  );
 
 UPDATE openai_api_audit_events a
 SET relation_id = COALESCE(a.relation_id, w.matched_relation_id)

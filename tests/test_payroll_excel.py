@@ -689,6 +689,16 @@ class CompletePeriodTimesheetImportTests(unittest.TestCase):
         self.assertIn("generate_series(1, 13)", restore_migration)
         self.assertIn("payroll_period_weeks", restore_migration)
 
+    def test_audit_context_migration_ignores_deleted_test_records(self):
+        migration = Path("migrations/042_payroll_audit_context.sql").read_text(encoding="utf-8-sig")
+
+        self.assertIn("FROM whatsapp_timesheet_inbox w", migration)
+        self.assertIn("WHERE w.id = e.entity_id", migration)
+        self.assertIn("WHERE w.id = a.source_id", migration)
+        self.assertIn("FROM relations r", migration)
+        self.assertIn("FROM payroll_periods p", migration)
+        self.assertIn("FROM payroll_week_inputs i", migration)
+
     def test_payslip_manual_net_received_recalculates_remaining_net(self):
         row = {
             "period_total": f"{chr(8364)} 1707,06",
