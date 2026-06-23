@@ -4,7 +4,7 @@ from datetime import date, datetime
 from pathlib import Path
 from unittest.mock import patch
 
-from apps.dashboard import records, router as dashboard_router
+from apps.dashboard import openai_usage, records, router as dashboard_router
 from apps.dashboard.payroll_calculations import derived_period_total_rows
 from apps.dashboard.payroll_excel import analyze_payroll_workbook, build_payroll_output_workbook
 
@@ -309,6 +309,60 @@ class PayrollDatamodelFoundationTests(unittest.TestCase):
 
         self.assertIn("migrations/037_payroll_datamodel_foundation.sql", data_store)
 
+
+
+class PayrollAuditContextTests(unittest.TestCase):
+    def test_audit_context_migration_links_payroll_and_ai_ocr_records(self):
+        migration = Path("migrations/042_payroll_audit_context.sql").read_text(encoding="utf-8-sig")
+
+        for field in [
+            "payroll_year_id",
+            "payroll_period_id",
+            "payroll_period_week_id",
+            "payroll_week_input_id",
+            "timesheet_inbox_id",
+            "relation_id",
+            "correlation_id",
+            "source_channel",
+        ]:
+            self.assertIn(field, migration)
+        self.assertIn("payroll_audit_context", migration)
+        self.assertIn("payroll_ai_ocr_audit_context", migration)
+        self.assertIn("payroll_period_audit_summary", migration)
+
+    def test_audit_context_migration_is_part_of_dashboard_startup(self):
+        data_store = Path("apps/dashboard/data_store.py").read_text(encoding="utf-8-sig")
+
+        self.assertIn("migrations/042_payroll_audit_context.sql", data_store)
+        self.assertLess(
+            data_store.index("migrations/038_payroll_datamodel_views.sql"),
+            data_store.index("migrations/042_payroll_audit_context.sql"),
+        )
+
+    def test_audit_context_fields_are_inferred_from_entity_and_metadata(self):
+        context = records._audit_context_fields(
+            "payroll_period",
+            12,
+            {"relation_id": "7", "timesheet_inbox_id": "44", "source_channel": "test"},
+        )
+
+        self.assertEqual(context["payroll_period_id"], 12)
+        self.assertEqual(context["relation_id"], 7)
+        self.assertEqual(context["timesheet_inbox_id"], 44)
+        self.assertEqual(context["source_channel"], "test")
+
+    def test_openai_audit_context_defaults_to_timesheet_ocr(self):
+        context = openai_usage._openai_api_audit_context(
+            "whatsapp_timesheet",
+            55,
+            {"relation_id": "8", "total_tokens": "120"},
+        )
+
+        self.assertEqual(context["provider"], "openai")
+        self.assertEqual(context["purpose"], "timesheet_ocr")
+        self.assertEqual(context["timesheet_inbox_id"], 55)
+        self.assertEqual(context["relation_id"], 8)
+        self.assertEqual(context["total_tokens"], 120)
 
 
 class PayrollDatamodelViewTests(unittest.TestCase):

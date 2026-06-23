@@ -114,6 +114,7 @@ def save_timesheet_upload(
             audit.get("request_payload") or {},
             audit.get("response_payload") or {},
             audit.get("status_code"),
+            context={"purpose": "timesheet_ocr", "relation_id": matched_relation_id, "timesheet_inbox_id": record_id},
         )
 
     return record_id
@@ -205,4 +206,5 @@ def reparse_timesheet_upload(timesheet_id: int, allow_openai: bool = True) -> No
             audit.get("request_payload") or {},
             audit.get("response_payload") or {},
             audit.get("status_code"),
+            context={"purpose": "timesheet_ocr", "relation_id": matched_relation_id, "timesheet_inbox_id": timesheet_id},
         )

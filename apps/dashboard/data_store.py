@@ -53,6 +53,7 @@ def ensure_dashboard_tables():
         Path("migrations/036_payroll_running_balances.sql"),
         Path("migrations/037_payroll_datamodel_foundation.sql"),
         Path("migrations/038_payroll_datamodel_views.sql"),
+        Path("migrations/042_payroll_audit_context.sql"),
     ]
 
     optional_migrations = {

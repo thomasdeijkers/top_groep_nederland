@@ -291,6 +291,45 @@ def _demo_weekly_hours_yoy() -> list[dict]:
     return rows
 
 
+def _audit_int(value) -> int | None:
+    try:
+        if value in (None, ""):
+            return None
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _audit_context_fields(entity_type: str, entity_id: int | None, metadata: dict | None) -> dict:
+    metadata = metadata or {}
+    relation_id = _audit_int(metadata.get("relation_id"))
+    timesheet_inbox_id = _audit_int(metadata.get("timesheet_inbox_id") or metadata.get("timesheet_id"))
+    payroll_year_id = _audit_int(metadata.get("payroll_year_id"))
+    payroll_period_id = _audit_int(metadata.get("payroll_period_id") or metadata.get("period_id"))
+    payroll_period_week_id = _audit_int(metadata.get("payroll_period_week_id") or metadata.get("period_week_id"))
+    payroll_week_input_id = _audit_int(metadata.get("payroll_week_input_id"))
+
+    normalized_type = str(entity_type or "").lower()
+    entity_id_value = _audit_int(entity_id)
+    if normalized_type in {"relatie", "candidate", "principal"} and relation_id is None:
+        relation_id = entity_id_value
+    if normalized_type in {"urenbriefje", "whatsapp_timesheet"} and timesheet_inbox_id is None:
+        timesheet_inbox_id = entity_id_value
+    if normalized_type in {"periode", "payroll_period"} and payroll_period_id is None:
+        payroll_period_id = entity_id_value
+
+    return {
+        "relation_id": relation_id,
+        "timesheet_inbox_id": timesheet_inbox_id,
+        "payroll_year_id": payroll_year_id,
+        "payroll_period_id": payroll_period_id,
+        "payroll_period_week_id": payroll_period_week_id,
+        "payroll_week_input_id": payroll_week_input_id,
+        "correlation_id": str(metadata.get("correlation_id") or "") or None,
+        "source_channel": str(metadata.get("source_channel") or metadata.get("bron") or "") or None,
+    }
+
+
 def log_audit_event(
     action: str,
     entity_type: str,
@@ -303,6 +342,7 @@ def log_audit_event(
 ) -> None:
     try:
         _ensure_dashboard_tables_for_read()
+        context_fields = _audit_context_fields(entity_type, entity_id, metadata)
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -316,9 +356,17 @@ def log_audit_event(
                         description,
                         status,
                         metadata,
+                        relation_id,
+                        timesheet_inbox_id,
+                        payroll_year_id,
+                        payroll_period_id,
+                        payroll_period_week_id,
+                        payroll_week_input_id,
+                        correlation_id,
+                        source_channel,
                         created_at
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW());
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW());
                     """,
                     (
                         actor_name or "Admin",
@@ -329,6 +377,14 @@ def log_audit_event(
                         description or "",
                         status or "",
                         Json(metadata or {}),
+                        context_fields["relation_id"],
+                        context_fields["timesheet_inbox_id"],
+                        context_fields["payroll_year_id"],
+                        context_fields["payroll_period_id"],
+                        context_fields["payroll_period_week_id"],
+                        context_fields["payroll_week_input_id"],
+                        context_fields["correlation_id"],
+                        context_fields["source_channel"],
                     ),
                 )
             conn.commit()

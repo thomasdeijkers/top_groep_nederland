@@ -72,6 +72,35 @@ def record_openai_usage(source: str, source_id: int | None, model: str, usage: d
     _USAGE_CACHE = None
 
 
+def _audit_int(value) -> int | None:
+    try:
+        if value in (None, ""):
+            return None
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _openai_api_audit_context(source: str, source_id: int | None, context: dict | None) -> dict:
+    context = context or {}
+    timesheet_inbox_id = _audit_int(context.get("timesheet_inbox_id"))
+    if timesheet_inbox_id is None and source in {"whatsapp_timesheet", "whatsapp_timesheet_reparse"}:
+        timesheet_inbox_id = _audit_int(source_id)
+    return {
+        "provider": context.get("provider") or "openai",
+        "purpose": context.get("purpose") or ("timesheet_ocr" if source in {"whatsapp_timesheet", "whatsapp_timesheet_reparse"} else source),
+        "relation_id": _audit_int(context.get("relation_id")),
+        "timesheet_inbox_id": timesheet_inbox_id,
+        "payroll_week_input_id": _audit_int(context.get("payroll_week_input_id")),
+        "request_hash": context.get("request_hash") or None,
+        "response_hash": context.get("response_hash") or None,
+        "prompt_tokens": _audit_int(context.get("prompt_tokens")),
+        "completion_tokens": _audit_int(context.get("completion_tokens")),
+        "total_tokens": _audit_int(context.get("total_tokens")),
+        "latency_ms": _audit_int(context.get("latency_ms")),
+    }
+
+
 def record_openai_api_audit(
     source: str,
     source_id: int | None,
@@ -81,18 +110,23 @@ def record_openai_api_audit(
     response_payload: dict | None = None,
     status_code: int | None = None,
     error: str = "",
+    context: dict | None = None,
 ) -> None:
     try:
         ensure_dashboard_tables()
+        audit_context = _openai_api_audit_context(source, source_id, context)
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
                     """
                     INSERT INTO openai_api_audit_events (
                         source, source_id, model, endpoint, request_payload,
-                        response_payload, status_code, error
+                        response_payload, status_code, error, provider, purpose,
+                        relation_id, timesheet_inbox_id, payroll_week_input_id,
+                        request_hash, response_hash, prompt_tokens, completion_tokens,
+                        total_tokens, latency_ms
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s);
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
                     """,
                     (
                         source,
@@ -103,6 +137,17 @@ def record_openai_api_audit(
                         Json(response_payload or {}),
                         status_code,
                         error or "",
+                        audit_context["provider"],
+                        audit_context["purpose"],
+                        audit_context["relation_id"],
+                        audit_context["timesheet_inbox_id"],
+                        audit_context["payroll_week_input_id"],
+                        audit_context["request_hash"],
+                        audit_context["response_hash"],
+                        audit_context["prompt_tokens"],
+                        audit_context["completion_tokens"],
+                        audit_context["total_tokens"],
+                        audit_context["latency_ms"],
                     ),
                 )
             conn.commit()
