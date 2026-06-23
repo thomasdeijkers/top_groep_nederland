@@ -532,6 +532,8 @@ class DashboardVisibleDemoPayrollSeedTests(unittest.TestCase):
         self.assertIn("migrations/041_dashboard_demo_payroll.sql", source)
         self.assertIn("migrations/033_payroll_week_inputs.sql", source)
         self.assertIn("DASHBOARD_DEMO_PAYROLL_SEED_STEP_ERROR", source)
+        runtime_source = source[source.index("def get_overview_data"):]
+        self.assertNotIn("ensure_visible_demo_payroll_data()", runtime_source)
         self.assertGreaterEqual(source.count("_ensure_dashboard_tables_for_read()"), 10)
 
     def test_payroll_archive_is_a_real_tab_panel(self):
@@ -626,12 +628,14 @@ class CompletePeriodTimesheetImportTests(unittest.TestCase):
 
         self.assertIn("test-data-panel", template)
         self.assertIn("test-file-picker", template)
+        self.assertIn("test-file-picker__input", template)
         self.assertIn("test-action-button--primary", template)
         self.assertIn("test-action-button--danger", template)
         self.assertIn("Alles legen", template)
         self.assertIn("De loonperiodes zelf blijven staan", template)
         self.assertNotIn("loonperiodes voor deze testomgeving legen", template)
         self.assertIn(".test-data-panel", stylesheet)
+        self.assertIn(".test-file-picker__input", stylesheet)
         self.assertIn(".test-file-picker__control", stylesheet)
         self.assertIn("@router.get(\"/api/whatsapp/complete-period-import\")", router_source)
         self.assertIn("upload_error", router_source)

@@ -163,7 +163,6 @@ def _payroll_demo_seed_is_suppressed(cursor) -> bool:
 def get_overview_data() -> dict:
     try:
         _ensure_dashboard_tables_for_read()
-        ensure_visible_demo_payroll_data()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 counts = {}
@@ -922,7 +921,6 @@ def list_candidates(limit: int = 25, query: str = "") -> list[dict]:
 def list_relations(limit: int = 15, query: str = "", relation_type: str = "", status: str = "") -> list[dict]:
     try:
         _ensure_dashboard_tables_for_read()
-        ensure_visible_demo_payroll_data()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 params = []
