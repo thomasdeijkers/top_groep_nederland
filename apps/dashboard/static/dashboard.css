@@ -4677,11 +4677,7 @@ body[data-theme="light"] .theme-toggle strong {
     grid-template-columns: minmax(180px, 1fr) auto;
     gap: 10px;
     align-items: end;
-    min-width: 340px;
-    padding: 12px;
-    border: 1px solid rgba(127, 209, 160, 0.22);
-    border-radius: 8px;
-    background: rgba(16, 38, 38, 0.58);
+    min-width: 0;
 }
 
 .timesheet-batch-import label {
@@ -4753,10 +4749,29 @@ body[data-theme="light"] .theme-toggle strong {
 .timesheet-entry-actions {
     justify-self: end;
     display: grid;
-    grid-template-columns: auto minmax(420px, 620px) auto;
+    grid-template-columns: auto minmax(420px, 620px);
     align-items: stretch;
     gap: 10px;
     width: min(100%, 960px);
+}
+
+.test-data-panel {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: minmax(180px, 0.8fr) minmax(300px, 1.4fr) auto;
+    gap: 12px;
+    align-items: end;
+    padding: 14px;
+    border: 1px solid rgba(255, 176, 82, 0.42);
+    border-radius: 8px;
+    background: rgba(80, 50, 18, 0.36);
+    box-shadow: inset 0 0 0 1px rgba(255, 176, 82, 0.08);
+}
+
+.test-data-panel h3 {
+    margin: 2px 0 0;
+    color: #fff3df;
+    font-size: 1rem;
 }
 
 .period-clear-form,
@@ -4768,6 +4783,13 @@ body[data-theme="light"] .theme-toggle strong {
 .timesheet-clear-form .ghost-button {
     min-height: 38px;
     white-space: nowrap;
+}
+
+.test-data-panel .danger-button {
+    min-height: 48px;
+    border-color: rgba(255, 139, 112, 0.7);
+    background: rgba(116, 45, 30, 0.52);
+    color: #ffe0d7;
 }
 
 .timesheet-manual-button {
@@ -6456,6 +6478,11 @@ body[data-theme="light"] .theme-toggle strong {
     .timesheet-entry-actions {
         justify-self: stretch;
         width: 100%;
+    }
+
+    .test-data-panel,
+    .timesheet-batch-import {
+        grid-template-columns: 1fr;
     }
 
     .timesheet-dropzone--compact {

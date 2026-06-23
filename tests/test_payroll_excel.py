@@ -594,10 +594,24 @@ class CompletePeriodTimesheetImportTests(unittest.TestCase):
         self.assertIn("Testomgeving legen", template)
         self.assertIn("def clear_payroll_workspace_for_testing", router_source)
         self.assertIn("clear_payroll_test_workspace", router_source)
-        self.assertIn("DELETE FROM project_time_bookings", records_source)
-        self.assertIn("DELETE FROM whatsapp_timesheet_inbox", records_source)
-        self.assertIn("DELETE FROM payroll_periods", records_source)
+        self.assertIn("def _delete_existing_table", records_source)
+        self.assertIn("project_time_bookings", records_source)
+        self.assertIn("whatsapp_timesheet_inbox", records_source)
+        self.assertIn("payroll_periods", records_source)
+        self.assertIn("payroll_week_inputs", records_source)
+        self.assertIn("payroll_week_results", records_source)
+        self.assertIn("payroll_period_settlements", records_source)
+        self.assertIn("openai_api_audit_events", records_source)
         self.assertIn("_payroll_demo_seed_is_suppressed", records_source)
+        self.assertIn("cleared_payroll_rows", router_source)
+
+    def test_test_data_controls_are_visually_grouped(self):
+        template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
+        stylesheet = Path("apps/dashboard/static/dashboard.css").read_text(encoding="utf-8-sig")
+
+        self.assertIn("test-data-panel", template)
+        self.assertIn("Alles legen", template)
+        self.assertIn(".test-data-panel", stylesheet)
 
     def test_payslip_manual_net_received_recalculates_remaining_net(self):
         row = {

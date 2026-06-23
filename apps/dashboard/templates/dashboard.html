@@ -1362,7 +1362,7 @@ Metadata:
                         {% if request.query_params.get('cleared_timesheets') %}
                         <div class="timesheet-import-notice timesheet-import-notice--danger">
                             <strong>Testomgeving geleegd</strong>
-                            <span>{{ request.query_params.get('cleared_timesheets') }} urenbriefjes en {{ request.query_params.get('cleared_periods') or 0 }} loonperiodes verwijderd.</span>
+                            <span>{{ request.query_params.get('cleared_timesheets') }} urenbriefjes, {{ request.query_params.get('cleared_periods') or 0 }} loonperiodes en {{ request.query_params.get('cleared_payroll_rows') or 0 }} payrollregels verwijderd.</span>
                         </div>
                         {% endif %}
 
@@ -2171,19 +2171,25 @@ Metadata:
                                     <small>Afbeelding of PDF wordt direct een taak.</small>
                                     <button class="ghost-button" type="button" data-timesheet-drop-button>Bestand kiezen</button>
                                 </form>
-                                <form class="timesheet-batch-import" action="/api/whatsapp/complete-period-import" method="post" enctype="multipart/form-data">
-                                    <input type="hidden" name="replace_existing" value="true">
-                                    <input type="hidden" name="allow_openai" value="false">
-                                    <label>
-                                        <span>Complete loonperiode</span>
-                                        <input type="file" name="files" accept=".zip,image/*,.pdf" multiple>
-                                    </label>
-                                    <button class="ghost-button" type="submit">Testset vervangen</button>
-                                </form>
-                                <form class="timesheet-clear-form" action="/api/test/payroll-workspace/clear" method="post" onsubmit="return confirm('Alle urenbriefjes, projectboekingen en loonperiodes voor deze testomgeving legen? Relaties en instellingen blijven staan.');">
-                                    <input type="hidden" name="return_to" value="timesheets">
-                                    <button class="ghost-button danger-button" type="submit">Testomgeving legen</button>
-                                </form>
+                                <div class="test-data-panel">
+                                    <div>
+                                        <p class="section-label">Testdata</p>
+                                        <h3>Complete loonperiode</h3>
+                                    </div>
+                                    <form class="timesheet-batch-import" action="/api/whatsapp/complete-period-import" method="post" enctype="multipart/form-data">
+                                        <input type="hidden" name="replace_existing" value="true">
+                                        <input type="hidden" name="allow_openai" value="false">
+                                        <label>
+                                            <span>Bestanden</span>
+                                            <input type="file" name="files" accept=".zip,image/*,.pdf" multiple>
+                                        </label>
+                                        <button class="ghost-button" type="submit">Testset vervangen</button>
+                                    </form>
+                                    <form class="timesheet-clear-form" action="/api/test/payroll-workspace/clear" method="post" onsubmit="return confirm('Alle urenbriefjes, projectboekingen, payrollregels en loonperiodes voor deze testomgeving legen? Relaties, projecten en instellingen blijven staan.');">
+                                        <input type="hidden" name="return_to" value="timesheets">
+                                        <button class="ghost-button danger-button" type="submit">Alles legen</button>
+                                    </form>
+                                </div>
                             </div>
                             {% endif %}
                         </div>
@@ -2262,7 +2268,7 @@ Metadata:
                         {% if request.query_params.get('cleared_timesheets') %}
                         <div class="timesheet-import-notice timesheet-import-notice--danger">
                             <strong>Testomgeving geleegd</strong>
-                            <span>{{ request.query_params.get('cleared_timesheets') }} urenbriefjes en {{ request.query_params.get('cleared_periods') or 0 }} loonperiodes verwijderd.</span>
+                            <span>{{ request.query_params.get('cleared_timesheets') }} urenbriefjes, {{ request.query_params.get('cleared_periods') or 0 }} loonperiodes en {{ request.query_params.get('cleared_payroll_rows') or 0 }} payrollregels verwijderd.</span>
                         </div>
                         {% endif %}
 

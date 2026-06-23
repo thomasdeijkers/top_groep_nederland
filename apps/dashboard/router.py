@@ -756,7 +756,11 @@ async def import_complete_period_timesheet_set(
 @router.post("/api/test/payroll-workspace/clear")
 def clear_payroll_workspace_for_testing(return_to: str = Form("timesheets")):
     result = clear_payroll_test_workspace()
-    query = f"cleared_timesheets={result['deleted_timesheets']}&cleared_periods={result['deleted_payroll_periods']}"
+    query = (
+        f"cleared_timesheets={result['deleted_timesheets']}"
+        f"&cleared_periods={result['deleted_payroll_periods']}"
+        f"&cleared_payroll_rows={result['deleted_payroll_rows']}"
+    )
     target = (
         f"/dashboard/periods?{query}#periodes"
         if return_to == "periods"

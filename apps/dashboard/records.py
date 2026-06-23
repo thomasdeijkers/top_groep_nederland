@@ -3278,31 +3278,69 @@ def _available_payroll_period_numbers(year: int, count: int) -> list[int]:
     return numbers
 
 
+def _delete_existing_table(cursor, table_name: str) -> int:
+    cursor.execute("SELECT to_regclass(%s);", (f"public.{table_name}",))
+    if not cursor.fetchone()[0]:
+        return 0
+    cursor.execute(f"DELETE FROM {table_name};")
+    return cursor.rowcount
+
+
 def clear_payroll_test_workspace() -> dict:
     _ensure_dashboard_tables_for_read()
     with get_connection() as conn:
         with conn.cursor() as cursor:
-            cursor.execute("DELETE FROM project_time_bookings;")
-            deleted_bookings = cursor.rowcount
-            cursor.execute(
-                """
-                DELETE FROM whatsapp_timesheet_inbox;
-                """
+            deleted_counts = {}
+            for table_name in (
+                "payroll_workbook_cell_overrides",
+                "openai_api_audit_events",
+                "openai_usage_events",
+                "payroll_running_balance_mutations",
+                "payroll_running_balance_accounts",
+                "payroll_period_settlements",
+                "payroll_calculation_results",
+                "payroll_period_totals",
+                "payroll_week_results",
+                "payroll_week_lines",
+                "payroll_week_input_projects",
+                "payroll_week_input_days",
+                "payroll_week_inputs",
+                "payroll_week_entries",
+                "payroll_import_logs",
+                "payroll_employee_settings",
+                "payroll_employee_rights",
+                "payroll_employee_allowances",
+                "payroll_employee_arrangements",
+                "project_time_bookings",
+                "timesheet_field_corrections",
+                "whatsapp_timesheet_inbox",
+                "payroll_period_weeks",
+                "payroll_periods",
+                "payroll_employees",
+                "audit_log",
+            ):
+                deleted_counts[table_name] = _delete_existing_table(cursor, table_name)
+            deleted_bookings = deleted_counts.get("project_time_bookings", 0)
+            deleted_timesheets = deleted_counts.get("whatsapp_timesheet_inbox", 0)
+            deleted_periods = deleted_counts.get("payroll_periods", 0)
+            deleted_payroll_rows = sum(
+                count
+                for table, count in deleted_counts.items()
+                if table not in {"project_time_bookings", "whatsapp_timesheet_inbox", "payroll_periods"}
             )
-            deleted_timesheets = cursor.rowcount
-            cursor.execute("DELETE FROM payroll_periods;")
-            deleted_periods = cursor.rowcount
         conn.commit()
     log_audit_event(
         action="Testfase uren en loonperiodes geleegd",
         entity_type="payroll_test_reset",
         entity_label="Urenbriefjes en loonperiodes",
-        description=f"{deleted_timesheets} urenbriefjes verwijderd, {deleted_bookings} projectboekingen verwijderd en {deleted_periods} loonperiodes verwijderd.",
+        description=f"{deleted_timesheets} urenbriefjes, {deleted_bookings} projectboekingen, {deleted_periods} loonperiodes en {deleted_payroll_rows} payrollregels verwijderd.",
         status="Verwijderd",
         metadata={
             "deleted_timesheets": deleted_timesheets,
             "deleted_project_bookings": deleted_bookings,
             "deleted_payroll_periods": deleted_periods,
+            "deleted_payroll_rows": deleted_payroll_rows,
+            "deleted_tables": deleted_counts,
             "source_channel": "test_reset",
         },
     )
@@ -3310,6 +3348,7 @@ def clear_payroll_test_workspace() -> dict:
         "deleted_timesheets": deleted_timesheets,
         "deleted_project_bookings": deleted_bookings,
         "deleted_payroll_periods": deleted_periods,
+        "deleted_payroll_rows": deleted_payroll_rows,
     }
 
 
