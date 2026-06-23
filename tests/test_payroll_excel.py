@@ -545,6 +545,18 @@ class DashboardVisibleDemoPayrollSeedTests(unittest.TestCase):
         self.assertIn("data-period-panel", script)
         self.assertIn("#periode-archief", script)
 
+    def test_period_page_ensures_full_2026_calendar_without_timesheets(self):
+        source = Path("apps/dashboard/records.py").read_text(encoding="utf-8-sig")
+
+        self.assertIn("def ensure_payroll_period_calendar", source)
+        self.assertIn("PAYROLL_CALENDAR_START_2026", source)
+        self.assertIn("range(1, PAYROLL_PERIODS_PER_YEAR + 1)", source)
+        self.assertIn("INSERT INTO payroll_periods", source)
+        self.assertIn("INSERT INTO payroll_period_weeks", source)
+        self.assertIn("ensure_payroll_period_calendar(2026)", source)
+        list_periods_block = source[source.index("def list_payroll_periods"):source.index("def get_payroll_data_diagnostics")]
+        self.assertNotIn("ensure_visible_demo_payroll_data()", list_periods_block)
+
 class PayrollDataDiagnosticsTests(unittest.TestCase):
     def test_periods_page_loads_payroll_data_diagnostics(self):
         router = Path("apps/dashboard/router.py").read_text(encoding="utf-8-sig")

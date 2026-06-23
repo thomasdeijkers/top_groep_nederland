@@ -20,6 +20,7 @@ from shared.db.connection import get_connection
 
 
 PAYROLL_PERIODS_PER_YEAR = 13
+PAYROLL_CALENDAR_START_2026 = date(2026, 1, 5)
 
 
 def _ensure_dashboard_tables_for_read() -> None:
@@ -70,6 +71,76 @@ def ensure_visible_demo_payroll_data() -> None:
                         print(f"DASHBOARD_DEMO_PAYROLL_SEED_STEP_ERROR {migration.name}: {type(migration_exc).__name__}: {migration_exc}")
     except Exception as exc:
         print(f"DASHBOARD_DEMO_PAYROLL_SEED_ERROR {type(exc).__name__}: {exc}")
+
+
+def ensure_payroll_period_calendar(year: int = 2026) -> None:
+    start_date = PAYROLL_CALENDAR_START_2026 if year == 2026 else date(year, 1, 1)
+    try:
+        _ensure_dashboard_tables_for_read()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO payroll_years (year, status, notes, created_at, updated_at)
+                    VALUES (%s, 'active', 'Loonjaar met 13 periodes van 4 weken.', NOW(), NOW())
+                    ON CONFLICT (year)
+                    DO UPDATE SET period_count = 13, weeks_per_period = 4, updated_at = NOW()
+                    RETURNING id;
+                    """,
+                    (year,),
+                )
+                payroll_year_id = cursor.fetchone()[0]
+                for period_number in range(1, PAYROLL_PERIODS_PER_YEAR + 1):
+                    period_start = start_date + timedelta(days=(period_number - 1) * 28)
+                    period_end = period_start + timedelta(days=27)
+                    cursor.execute(
+                        """
+                        INSERT INTO payroll_periods (
+                            payroll_year_id, year, period_number, name, start_date, end_date,
+                            status, notes, created_at, updated_at
+                        )
+                        VALUES (%s, %s, %s, %s, %s, %s, 'open', %s, NOW(), NOW())
+                        ON CONFLICT (year, period_number)
+                        DO UPDATE SET
+                            payroll_year_id = COALESCE(payroll_periods.payroll_year_id, EXCLUDED.payroll_year_id),
+                            start_date = EXCLUDED.start_date,
+                            end_date = EXCLUDED.end_date,
+                            updated_at = NOW()
+                        RETURNING id;
+                        """,
+                        (
+                            payroll_year_id,
+                            year,
+                            period_number,
+                            f"Periode {period_number:02d} {year}",
+                            period_start,
+                            period_end,
+                            "Automatische loonperiodekalender; urenbriefjes en verwerking blijven leeg.",
+                        ),
+                    )
+                    period_id = cursor.fetchone()[0]
+                    for week_index in range(1, 5):
+                        week_start = period_start + timedelta(days=(week_index - 1) * 7)
+                        week_end = week_start + timedelta(days=6)
+                        cursor.execute(
+                            """
+                            INSERT INTO payroll_period_weeks (
+                                payroll_period_id, week_index, week_number, start_date, end_date,
+                                created_at, updated_at
+                            )
+                            VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
+                            ON CONFLICT (payroll_period_id, week_index)
+                            DO UPDATE SET
+                                week_number = EXCLUDED.week_number,
+                                start_date = EXCLUDED.start_date,
+                                end_date = EXCLUDED.end_date,
+                                updated_at = NOW();
+                            """,
+                            (period_id, week_index, week_start.isocalendar().week, week_start, week_end),
+                        )
+            conn.commit()
+    except Exception as exc:
+        print(f"PAYROLL_PERIOD_CALENDAR_WARNING {type(exc).__name__}: {exc}")
 
 
 def _payroll_demo_seed_is_suppressed(cursor) -> bool:
@@ -1431,7 +1502,7 @@ def _format_money(value) -> str:
 def list_payroll_periods(limit: int = 25, archived: bool = False) -> list[dict]:
     try:
         _ensure_dashboard_tables_for_read()
-        ensure_visible_demo_payroll_data()
+        ensure_payroll_period_calendar(2026)
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -1785,6 +1856,7 @@ def get_payroll_period_defaults() -> dict:
     fallback_start = today - timedelta(days=today.weekday())
     try:
         _ensure_dashboard_tables_for_read()
+        ensure_payroll_period_calendar(2026)
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
