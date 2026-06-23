@@ -69,8 +69,7 @@ def ensure_dashboard_tables():
         Path("migrations/037_payroll_datamodel_foundation.sql"),
         Path("migrations/038_payroll_datamodel_views.sql"),
         Path("migrations/042_payroll_audit_context.sql"),
-        Path("migrations/043_reset_payroll_test_dataset_once.sql"),
-        Path("migrations/044_fast_reset_payroll_test_dataset_once.sql"),
+        Path("migrations/045_restore_payroll_period_calendar.sql"),
     ]
 
     optional_migrations = set()

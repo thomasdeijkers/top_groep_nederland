@@ -712,17 +712,27 @@ async def upload_whatsapp_timesheet(
     sender_name: str = Form(""),
     sender_phone: str = Form(""),
 ):
-    content = await file.read()
-    record_id = save_timesheet_upload(
-        content=content,
-        filename=file.filename or "urenbriefje.jpg",
-        sender_name=sender_name,
-        sender_phone=sender_phone,
-        source_channel="manual_upload",
-        allow_openai=True,
-    )
-    _audit("Urenbriefje geupload", "urenbriefje", record_id, file.filename or "urenbriefje.jpg", "Nieuw urenbriefje ontvangen en klaargezet voor controle.", "Urenverwerking")
-    return RedirectResponse(f"/dashboard/timesheets?tab=overview&stage=all&uploaded={record_id}#timesheet-inbox", status_code=303)
+    try:
+        content = await file.read()
+        record_id = save_timesheet_upload(
+            content=content,
+            filename=file.filename or "urenbriefje.jpg",
+            sender_name=sender_name,
+            sender_phone=sender_phone,
+            source_channel="manual_upload",
+            allow_openai=True,
+        )
+        _audit("Urenbriefje geupload", "urenbriefje", record_id, file.filename or "urenbriefje.jpg", "Nieuw urenbriefje ontvangen en klaargezet voor controle.", "Urenverwerking")
+        return RedirectResponse(f"/dashboard/timesheets?tab=overview&stage=all&uploaded={record_id}#timesheet-inbox", status_code=303)
+    except Exception as exc:
+        print(f"TIMESHEET_UPLOAD_ERROR {type(exc).__name__}: {exc}")
+        query = urlencode({"tab": "overview", "stage": "all", "upload_error": type(exc).__name__})
+        return RedirectResponse(f"/dashboard/timesheets?{query}#timesheet-inbox", status_code=303)
+
+
+@router.get("/api/whatsapp/complete-period-import")
+def import_complete_period_timesheet_set_get():
+    return RedirectResponse("/dashboard/timesheets?tab=overview&stage=all#timesheet-inbox", status_code=303)
 
 
 @router.post("/api/whatsapp/complete-period-import")
@@ -731,26 +741,31 @@ async def import_complete_period_timesheet_set(
     replace_existing: bool = Form(True),
     allow_openai: bool = Form(False),
 ):
-    uploads = [(file.filename or "urenbriefje.zip", await file.read()) for file in files]
-    result = import_complete_period_timesheets(uploads, replace_existing=replace_existing, allow_openai=allow_openai)
-    _audit(
-        "Complete loonperiode geimporteerd",
-        "urenbriefje",
-        None,
-        "Complete loonperiode",
-        f"{result['imported']} urenbriefjes geimporteerd; {result['replaced']} oude testtaken vervangen.",
-        "Urenverwerking",
-        metadata={
-            "source_channel": "complete_payroll_period_import",
-            "imported": result["imported"],
-            "replaced": result["replaced"],
-            "skipped": len(result["skipped"]),
-        },
-    )
-    return RedirectResponse(
-        f"/dashboard/timesheets?tab=overview&stage=all&complete_imported={result['imported']}&complete_replaced={result['replaced']}&complete_skipped={len(result['skipped'])}#timesheet-inbox",
-        status_code=303,
-    )
+    try:
+        uploads = [(file.filename or "urenbriefje.zip", await file.read()) for file in files]
+        result = import_complete_period_timesheets(uploads, replace_existing=replace_existing, allow_openai=allow_openai)
+        _audit(
+            "Complete loonperiode geimporteerd",
+            "urenbriefje",
+            None,
+            "Complete loonperiode",
+            f"{result['imported']} urenbriefjes geimporteerd; {result['replaced']} oude testtaken vervangen.",
+            "Urenverwerking",
+            metadata={
+                "source_channel": "complete_payroll_period_import",
+                "imported": result["imported"],
+                "replaced": result["replaced"],
+                "skipped": len(result["skipped"]),
+            },
+        )
+        return RedirectResponse(
+            f"/dashboard/timesheets?tab=overview&stage=all&complete_imported={result['imported']}&complete_replaced={result['replaced']}&complete_skipped={len(result['skipped'])}#timesheet-inbox",
+            status_code=303,
+        )
+    except Exception as exc:
+        print(f"COMPLETE_PERIOD_IMPORT_ERROR {type(exc).__name__}: {exc}")
+        query = urlencode({"tab": "overview", "stage": "all", "import_error": type(exc).__name__})
+        return RedirectResponse(f"/dashboard/timesheets?{query}#timesheet-inbox", status_code=303)
 
 
 @router.post("/api/test/payroll-workspace/clear")

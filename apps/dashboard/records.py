@@ -3317,16 +3317,9 @@ def clear_payroll_test_workspace() -> dict:
                 "payroll_week_inputs",
                 "payroll_week_entries",
                 "payroll_import_logs",
-                "payroll_employee_settings",
-                "payroll_employee_rights",
-                "payroll_employee_allowances",
-                "payroll_employee_arrangements",
                 "project_time_bookings",
                 "timesheet_field_corrections",
                 "whatsapp_timesheet_inbox",
-                "payroll_period_weeks",
-                "payroll_periods",
-                "payroll_employees",
                 "audit_log",
             )
             deleted_counts = {}
@@ -3335,18 +3328,18 @@ def clear_payroll_test_workspace() -> dict:
             _truncate_existing_tables(cursor, reset_tables)
             deleted_bookings = deleted_counts.get("project_time_bookings", 0)
             deleted_timesheets = deleted_counts.get("whatsapp_timesheet_inbox", 0)
-            deleted_periods = deleted_counts.get("payroll_periods", 0)
+            deleted_periods = 0
             deleted_payroll_rows = sum(
                 count
                 for table, count in deleted_counts.items()
-                if table not in {"project_time_bookings", "whatsapp_timesheet_inbox", "payroll_periods"}
+                if table not in {"project_time_bookings", "whatsapp_timesheet_inbox"}
             )
         conn.commit()
     log_audit_event(
         action="Testfase uren en loonperiodes geleegd",
         entity_type="payroll_test_reset",
         entity_label="Urenbriefjes en loonperiodes",
-        description=f"{deleted_timesheets} urenbriefjes, {deleted_bookings} projectboekingen, {deleted_periods} loonperiodes en {deleted_payroll_rows} payrollregels verwijderd.",
+        description=f"{deleted_timesheets} urenbriefjes, {deleted_bookings} projectboekingen en {deleted_payroll_rows} payrollverwerkingsregels verwijderd. Loonperiodes zijn behouden.",
         status="Verwijderd",
         metadata={
             "deleted_timesheets": deleted_timesheets,

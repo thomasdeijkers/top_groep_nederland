@@ -598,7 +598,7 @@ class CompletePeriodTimesheetImportTests(unittest.TestCase):
         self.assertIn("TRUNCATE TABLE", records_source)
         self.assertIn("project_time_bookings", records_source)
         self.assertIn("whatsapp_timesheet_inbox", records_source)
-        self.assertIn("payroll_periods", records_source)
+        self.assertIn("Loonperiodes zijn behouden", records_source)
         self.assertIn("payroll_week_inputs", records_source)
         self.assertIn("payroll_week_results", records_source)
         self.assertIn("payroll_period_settlements", records_source)
@@ -609,6 +609,7 @@ class CompletePeriodTimesheetImportTests(unittest.TestCase):
     def test_test_data_controls_are_visually_grouped(self):
         template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
         stylesheet = Path("apps/dashboard/static/dashboard.css").read_text(encoding="utf-8-sig")
+        router_source = Path("apps/dashboard/router.py").read_text(encoding="utf-8-sig")
 
         self.assertIn("test-data-panel", template)
         self.assertIn("test-file-picker", template)
@@ -617,19 +618,24 @@ class CompletePeriodTimesheetImportTests(unittest.TestCase):
         self.assertIn("Alles legen", template)
         self.assertIn(".test-data-panel", stylesheet)
         self.assertIn(".test-file-picker__control", stylesheet)
+        self.assertIn("@router.get(\"/api/whatsapp/complete-period-import\")", router_source)
+        self.assertIn("upload_error", router_source)
+        self.assertIn("import_error", template)
 
     def test_test_seeds_are_suppressed_after_reset_and_deploy_clears_once(self):
         data_store = Path("apps/dashboard/data_store.py").read_text(encoding="utf-8-sig")
         migration = Path("migrations/043_reset_payroll_test_dataset_once.sql").read_text(encoding="utf-8-sig")
         fast_migration = Path("migrations/044_fast_reset_payroll_test_dataset_once.sql").read_text(encoding="utf-8-sig")
+        restore_migration = Path("migrations/045_restore_payroll_period_calendar.sql").read_text(encoding="utf-8-sig")
 
         self.assertIn("_payroll_test_seed_is_suppressed", data_store)
         self.assertLess(
             data_store.index("migrations/021_audit_events.sql"),
             data_store.index("migrations/022_otys_staging_tables.sql"),
         )
-        self.assertIn("043_reset_payroll_test_dataset_once.sql", data_store)
-        self.assertIn("044_fast_reset_payroll_test_dataset_once.sql", data_store)
+        self.assertNotIn("043_reset_payroll_test_dataset_once.sql", data_store)
+        self.assertNotIn("044_fast_reset_payroll_test_dataset_once.sql", data_store)
+        self.assertIn("045_restore_payroll_period_calendar.sql", data_store)
         self.assertNotIn("migrations/019_demo_seed_data.sql", data_store)
         self.assertNotIn("migrations/040_one_period_test_hours.sql", data_store)
         self.assertIn("deploy_reset_043", migration)
@@ -640,6 +646,9 @@ class CompletePeriodTimesheetImportTests(unittest.TestCase):
         self.assertIn("payroll_periods", migration)
         self.assertIn("openai_api_audit_events", migration)
         self.assertIn("Testfase uren en loonperiodes geleegd", migration)
+        self.assertIn("Herstelde loonperiodekalender", restore_migration)
+        self.assertIn("generate_series(1, 13)", restore_migration)
+        self.assertIn("payroll_period_weeks", restore_migration)
 
     def test_payslip_manual_net_received_recalculates_remaining_net(self):
         row = {

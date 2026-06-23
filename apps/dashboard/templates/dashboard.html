@@ -1362,7 +1362,7 @@ Metadata:
                         {% if request.query_params.get('cleared_timesheets') %}
                         <div class="timesheet-import-notice timesheet-import-notice--danger">
                             <strong>Testomgeving geleegd</strong>
-                            <span>{{ request.query_params.get('cleared_timesheets') }} urenbriefjes, {{ request.query_params.get('cleared_periods') or 0 }} loonperiodes en {{ request.query_params.get('cleared_payroll_rows') or 0 }} payrollregels verwijderd.</span>
+                            <span>{{ request.query_params.get('cleared_timesheets') }} urenbriefjes en {{ request.query_params.get('cleared_payroll_rows') or 0 }} payrollregels verwijderd. Loonperiodes zijn behouden.</span>
                         </div>
                         {% endif %}
 
@@ -2269,10 +2269,17 @@ Metadata:
                         </div>
                         {% endif %}
 
+                        {% if request.query_params.get('upload_error') or request.query_params.get('import_error') %}
+                        <div class="timesheet-import-notice timesheet-import-notice--danger">
+                            <strong>Upload niet verwerkt</strong>
+                            <span>De server heeft de upload afgebroken. Foutcode: {{ request.query_params.get('upload_error') or request.query_params.get('import_error') }}.</span>
+                        </div>
+                        {% endif %}
+
                         {% if request.query_params.get('cleared_timesheets') %}
                         <div class="timesheet-import-notice timesheet-import-notice--danger">
                             <strong>Testomgeving geleegd</strong>
-                            <span>{{ request.query_params.get('cleared_timesheets') }} urenbriefjes, {{ request.query_params.get('cleared_periods') or 0 }} loonperiodes en {{ request.query_params.get('cleared_payroll_rows') or 0 }} payrollregels verwijderd.</span>
+                            <span>{{ request.query_params.get('cleared_timesheets') }} urenbriefjes en {{ request.query_params.get('cleared_payroll_rows') or 0 }} payrollregels verwijderd. Loonperiodes zijn behouden.</span>
                         </div>
                         {% endif %}
 
