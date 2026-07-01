@@ -1206,9 +1206,44 @@ class DashboardContextSafetyTests(unittest.TestCase):
 
         self.assertIn("timesheet_payroll_period_shortcut.url", template)
         self.assertIn("timesheet_payroll_period_shortcut.title", template)
-        self.assertIn("_timesheet_payroll_period_shortcut(timesheet_stage_items, payroll_periods)", router_source)
+        self.assertIn("_timesheet_payroll_period_shortcut(timesheet_stage_items, timesheet_payroll_periods)", router_source)
         self.assertIn('data_page in {"periods", "timesheets"}', router_source)
         self.assertIn('"raw_start_date"', records_source)
+
+    def test_timesheet_rows_link_to_matching_payroll_periods(self):
+        item = {"workflow_stage": "loon", "work_date": date(2026, 5, 18)}
+        dashboard_router._attach_timesheet_payroll_period_link(
+            item,
+            [
+                {
+                    "id": 6,
+                    "name": "Periode 06 25/05 - 21/06",
+                    "period_number": 6,
+                    "raw_start_date": date(2026, 5, 25),
+                    "raw_end_date": date(2026, 6, 21),
+                },
+                {
+                    "id": 5,
+                    "name": "Periode 05 27/04 - 24/05",
+                    "period_number": 5,
+                    "raw_start_date": date(2026, 4, 27),
+                    "raw_end_date": date(2026, 5, 24),
+                },
+            ],
+        )
+
+        self.assertEqual(item["payroll_period_url"], "/dashboard/periods?period=5#periode-verloning")
+        self.assertEqual(item["payroll_period_title"], "Periode 05 27/04 - 24/05")
+
+    def test_timesheet_overview_shows_row_period_link_for_payroll_and_archive(self):
+        template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
+        router_source = Path("apps/dashboard/router.py").read_text(encoding="utf-8-sig")
+
+        self.assertIn("Open loonperiode", template)
+        self.assertIn("message.workflow_stage in ['loon', 'archief']", template)
+        self.assertIn("message.payroll_period_url", template)
+        self.assertIn("payroll_periods + archived_payroll_periods", router_source)
+        self.assertIn('"archief": "Archief"', router_source)
 
     def test_timesheet_processed_status_moves_to_archive_stage(self):
         self.assertEqual(dashboard_router._timesheet_stage("processed"), "archief")

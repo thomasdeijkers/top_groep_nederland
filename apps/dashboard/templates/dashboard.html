@@ -2473,6 +2473,9 @@ Metadata:
                                             <td>
                                                 <div class="message-actions">
                                                     <a class="icon-text-button" href="/dashboard/timesheets?tab=task&stage={{ message.workflow_stage }}&timesheet={{ message.id }}#timesheet-tabs">Open taak</a>
+                                                    {% if message.workflow_stage in ['loon', 'archief'] and message.payroll_period_url %}
+                                                    <a class="icon-text-button" href="{{ message.payroll_period_url }}" title="{{ message.payroll_period_title }}">Open loonperiode</a>
+                                                    {% endif %}
                                                     <form action="/api/whatsapp/timesheet/{{ message.id }}/archive" method="post">
                                                         <button class="icon-text-button" type="submit">Archiveren</button>
                                                     </form>
