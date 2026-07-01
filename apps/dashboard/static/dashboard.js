@@ -1262,7 +1262,7 @@
             syncTotalCheck("submit", event.submitter?.dataset.manualParseSave === "true");
             saveCorrections(event.submitter);
         });
-        form.querySelector("[data-manual-parse-open]")?.addEventListener("click", () => {
+        form.querySelector("[data-manual-fields-open]")?.addEventListener("click", () => {
             form.querySelectorAll(".timesheet-accordion").forEach((section) => {
                 section.open = true;
             });
@@ -1276,6 +1276,15 @@
         });
         applyAbsenceCode();
         syncTotalCheck("hours");
+    });
+
+    document.querySelectorAll("[data-force-parse-button]").forEach((button) => {
+        button.addEventListener("click", (event) => {
+            event.preventDefault();
+            button.disabled = true;
+            button.textContent = "OCR + OpenAI bezig...";
+            button.form?.requestSubmit();
+        });
     });
 
     document.addEventListener("click", (event) => {

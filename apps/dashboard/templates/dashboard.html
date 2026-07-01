@@ -2636,7 +2636,8 @@ Metadata:
                                                     <span class="autosave-status" data-autosave-status>Wijzigingen worden automatisch opgeslagen</span>
                                                 </div>
                                                 <div class="manual-parse-actions">
-                                                    <button class="ghost-button" type="button" data-manual-parse-open>Handmatig parsen</button>
+                                                    <button class="ghost-button ghost-button--primary" type="submit" form="timesheet-force-parse-form" data-force-parse-button>OCR + OpenAI parsen</button>
+                                                    <button class="ghost-button" type="button" data-manual-fields-open>Velden handmatig invullen</button>
                                                     <button class="ghost-button ghost-button--primary" type="submit" name="manual_parse" value="1" data-manual-parse-save="true">Handmatige parse opslaan</button>
                                                 </div>
                                             </div>
@@ -2841,6 +2842,7 @@ Metadata:
 
                                             <button class="sr-only" type="submit">Opslaan</button>
                                 </form>
+                                <form id="timesheet-force-parse-form" action="/api/whatsapp/timesheet/{{ selected_message.id }}/reparse" method="post"></form>
                                 <form id="timesheet-create-candidate-form" action="/api/whatsapp/timesheet/{{ selected_message.id }}/candidate" method="post"></form>
                                 <div class="workflow-action-row">
                                 <form class="workflow-actions" action="/api/whatsapp/timesheet/{{ selected_message.id }}/validate" method="post">

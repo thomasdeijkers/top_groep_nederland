@@ -1040,13 +1040,20 @@ class TimesheetCandidateValidationTests(unittest.TestCase):
         router_source = Path("apps/dashboard/router.py").read_text(encoding="utf-8-sig")
         stylesheet = Path("apps/dashboard/static/dashboard.css").read_text(encoding="utf-8-sig")
 
-        self.assertIn("data-manual-parse-open", template)
+        self.assertIn("OCR + OpenAI parsen", template)
+        self.assertIn("form=\"timesheet-force-parse-form\"", template)
+        self.assertIn("/api/whatsapp/timesheet/{{ selected_message.id }}/reparse", template)
+        self.assertIn("data-force-parse-button", template)
+        self.assertIn("data-manual-fields-open", template)
         self.assertIn('name="manual_parse"', template)
         self.assertIn("Handmatige parse opslaan", template)
         self.assertIn("form.querySelectorAll(\".timesheet-accordion\")", script)
+        self.assertIn("OCR + OpenAI bezig", script)
         self.assertIn("formData.set(submitter.name", script)
         self.assertIn("manual_parse = str(form.get(\"manual_parse\")", router_source)
         self.assertIn("Urenbriefje handmatig geparsed", router_source)
+        self.assertIn("Urenbriefje met OCR en OpenAI geparsed", router_source)
+        self.assertIn("tab=task&stage=controle", router_source)
         self.assertIn(".manual-parse-actions", stylesheet)
 
     def test_manual_timesheet_fields_recalculate_totals_and_badges(self):

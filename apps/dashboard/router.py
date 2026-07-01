@@ -896,8 +896,8 @@ def search_principals(q: str = "", limit: int = Query(120, ge=1, le=500)):
 @router.post("/api/whatsapp/timesheet/{timesheet_id}/reparse")
 def reparse_whatsapp_timesheet(timesheet_id: int):
     reparse_timesheet_upload(timesheet_id, allow_openai=True)
-    _audit("Urenbriefje opnieuw geparsed", "urenbriefje", timesheet_id, f"Urenbriefje {timesheet_id}", "Parsing opnieuw uitgevoerd met de actuele parserinstellingen.", "Controle")
-    return RedirectResponse(f"/dashboard/timesheets?stage=controle&timesheet={timesheet_id}", status_code=303)
+    _audit("Urenbriefje met OCR en OpenAI geparsed", "urenbriefje", timesheet_id, f"Urenbriefje {timesheet_id}", "OCR/OpenAI parsing opnieuw uitgevoerd voor alle weekstaatvelden.", "Controle")
+    return RedirectResponse(f"/dashboard/timesheets?tab=task&stage=controle&timesheet={timesheet_id}#digital-timesheet", status_code=303)
 
 
 @router.post("/api/whatsapp/timesheet/{timesheet_id}/validate")
