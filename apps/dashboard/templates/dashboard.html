@@ -1901,7 +1901,7 @@ Metadata:
                                     <strong>{{ tab.label }}</strong>
                                     {% if tab.kind == 'week' and tab.summary %}
                                     <small>{{ tab.summary.total_hours }} uur · {{ tab.summary.booking_count }} regels</small>
-                                    <small>{{ tab.summary.booking_count }} declaraties</small>
+                                    <small class="payroll-week-tab-summary">{{ tab.summary.total_hours }} uur - {{ tab.summary.booking_count }} regels</small>
                                     {% elif tab.kind in ['payment', 'paid'] %}
                                     <small>{{ tab.rows|length }} declaraties</small>
                                     {% endif %}

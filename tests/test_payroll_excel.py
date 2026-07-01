@@ -1149,7 +1149,8 @@ class CompletePeriodTimesheetImportTests(unittest.TestCase):
         self.assertIn('target_tab = "Uitbetaald" if result.get("status") == "uitbetaald" else "Uit te betalen"', router_source)
         self.assertIn("PAYROLL_PREPAYMENT_STATUSES", records_source)
         self.assertIn("def _active_timesheet_condition", records_source)
-        self.assertIn("declaraties", template)
+        self.assertIn("payroll-week-tab-summary", template)
+        self.assertIn("uur - {{ tab.summary.booking_count }} regels", template)
 
     def test_deleted_timesheets_are_removed_from_payroll_periods(self):
         actions_source = Path("apps/dashboard/whatsapp_actions.py").read_text(encoding="utf-8-sig")

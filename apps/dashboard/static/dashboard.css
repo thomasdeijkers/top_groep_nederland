@@ -1029,6 +1029,10 @@ h2 {
     font-weight: 800;
 }
 
+.payroll-workbook-tab small:first-of-type:nth-last-of-type(2) {
+    display: none;
+}
+
 .payroll-workbook-tab--active {
     background: #29443d;
     color: #d9ffe8;
