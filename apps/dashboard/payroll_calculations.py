@@ -171,34 +171,35 @@ def build_week_sheet_rows(sheet_label: str, candidates: list[dict], payroll_rows
         week_timesheet_ids = payroll_row.get("week_timesheet_ids", [])
         timesheet_ids = week_timesheet_ids[week_index - 1] if len(week_timesheet_ids) >= week_index else []
         timesheet_label = "Open" if len(timesheet_ids) <= 1 else f"Open ({len(timesheet_ids)})"
-        worked_days = Decimal("5") if worked_hours >= 32 else Decimal("4")
-        single_trip_km = Decimal(10 + ((index + week_index) % 18))
-        total_km = single_trip_km * worked_days * 2
-        net_advance = Decimal("0") if index % 4 else Decimal("150")
+        worked_days = _decimal(payroll_row.get("worked_days") or payroll_row.get("days_worked"))
+        single_trip_km = _decimal(payroll_row.get("single_trip_km"))
+        work_km = _decimal(payroll_row.get("work_km"))
+        total_km = _decimal(payroll_row.get("total_km")) or ((single_trip_km * worked_days * 2) + work_km if single_trip_km and worked_days else Decimal("0"))
+        net_advance = _decimal(payroll_row.get("net_advance"))
         rows.append(
             {
                 "employee_name": employee_name,
                 "timesheet_id": timesheet_ids[0] if timesheet_ids else "",
                 "timesheet_link": timesheet_label if timesheet_ids else "-",
                 "relation_id": payroll_row.get("relation_id") or candidate.get("id"),
-                "contract_hours": payroll_row.get("standard_week_hours") or "40",
-                "worked_days": _format_number(worked_days),
+                "contract_hours": payroll_row.get("standard_week_hours") or payroll_row.get("payroll_cao_hours") or "",
+                "worked_days": _format_number(worked_days) if worked_days else "",
                 "worked_hours": _format_number(worked_hours),
-                "vacation_hours": "0",
-                "sickness_hours": "0",
-                "rv_hours": "0",
-                "kv_hours": "0",
-                "holiday_hours": "0",
-                "net_amount": _format_money(worked_hours * Decimal("13.75")),
-                "commute_km": _format_number(total_km),
-                "work_km": "0",
-                "total_km": _format_number(total_km),
-                "fuel_amount": _format_money(Decimal("0")),
-                "extra_reimbursement": _format_money(Decimal("0")),
-                "net_advance": _format_money(net_advance),
-                "remarks": "",
+                "vacation_hours": payroll_row.get("vacation_hours") or "",
+                "sickness_hours": payroll_row.get("sickness_hours") or "",
+                "rv_hours": payroll_row.get("rv_hours") or "",
+                "kv_hours": payroll_row.get("kv_hours") or "",
+                "holiday_hours": payroll_row.get("holiday_hours") or "",
+                "net_amount": payroll_row.get("net_amount") or "",
+                "commute_km": _format_number(total_km) if total_km else "",
+                "work_km": _format_number(work_km) if work_km else "",
+                "total_km": _format_number(total_km) if total_km else "",
+                "fuel_amount": payroll_row.get("fuel_amount") or "",
+                "extra_reimbursement": payroll_row.get("extra_reimbursement") or "",
+                "net_advance": _format_money(net_advance) if net_advance else "",
+                "remarks": payroll_row.get("remarks") or payroll_row.get("notes") or "",
                 "project_info": payroll_row.get("projects") or "",
-                "single_trip_km": _format_number(single_trip_km),
+                "single_trip_km": _format_number(single_trip_km) if single_trip_km else "",
                 "hours_check": "urenverwerking",
                 "km_check": "urenverwerking",
                 "source": "urenverwerking",
@@ -296,54 +297,47 @@ def build_period_sheet_rows(candidates: list[dict], payroll_rows: list[dict]) ->
     for index, payroll_row in enumerate(payroll_rows, start=1):
         employee_name = payroll_row.get("employee_name") or "-"
         candidate = candidates_by_name.get(_key(employee_name), {})
-        hourly_wage = (
-            _decimal(payroll_row.get("payroll_hourly_wage"))
-            or _decimal(candidate.get("hourly_rate"))
-            or _decimal(payroll_row.get("hourly_wage"))
-            or Decimal("21.50")
-        )
-        contract_hours = _decimal(payroll_row.get("payroll_cao_hours")) or _decimal(payroll_row.get("standard_week_hours")) or Decimal("40")
-        cao_name = payroll_row.get("cao_name") or ("UTA" if index % 3 == 0 else "SAVG" if index % 2 == 0 else "Bouw & Infra")
-        phase = payroll_row.get("payroll_phase") or ("Fase B" if index % 2 else "Fase A")
-        reservation_percent = Decimal("18.5") if cao_name.lower().startswith("bouw") else Decimal("16.0")
-        bruto_total = hourly_wage * contract_hours
-        staffing_factor = Decimal("1.83") if cao_name.lower().startswith("bouw") else Decimal("1.72")
+        hourly_wage = _decimal(payroll_row.get("payroll_hourly_wage")) or _decimal(candidate.get("hourly_rate")) or _decimal(payroll_row.get("hourly_wage"))
+        contract_hours = _decimal(payroll_row.get("payroll_cao_hours")) or _decimal(payroll_row.get("standard_week_hours"))
+        cao_name = payroll_row.get("cao_name") or payroll_row.get("payroll_cao_name") or ""
+        phase = payroll_row.get("payroll_phase") or ""
+        bruto_total = hourly_wage * contract_hours if hourly_wage and contract_hours else Decimal("0")
         rows.append(
             {
                 "employee_name": employee_name,
                 "relation_id": payroll_row.get("relation_id") or candidate.get("id"),
-                "license_plate": payroll_row.get("payroll_license_plate") or _dummy_license_plate(index),
-                "choice_budget": payroll_row.get("payroll_choice_budget") or _format_money(Decimal("1100") + Decimal(index * 62)),
+                "license_plate": payroll_row.get("payroll_license_plate") or "",
+                "choice_budget": payroll_row.get("payroll_choice_budget") or "",
                 "phase": phase,
-                "pension_scheme": payroll_row.get("payroll_pension") or ("StiPP Basis" if phase == "A" else "StiPP Plus"),
-                "contract_hours": _format_number(contract_hours),
+                "pension_scheme": payroll_row.get("payroll_pension") or "",
+                "contract_hours": _format_number(contract_hours) if contract_hours else "",
                 "cao_name": cao_name,
-                "days_right": payroll_row.get("payroll_days_right") or "20",
-                "configuration": payroll_row.get("payroll_scale") or ("B.02.1 Aannemingschaal 2" if cao_name == "SAVG" else "T4.2 F/G A"),
-                "function_name": payroll_row.get("payroll_function") or candidate.get("notes") or "Medewerker bouw",
-                "gross_hourly_wage": _format_money(hourly_wage),
-                "gross_total": _format_money(bruto_total),
-                "reservations": f"{_format_number(reservation_percent)}%",
-                "bik": "0,00",
-                "wage_component": "0,00",
-                "reserve_vacation_days": "25",
-                "reserve_adv": "20",
-                "reserve_holiday": "5",
-                "tsf": "0",
-                "holiday_allowance": "8,33%",
-                "rv_flex": "3,65%",
-                "compensation_uta_days": "0",
-                "compensation_adv_days": "0",
-                "compensation_t": "0",
-                "pension_component": "2,38%",
-                "labor_cost_margin": _format_money(bruto_total * Decimal("0.18")),
-                "staffing_factor": _format_number(staffing_factor),
-                "net_period_basis": _format_money(bruto_total * Decimal("0.62")),
-                "period_basis": "4 weken",
-                "reservation_basis": f"{cao_name} concept",
+                "days_right": payroll_row.get("payroll_days_right") or "",
+                "configuration": payroll_row.get("payroll_scale") or "",
+                "function_name": payroll_row.get("payroll_function") or "",
+                "gross_hourly_wage": _format_money(hourly_wage) if hourly_wage else "",
+                "gross_total": _format_money(bruto_total) if bruto_total else "",
+                "reservations": payroll_row.get("reservations") or "",
+                "bik": payroll_row.get("bik") or "",
+                "wage_component": payroll_row.get("wage_component") or "",
+                "reserve_vacation_days": payroll_row.get("reserve_vacation_days") or "",
+                "reserve_adv": payroll_row.get("reserve_adv") or "",
+                "reserve_holiday": payroll_row.get("reserve_holiday") or "",
+                "tsf": payroll_row.get("tsf") or "",
+                "holiday_allowance": payroll_row.get("holiday_allowance") or "",
+                "rv_flex": payroll_row.get("rv_flex") or "",
+                "compensation_uta_days": payroll_row.get("compensation_uta_days") or "",
+                "compensation_adv_days": payroll_row.get("compensation_adv_days") or "",
+                "compensation_t": payroll_row.get("compensation_t") or "",
+                "pension_component": payroll_row.get("pension_component") or "",
+                "labor_cost_margin": payroll_row.get("labor_cost_margin") or "",
+                "staffing_factor": payroll_row.get("staffing_factor") or "",
+                "net_period_basis": payroll_row.get("net_period_basis") or "",
+                "period_basis": payroll_row.get("period_basis") or "",
+                "reservation_basis": payroll_row.get("reservation_basis") or "",
                 "source": "urenverwerking",
-                "status": "concept",
-                "excel_control": "zichtbaar gemaakt",
+                "status": payroll_row.get("status") or "",
+                "excel_control": "",
             }
         )
     return rows
@@ -403,8 +397,8 @@ def build_payslip_sheet_rows(period_rows: list[dict], total_rows: list[dict]) ->
                 "bkp_ntfsl": _format_money(Decimal("0")),
                 "sickness_value": _format_money(Decimal("0")),
                 "personnel_costs": _format_money(gross_reference * Decimal("1.35")),
-                "notes": "Dummy/concept, nog valideren",
-                "status": "concept",
+                "notes": period_row.get("notes") or "",
+                "status": period_row.get("status") or "",
                 "excel_control": "zichtbaar gemaakt",
             }
         )

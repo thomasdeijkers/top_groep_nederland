@@ -122,16 +122,21 @@ class PayrollCalculationTests(unittest.TestCase):
         template["WK21"]["C8"] = "=Periode!G8"
         template["WK21"]["K8"] = "=(Periode!BB8*E8/40)"
         template["WK21"]["Q8"] = "=K8+O8+P8"
+        template["WK21"]["R8"] = "oude opmerking"
+        template["WK21"]["S8"] = "oude projectinfo"
+        template["WK21"]["R14"] = "4 wekelijkse betaling"
+        template["WK21"]["S130"] = "Loonbeslag Belastingdienst NL89"
         template["Loonstrook"]["B7"] = "Werknemer"
         template["Loonstrook"]["B8"] = "=Periode!B8"
         template["Loonstrook"]["D8"] = "='WK21'!D8+'WK22'!D8+'WK23'!D8+'WK24'!D8"
+        template["Loonstrook"]["P8"] = "oude loonstrooknotitie"
 
         period = {
             "workbook_tabs": [
                 {
                     "label": "WK17",
                     "kind": "week",
-                    "rows": [{"employee_name": "Thomas", "worked_days": "5", "worked_hours": "40", "single_trip_km": "12"}],
+                    "rows": [{"employee_name": "Thomas", "worked_days": "5", "worked_hours": "40", "single_trip_km": "12", "remarks": "dashboard opmerking", "project_info": "Project A"}],
                 },
                 {"label": "WK18", "kind": "week", "rows": []},
                 {"label": "WK19", "kind": "week", "rows": []},
@@ -154,8 +159,45 @@ class PayrollCalculationTests(unittest.TestCase):
         self.assertIn("WK17", workbook.sheetnames)
         self.assertEqual(workbook["Periode"]["B8"].value, "Thomas")
         self.assertEqual(workbook["WK17"]["E8"].value, 40)
+        self.assertEqual(workbook["WK17"]["R8"].value, "dashboard opmerking")
+        self.assertEqual(workbook["WK17"]["S8"].value, "Project A")
+        self.assertIsNone(workbook["WK17"]["R14"].value)
+        self.assertIsNone(workbook["WK17"]["S130"].value)
+        self.assertEqual(workbook["Loonstrook"]["P8"].value, "controle")
         self.assertEqual(workbook["WK17"]["K8"].value, "=(Periode!BB8*E8/40)")
         self.assertIn("'WK17'!D8", workbook["Loonstrook"]["D8"].value)
+
+    @unittest.skipIf(Workbook is None, "openpyxl is niet beschikbaar")
+    def test_tgn_template_export_leaves_empty_notes_empty(self):
+        template = Workbook()
+        template.active.title = "WK21"
+        for sheet_name in ["WK22", "WK23", "WK24", "Periode", "Loonstrook", "Grondslag bouw & infra", "SAVG"]:
+            template.create_sheet(sheet_name)
+        template["Periode"]["B8"] = "Oud"
+        template["WK21"]["B8"] = "=Periode!B8"
+        template["WK21"]["R8"] = "oude opmerking"
+        template["WK21"]["S8"] = "oude projectinfo"
+        template["Loonstrook"]["P8"] = "oude loonstrooknotitie"
+        period = {
+            "workbook_tabs": [
+                {"label": "WK17", "kind": "week", "rows": [{"employee_name": "Thomas", "worked_hours": "8"}]},
+                {"label": "WK18", "kind": "week", "rows": []},
+                {"label": "WK19", "kind": "week", "rows": []},
+                {"label": "WK20", "kind": "week", "rows": []},
+                {"label": "Periode", "kind": "period", "rows": [{"employee_name": "Thomas"}]},
+                {"label": "Loonstrook", "kind": "payslip", "rows": [{"employee_name": "Thomas"}]},
+            ]
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            template_path = Path(tmp_dir) / "template.xlsx"
+            output_path = Path(tmp_dir) / "output.xlsx"
+            template.save(template_path)
+            build_tgn_template_output_workbook(output_path, period, template_path)
+            workbook = load_workbook(output_path, data_only=False)
+
+        self.assertIsNone(workbook["WK17"]["R8"].value)
+        self.assertIsNone(workbook["WK17"]["S8"].value)
+        self.assertIsNone(workbook["Loonstrook"]["P8"].value)
 
     def test_period_excel_endpoint_uses_tgn_template_export(self):
         source = Path("apps/dashboard/router.py").read_text(encoding="utf-8")
@@ -186,6 +228,19 @@ class PayrollCalculationTests(unittest.TestCase):
         self.assertIn("payroll-workbook-link", template)
         self.assertIn("timesheet={{ row.timesheet_id }}", template)
         self.assertIn("/dashboard/relations?tab=candidates&edit={{ row.relation_id }}", template)
+
+    def test_workbook_rows_do_not_invent_missing_payroll_values(self):
+        from apps.dashboard.payroll_calculations import build_period_sheet_rows, build_week_sheet_rows
+
+        period_rows = build_period_sheet_rows([], [{"employee_name": "Thomas"}])
+        week_rows = build_week_sheet_rows("WK18", [], [{"employee_name": "Thomas", "week_hours": ["8"]}], {"week_index": 1, "week_number": 18})
+
+        self.assertEqual(period_rows[0]["license_plate"], "")
+        self.assertEqual(period_rows[0]["function_name"], "")
+        self.assertEqual(period_rows[0]["gross_hourly_wage"], "")
+        self.assertEqual(period_rows[0]["reserve_vacation_days"], "")
+        self.assertEqual(week_rows[0]["single_trip_km"], "")
+        self.assertEqual(week_rows[0]["project_info"], "")
 
     def test_workbook_editable_fields_recalculate_like_excel(self):
         week_row = {

@@ -287,9 +287,15 @@ def _template_employee_rows(worksheet) -> list[int]:
     return rows
 
 
+def _clear_columns(worksheet, columns: tuple[str, ...], start_row: int = 8) -> None:
+    for row_index in range(start_row, worksheet.max_row + 1):
+        for column in columns:
+            worksheet[f"{column}{row_index}"].value = None
+
+
 def _fill_template_period_sheet(worksheet, rows: list[dict]) -> dict[str, int]:
     target_rows = _template_employee_rows(worksheet)
-    _clear_template_period_inputs(worksheet, target_rows)
+    _clear_template_period_inputs(worksheet)
     row_map = {}
     for target_row, source in zip(target_rows, rows):
         employee_name = source.get("employee_name") or ""
@@ -315,22 +321,23 @@ def _fill_template_period_sheet(worksheet, rows: list[dict]) -> dict[str, int]:
         _set(worksheet, target_row, "AE", source.get("compensation_t"))
         _set(worksheet, target_row, "AI", source.get("rv_flex"))
         _set(worksheet, target_row, "BB", source.get("net_period_basis"))
-        _set(worksheet, target_row, "BG", source.get("notes") or source.get("status"))
+        _set(worksheet, target_row, "BG", source.get("notes"))
     return row_map
 
 
-def _clear_template_period_inputs(worksheet, rows: list[int]) -> None:
-    columns = ("B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "T", "V", "W", "Y", "AC", "AD", "AE", "AI", "BB", "BC", "BG")
-    for row_index in rows:
-        for column in columns:
-            worksheet[f"{column}{row_index}"].value = None
+def _clear_template_period_inputs(worksheet) -> None:
+    _clear_columns(
+        worksheet,
+        (
+            "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "O", "Q",
+            "T", "V", "W", "Y", "AC", "AD", "AE", "AH", "AI", "AK", "AN",
+            "AS", "AT", "AU", "AV", "AW", "AX", "AZ", "BB", "BC", "BG",
+        ),
+    )
 
 
 def _fill_template_week_sheet(worksheet, rows: list[dict], row_map: dict[str, int]) -> None:
-    target_rows = _template_employee_rows(worksheet)
-    for target_row in target_rows:
-        for column in ("D", "E", "F", "G", "H", "I", "J", "L", "M", "P", "R", "S"):
-            worksheet[f"{column}{target_row}"].value = None
+    _clear_template_week_inputs(worksheet)
     for source in rows:
         target_row = row_map.get(_key(source.get("employee_name")))
         if not target_row:
@@ -349,7 +356,12 @@ def _fill_template_week_sheet(worksheet, rows: list[dict], row_map: dict[str, in
         _set(worksheet, target_row, "S", source.get("project_info"))
 
 
+def _clear_template_week_inputs(worksheet) -> None:
+    _clear_columns(worksheet, ("D", "E", "F", "G", "H", "I", "J", "L", "M", "O", "P", "R", "S"))
+
+
 def _fill_template_payslip_notes(worksheet, rows: list[dict], row_map: dict[str, int]) -> None:
+    _clear_template_payslip_notes(worksheet)
     for source in rows:
         target_row = row_map.get(_key(source.get("employee_name")))
         if not target_row:
@@ -357,8 +369,12 @@ def _fill_template_payslip_notes(worksheet, rows: list[dict], row_map: dict[str,
         _set(worksheet, target_row, "P", source.get("notes"))
 
 
+def _clear_template_payslip_notes(worksheet) -> None:
+    _clear_columns(worksheet, ("P", "Q", "R", "S"), start_row=8)
+
+
 def _set(worksheet, row: int, column: str, value) -> None:
-    if value in (None, "-"):
+    if value in (None, "", "-"):
         return
     worksheet[f"{column}{row}"].value = _excel_cell_value(value)
 
