@@ -621,6 +621,37 @@ class PayrollPeriodStructureTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 records.create_payroll_period({"year": "2026", "period_number": "14"})
 
+    def test_payroll_period_display_numbers_remain_real_period_numbers(self):
+        periods = [
+            {
+                "id": 5,
+                "year": 2026,
+                "period_number": 5,
+                "start_date": "22-06-2026",
+                "end_date": "19-07-2026",
+                "name": "Periode 05 22/06 - 19/07",
+            }
+        ]
+
+        records._apply_period_display_numbers(periods)
+
+        self.assertEqual(periods[0]["display_period_number"], 5)
+        self.assertEqual(periods[0]["name"], "Periode 05 22/06 - 19/07")
+
+    def test_payroll_periods_can_only_be_archived_from_dashboard(self):
+        template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
+        router_source = Path("apps/dashboard/router.py").read_text(encoding="utf-8-sig")
+        records_source = Path("apps/dashboard/records.py").read_text(encoding="utf-8-sig")
+
+        self.assertIn("Archiveer", template)
+        self.assertIn("Terugzetten", template)
+        self.assertNotIn("Verwijder definitief", template)
+        self.assertNotIn("delete_payroll_period,", router_source)
+        self.assertIn("Verwijderen is uitgeschakeld", router_source)
+        delete_block = records_source[records_source.index("def delete_payroll_period"):records_source.index("def update_payroll_period_status")]
+        self.assertIn("archive_payroll_period(period_id, archived=True)", delete_block)
+        self.assertNotIn("DELETE FROM payroll_periods", delete_block)
+
 
 class PayrollDatamodelFoundationTests(unittest.TestCase):
     def test_foundation_migration_creates_year_and_week_line_tables(self):

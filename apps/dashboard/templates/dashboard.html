@@ -1611,9 +1611,6 @@ Metadata:
                                                 <form action="/api/periods/{{ period.id }}/archive" method="post">
                                                     <button class="table-link table-link--button" type="submit">Archiveer</button>
                                                 </form>
-                                                <form action="/api/periods/{{ period.id }}/delete" method="post" onsubmit="return confirm('Weet je zeker dat je deze loonperiode definitief wilt verwijderen? Urenboekingen blijven bestaan, maar deze periode verdwijnt uit het overzicht.');">
-                                                    <button class="table-link table-link--button table-link--danger" type="submit">Verwijder definitief</button>
-                                                </form>
                                             </div>
                                         </td>
                                     </tr>
@@ -1679,9 +1676,6 @@ Metadata:
                                                 <a class="table-link" href="/dashboard/periods?period={{ period.id }}#periode-verloning">Open verloning</a>
                                                 <form action="/api/periods/{{ period.id }}/restore" method="post">
                                                     <button class="table-link table-link--button" type="submit">Terugzetten</button>
-                                                </form>
-                                                <form action="/api/periods/{{ period.id }}/delete" method="post" onsubmit="return confirm('Weet je zeker dat je deze gearchiveerde loonperiode definitief wilt verwijderen? Urenboekingen blijven bestaan, maar deze periode verdwijnt uit het overzicht.');">
-                                                    <button class="table-link table-link--button table-link--danger" type="submit">Verwijder definitief</button>
                                                 </form>
                                             </div>
                                         </td>

@@ -27,7 +27,6 @@ from apps.dashboard.records import (
     create_payroll_parameter_version,
     create_payroll_running_balance_mutation,
     clear_payroll_test_workspace,
-    delete_payroll_period,
     finalize_payroll_period_for_payment,
     get_cao_setting,
     get_payroll_parameter_version,
@@ -1414,9 +1413,9 @@ def restore_period(period_id: int):
 
 @router.post("/api/periods/{period_id}/delete")
 def delete_period(period_id: int):
-    delete_payroll_period(period_id)
-    _audit("Periode definitief verwijderd", "periode", period_id, f"Periode {period_id}", "Loonperiode definitief verwijderd. Urenboekingen zijn niet verwijderd.", "Periodes")
-    return RedirectResponse("/dashboard/periods#periodes", status_code=303)
+    archive_payroll_period(period_id, archived=True)
+    _audit("Periode gearchiveerd", "periode", period_id, f"Periode {period_id}", "Verwijderen is uitgeschakeld; loonperiode is veilig naar het archief verplaatst.", "Periodes")
+    return RedirectResponse("/dashboard/periods#periode-archief", status_code=303)
 
 
 async def _relation_photo_from_upload(photo: UploadFile | None):

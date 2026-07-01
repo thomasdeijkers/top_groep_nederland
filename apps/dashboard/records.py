@@ -3826,28 +3826,7 @@ def finalize_payroll_period_for_payment(period_id: int) -> dict:
 
 
 def delete_payroll_period(period_id: int) -> None:
-    if not period_id:
-        return
-    _ensure_dashboard_tables_for_read()
-    with get_connection() as conn:
-        with conn.cursor() as cursor:
-            cursor.execute(
-                """
-                UPDATE project_time_bookings
-                SET payroll_period_id = NULL,
-                    updated_at = NOW()
-                WHERE payroll_period_id = %s;
-                """,
-                (period_id,),
-            )
-            cursor.execute(
-                """
-                DELETE FROM payroll_periods
-                WHERE id = %s;
-                """,
-                (period_id,),
-            )
-        conn.commit()
+    archive_payroll_period(period_id, archived=True)
 
 
 def update_payroll_period_status(period_id: int, status: str) -> None:
@@ -3872,20 +3851,12 @@ def _payroll_period_name(period_number: int, start_date: date, end_date: date) -
 
 
 def _apply_period_display_numbers(periods: list[dict]) -> None:
-    grouped: dict[int, list[dict]] = {}
     for period in periods:
-        grouped.setdefault(period["year"], []).append(period)
-    for year_periods in grouped.values():
-        ordered = sorted(
-            year_periods,
-            key=lambda item: datetime.strptime(item["start_date"], "%d-%m-%Y") if item["start_date"] != "-" else datetime.min,
-        )
-        for display_number, period in enumerate(ordered, start=1):
-            period["display_period_number"] = display_number
-            start_date = datetime.strptime(period["start_date"], "%d-%m-%Y").date() if period["start_date"] != "-" else None
-            end_date = datetime.strptime(period["end_date"], "%d-%m-%Y").date() if period["end_date"] != "-" else None
-            if start_date and end_date:
-                period["name"] = _payroll_period_name(display_number, start_date, end_date)
+        period["display_period_number"] = period.get("period_number")
+        start_date = datetime.strptime(period["start_date"], "%d-%m-%Y").date() if period["start_date"] != "-" else None
+        end_date = datetime.strptime(period["end_date"], "%d-%m-%Y").date() if period["end_date"] != "-" else None
+        if start_date and end_date:
+            period["name"] = _payroll_period_name(period["period_number"], start_date, end_date)
 
 
 def _attach_period_weeks(cursor, periods: list[dict]) -> None:
