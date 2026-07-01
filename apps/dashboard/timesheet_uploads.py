@@ -26,6 +26,82 @@ def replace_complete_period_import(source_channel: str = COMPLETE_PERIOD_SOURCE_
         with conn.cursor() as cursor:
             cursor.execute(
                 """
+                SELECT id
+                FROM whatsapp_timesheet_inbox
+                WHERE source_channel = %s;
+                """,
+                (source_channel,),
+            )
+            timesheet_ids = [row[0] for row in cursor.fetchall()]
+            period_ids: list[int] = []
+            input_ids: list[int] = []
+            if timesheet_ids:
+                cursor.execute(
+                    """
+                    SELECT DISTINCT payroll_period_id
+                    FROM project_time_bookings
+                    WHERE timesheet_inbox_id = ANY(%s)
+                      AND payroll_period_id IS NOT NULL;
+                    """,
+                    (timesheet_ids,),
+                )
+                period_ids = [row[0] for row in cursor.fetchall()]
+                cursor.execute(
+                    """
+                    SELECT id, payroll_period_id
+                    FROM payroll_week_inputs
+                    WHERE timesheet_inbox_id = ANY(%s);
+                    """,
+                    (timesheet_ids,),
+                )
+                input_rows = cursor.fetchall()
+                input_ids = [row[0] for row in input_rows]
+                period_ids.extend(row[1] for row in input_rows if row[1])
+                period_ids = sorted(set(period_ids))
+
+            if period_ids:
+                for table_name in (
+                    "payroll_workbook_cell_overrides",
+                    "payroll_period_settlements",
+                    "payroll_calculation_results",
+                    "payroll_period_totals",
+                    "payroll_week_results",
+                    "payroll_week_lines",
+                    "payroll_week_inputs",
+                ):
+                    cursor.execute(f'DELETE FROM "{table_name}" WHERE payroll_period_id = ANY(%s);', (period_ids,))
+            elif input_ids:
+                for table_name in ("payroll_week_results", "payroll_week_lines"):
+                    cursor.execute(f'DELETE FROM "{table_name}" WHERE payroll_week_input_id = ANY(%s);', (input_ids,))
+                cursor.execute("DELETE FROM payroll_week_inputs WHERE id = ANY(%s);", (input_ids,))
+
+            if timesheet_ids:
+                cursor.execute(
+                    """
+                    DELETE FROM openai_api_audit_events
+                    WHERE timesheet_inbox_id = ANY(%s)
+                       OR (source IN ('whatsapp_timesheet', 'whatsapp_timesheet_reparse') AND source_id = ANY(%s));
+                    """,
+                    (timesheet_ids, timesheet_ids),
+                )
+                cursor.execute(
+                    """
+                    DELETE FROM openai_usage_events
+                    WHERE source IN ('whatsapp_timesheet', 'whatsapp_timesheet_reparse')
+                      AND source_id = ANY(%s);
+                    """,
+                    (timesheet_ids,),
+                )
+                cursor.execute(
+                    """
+                    DELETE FROM audit_events
+                    WHERE timesheet_inbox_id = ANY(%s)
+                       OR (entity_type IN ('urenbriefje', 'whatsapp_timesheet') AND entity_id = ANY(%s));
+                    """,
+                    (timesheet_ids, timesheet_ids),
+                )
+            cursor.execute(
+                """
                 DELETE FROM project_time_bookings b
                 USING whatsapp_timesheet_inbox w
                 WHERE b.timesheet_inbox_id = w.id
@@ -35,17 +111,28 @@ def replace_complete_period_import(source_channel: str = COMPLETE_PERIOD_SOURCE_
             )
             cursor.execute(
                 """
-                UPDATE whatsapp_timesheet_inbox
-                SET deleted_at = NOW(),
-                    archived_at = NOW(),
-                    updated_at = NOW()
-                WHERE source_channel = %s
-                  AND deleted_at IS NULL;
+                DELETE FROM timesheet_field_corrections c
+                USING whatsapp_timesheet_inbox w
+                WHERE c.timesheet_inbox_id = w.id
+                  AND w.source_channel = %s;
+                """,
+                (source_channel,),
+            )
+            cursor.execute(
+                """
+                DELETE FROM whatsapp_timesheet_inbox
+                WHERE source_channel = %s;
                 """,
                 (source_channel,),
             )
             replaced = cursor.rowcount
         conn.commit()
+    try:
+        from apps.dashboard.records import ensure_payroll_period_calendar
+
+        ensure_payroll_period_calendar(2026)
+    except Exception:
+        pass
     return replaced
 
 

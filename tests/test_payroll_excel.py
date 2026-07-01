@@ -696,6 +696,19 @@ class CompletePeriodTimesheetImportTests(unittest.TestCase):
         self.assertIn("replace_complete_period_import", upload_source)
         self.assertIn("project_time_bookings", upload_source)
 
+    def test_complete_period_replace_clears_old_payroll_processing(self):
+        upload_source = Path("apps/dashboard/timesheet_uploads.py").read_text(encoding="utf-8-sig")
+        replace_block = upload_source[upload_source.index("def replace_complete_period_import"):upload_source.index("def import_complete_period_timesheets")]
+
+        self.assertIn("SELECT id", replace_block)
+        self.assertIn("payroll_week_inputs", replace_block)
+        self.assertIn("payroll_week_results", replace_block)
+        self.assertIn("payroll_week_lines", replace_block)
+        self.assertIn("payroll_period_settlements", replace_block)
+        self.assertIn("payroll_period_totals", replace_block)
+        self.assertIn("DELETE FROM whatsapp_timesheet_inbox", replace_block)
+        self.assertIn("ensure_payroll_period_calendar(2026)", replace_block)
+
     def test_timesheet_upload_falls_back_when_candidate_fk_is_stale(self):
         upload_source = Path("apps/dashboard/timesheet_uploads.py").read_text(encoding="utf-8-sig")
 
@@ -739,6 +752,7 @@ class CompletePeriodTimesheetImportTests(unittest.TestCase):
         self.assertIn("payroll_week_results", records_source)
         self.assertIn("payroll_period_settlements", records_source)
         self.assertIn("openai_api_audit_events", records_source)
+        self.assertIn("audit_events", records_source)
         self.assertIn("_payroll_demo_seed_is_suppressed", records_source)
         self.assertIn("cleared_payroll_rows", router_source)
 

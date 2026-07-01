@@ -3406,6 +3406,7 @@ def clear_payroll_test_workspace() -> dict:
                 "timesheet_field_corrections",
                 "whatsapp_timesheet_inbox",
                 "audit_log",
+                "audit_events",
             )
             deleted_counts = _delete_all_existing_tables(cursor, reset_tables)
             deleted_bookings = deleted_counts.get("project_time_bookings", 0)
