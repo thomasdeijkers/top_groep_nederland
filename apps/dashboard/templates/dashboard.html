@@ -1899,6 +1899,12 @@ Metadata:
                         </details>
 
                         <div class="payroll-workbook" data-payroll-workbook data-period-id="{{ selected_payroll_period.id }}">
+                            {% if selected_payroll_period.is_locked_for_payment %}
+                            <div class="inline-alert inline-alert--success">
+                                <strong>Gevalideerd voor loonbetaling</strong>
+                                <span>Deze loonperiode staat op slot. Zet de periode vanuit het archief terug om urenbriefjes en workbookregels weer te wijzigen.</span>
+                            </div>
+                            {% endif %}
                             <div class="payroll-workbook-tabs" role="tablist" aria-label="Verloning werkmap">
                                 {% for tab in selected_payroll_period.workbook_tabs %}
                                 <button class="payroll-workbook-tab {% if loop.first %}payroll-workbook-tab--active{% endif %}" type="button" role="tab" data-payroll-tab="{{ tab.label }}" aria-selected="{{ 'true' if loop.first else 'false' }}">
@@ -1912,7 +1918,7 @@ Metadata:
                                     <a class="payroll-workbook-action" href="/api/periods/{{ selected_payroll_period.id }}/excel/export">Excel TGN-opzet</a>
                                     <a class="payroll-workbook-action" href="/dashboard/audit#auditspoor">Auditspoor</a>
                                     <form class="payroll-workbook-action-form" action="/api/periods/{{ selected_payroll_period.id }}/approve" method="post" onsubmit="return confirm('Valideer deze loonperiode definitief voor loonbetaling en verplaats de periode naar het archief?');">
-                                        <button class="payroll-workbook-action" type="submit" {% if not selected_payroll_period.payroll_phase_status.can_approve %}disabled title="Los eerst blokkerende payroll-uitzonderingen op."{% endif %}>Valideer voor loonbetaling</button>
+                                        <button class="payroll-workbook-action" type="submit" {% if selected_payroll_period.is_locked_for_payment or not selected_payroll_period.payroll_phase_status.can_approve %}disabled title="{% if selected_payroll_period.is_locked_for_payment %}Deze loonperiode is al gevalideerd voor loonbetaling.{% else %}Los eerst blokkerende payroll-uitzonderingen op.{% endif %}"{% endif %}>{% if selected_payroll_period.is_locked_for_payment %}Gevalideerd{% else %}Valideer voor loonbetaling{% endif %}</button>
                                     </form>
                                     <a class="payroll-workbook-action" href="/dashboard/periods#periodes">Sluiten</a>
                                 </div>
@@ -1948,13 +1954,13 @@ Metadata:
                                                         <span class="payroll-muted">-</span>
                                                         {% endif %}
                                                     {% elif column.options is defined %}
-                                                        <select class="payroll-cell-input" data-payroll-cell data-save-url="/api/periods/{{ selected_payroll_period.id }}/workbook-cell" data-tab-label="{{ tab.label }}" data-row-key="{{ row._row_key }}" data-employee-name="{{ row.employee_name }}" data-relation-id="{{ row.relation_id or '' }}" data-column-key="{{ column.key }}" data-column-label="{{ column.label }}" data-original-value="{{ cell_value }}" data-previous-value="{{ cell_mutation.previous_value if cell_mutation else cell_value }}" aria-label="{{ column.label }} {{ row.employee_name }}">
+                                                        <select class="payroll-cell-input" data-payroll-cell data-save-url="/api/periods/{{ selected_payroll_period.id }}/workbook-cell" data-tab-label="{{ tab.label }}" data-row-key="{{ row._row_key }}" data-employee-name="{{ row.employee_name }}" data-relation-id="{{ row.relation_id or '' }}" data-column-key="{{ column.key }}" data-column-label="{{ column.label }}" data-original-value="{{ cell_value }}" data-previous-value="{{ cell_mutation.previous_value if cell_mutation else cell_value }}" aria-label="{{ column.label }} {{ row.employee_name }}" {% if selected_payroll_period.is_locked_for_payment %}disabled{% endif %}>
                                                             {% for option in column.options %}
                                                             <option value="{{ option }}" {% if option == cell_value %}selected{% endif %}>{{ option }}</option>
                                                             {% endfor %}
                                                         </select>
                                                     {% else %}
-                                                        <input class="payroll-cell-input" value="{{ cell_value }}" data-payroll-cell data-save-url="/api/periods/{{ selected_payroll_period.id }}/workbook-cell" data-tab-label="{{ tab.label }}" data-row-key="{{ row._row_key }}" data-employee-name="{{ row.employee_name }}" data-relation-id="{{ row.relation_id or '' }}" data-column-key="{{ column.key }}" data-column-label="{{ column.label }}" data-original-value="{{ cell_value }}" data-previous-value="{{ cell_mutation.previous_value if cell_mutation else cell_value }}" aria-label="{{ column.label }} {{ row.employee_name }}">
+                                                        <input class="payroll-cell-input" value="{{ cell_value }}" data-payroll-cell data-save-url="/api/periods/{{ selected_payroll_period.id }}/workbook-cell" data-tab-label="{{ tab.label }}" data-row-key="{{ row._row_key }}" data-employee-name="{{ row.employee_name }}" data-relation-id="{{ row.relation_id or '' }}" data-column-key="{{ column.key }}" data-column-label="{{ column.label }}" data-original-value="{{ cell_value }}" data-previous-value="{{ cell_mutation.previous_value if cell_mutation else cell_value }}" aria-label="{{ column.label }} {{ row.employee_name }}" {% if selected_payroll_period.is_locked_for_payment %}disabled{% endif %}>
                                                     {% endif %}
                                                     <small class="payroll-cell-meta" data-cell-meta>
                                                         {% if cell_mutation %}
@@ -2528,17 +2534,23 @@ Metadata:
                                     <span>De nieuwe kandidaat is aan dit urenbriefje gekoppeld.</span>
                                 </div>
                                 {% endif %}
+                                {% if selected_message.payroll_locked or request.query_params.get('locked') %}
+                                <div class="inline-alert inline-alert--success">
+                                    <strong>Gevalideerd voor loonbetaling</strong>
+                                    <span>Dit urenbriefje staat op slot. Zet de gekoppelde loonperiode terug om wijzigingen weer mogelijk te maken.</span>
+                                </div>
+                                {% endif %}
                                 <details class="review-message-actions compact-actions message-tools">
                                     <summary>Berichtopties</summary>
                                     <div>
                                         <form action="/api/whatsapp/timesheet/{{ selected_message.id }}/reparse" method="post">
-                                            <button class="ghost-button" type="submit">Opnieuw parsen</button>
+                                            <button class="ghost-button" type="submit" {% if selected_message.payroll_locked %}disabled{% endif %}>Opnieuw parsen</button>
                                         </form>
                                         <form action="/api/whatsapp/timesheet/{{ selected_message.id }}/archive" method="post">
-                                            <button class="ghost-button" type="submit">Archiveren</button>
+                                            <button class="ghost-button" type="submit" {% if selected_message.payroll_locked %}disabled{% endif %}>Archiveren</button>
                                         </form>
                                         <form action="/api/whatsapp/timesheet/{{ selected_message.id }}/delete" method="post">
-                                            <button class="ghost-button danger-button" type="submit">Verwijderen</button>
+                                            <button class="ghost-button danger-button" type="submit" {% if selected_message.payroll_locked %}disabled{% endif %}>Verwijderen</button>
                                         </form>
                                     </div>
                                 </details>
@@ -2639,11 +2651,12 @@ Metadata:
                                                     <span class="autosave-status" data-autosave-status>Wijzigingen worden automatisch opgeslagen</span>
                                                 </div>
                                                 <div class="manual-parse-actions">
-                                                    <button class="ghost-button ghost-button--primary" type="submit" form="timesheet-force-parse-form" data-force-parse-button>OCR + OpenAI parsen</button>
-                                                    <button class="ghost-button" type="button" data-manual-fields-open>Velden handmatig invullen</button>
-                                                    <button class="ghost-button ghost-button--primary" type="submit" name="manual_parse" value="1" data-manual-parse-save="true">Handmatige parse opslaan</button>
+                                                    <button class="ghost-button ghost-button--primary" type="submit" form="timesheet-force-parse-form" data-force-parse-button {% if selected_message.payroll_locked %}disabled{% endif %}>OCR + OpenAI parsen</button>
+                                                    <button class="ghost-button" type="button" data-manual-fields-open {% if selected_message.payroll_locked %}disabled{% endif %}>Velden handmatig invullen</button>
+                                                    <button class="ghost-button ghost-button--primary" type="submit" name="manual_parse" value="1" data-manual-parse-save="true" {% if selected_message.payroll_locked %}disabled{% endif %}>Handmatige parse opslaan</button>
                                                 </div>
                                             </div>
+                                            <fieldset {% if selected_message.payroll_locked %}disabled{% endif %}>
 
                                             <details class="timesheet-accordion">
                                                 <summary>
@@ -2844,6 +2857,7 @@ Metadata:
                                             </details>
 
                                             <button class="sr-only" type="submit">Opslaan</button>
+                                            </fieldset>
                                 </form>
                                 <form id="timesheet-force-parse-form" action="/api/whatsapp/timesheet/{{ selected_message.id }}/reparse" method="post"></form>
                                 <form id="timesheet-create-candidate-form" action="/api/whatsapp/timesheet/{{ selected_message.id }}/candidate" method="post"></form>
@@ -2852,7 +2866,7 @@ Metadata:
                                     <input type="hidden" name="matched_relation_id" value="{{ selected_message.matched_relation_id or '' }}" data-workflow-candidate-id>
                                     <input type="hidden" name="principal_id" value="{{ selected_message.selected_principal_id or '' }}" data-workflow-principal-id>
                                     <input type="hidden" name="project_id" value="{{ selected_message.selected_project_id or '' }}" data-workflow-project-id>
-                                    <button class="ghost-button" type="submit" data-workflow-validate-button {% if not selected_message.matched_relation_id %}disabled title="Koppel eerst een kandidaat"{% endif %}>Valideren</button>
+                                    <button class="ghost-button" type="submit" data-workflow-validate-button {% if selected_message.payroll_locked or not selected_message.matched_relation_id %}disabled title="{% if selected_message.payroll_locked %}Dit urenbriefje is gevalideerd voor loonbetaling.{% else %}Koppel eerst een kandidaat{% endif %}"{% endif %}>Valideren</button>
                                     {% if not selected_message.matched_relation_id %}
                                     <span class="workflow-action-note" data-workflow-candidate-note>Koppel of maak eerst een kandidaat aan.</span>
                                     {% endif %}

@@ -21,6 +21,8 @@ from shared.db.connection import get_connection
 
 PAYROLL_PERIODS_PER_YEAR = 13
 PAYROLL_CALENDAR_START_2026 = date(2026, 1, 5)
+PAYROLL_LOCKED_STATUSES = ("processed", "definitief_loonbetaling", "verwerkt")
+PAYROLL_EDITABLE_AFTER_REOPEN_STATUS = "loon_te_berekenen"
 
 
 def _ensure_dashboard_tables_for_read() -> None:
@@ -1569,6 +1571,7 @@ def list_payroll_periods(limit: int = 25, archived: bool = False) -> list[dict]:
                         "start_date": row[4].strftime("%d-%m-%Y") if row[4] else "-",
                         "end_date": row[5].strftime("%d-%m-%Y") if row[5] else "-",
                         "status": row[6] or "concept",
+                        "is_locked_for_payment": str(row[6] or "").strip().lower() == "archief",
                         "notes": row[7] or "",
                         "week_count": row[8] or 0,
                         "booking_count": row[9] or 0,
@@ -1994,6 +1997,7 @@ def get_payroll_period(period_id: int | None) -> dict | None:
                     "start_date": row[4].strftime("%d-%m-%Y") if row[4] else "-",
                     "end_date": row[5].strftime("%d-%m-%Y") if row[5] else "-",
                     "status": row[6] or "concept",
+                    "is_locked_for_payment": str(row[6] or "").strip().lower() == "archief",
                     "notes": row[7] or "",
                     "week_count": row[8] or 0,
                     "booking_count": row[9] or 0,
@@ -3085,6 +3089,8 @@ def apply_payroll_workbook_overrides(period_id: int, tabs: list[dict]) -> None:
 
 def save_payroll_workbook_cell(period_id: int, payload: dict) -> dict:
     _ensure_dashboard_tables_for_read()
+    if is_payroll_period_locked_for_payment(period_id):
+        return {"ok": False, "error": "Deze loonperiode is al gevalideerd voor loonbetaling en staat op slot.", "locked": True}
     tab_label = str(payload.get("tab_label") or "").strip()
     row_key = str(payload.get("row_key") or "").strip()
     employee_name = str(payload.get("employee_name") or "").strip()
@@ -3530,6 +3536,160 @@ def archive_payroll_period(period_id: int, archived: bool = True) -> None:
                 (new_status, period_id),
             )
         conn.commit()
+
+
+def is_payroll_period_locked_for_payment(period_id: int | None) -> bool:
+    if not period_id:
+        return False
+    try:
+        _ensure_dashboard_tables_for_read()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT LOWER(COALESCE(status, '')) = 'archief'
+                    FROM payroll_periods
+                    WHERE id = %s;
+                    """,
+                    (period_id,),
+                )
+                row = cursor.fetchone()
+                return bool(row and row[0])
+    except Exception:
+        return False
+
+
+def get_timesheet_payroll_lock(timesheet_id: int | None) -> dict:
+    if not timesheet_id:
+        return {"locked": False}
+    try:
+        _ensure_dashboard_tables_for_read()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    WITH timesheet AS (
+                        SELECT id,
+                               status,
+                               COALESCE(work_date, received_at::date) AS work_day
+                        FROM whatsapp_timesheet_inbox
+                        WHERE id = %s
+                    ), matched_period AS (
+                        SELECT p.id,
+                               p.name,
+                               p.period_number,
+                               p.start_date,
+                               p.end_date,
+                               p.status
+                        FROM timesheet t
+                        JOIN payroll_periods p
+                          ON t.work_day BETWEEN p.start_date AND p.end_date
+                        ORDER BY p.start_date DESC
+                        LIMIT 1
+                    ), week_input AS (
+                        SELECT i.payroll_period_id,
+                               i.status
+                        FROM payroll_week_inputs i
+                        WHERE i.timesheet_inbox_id = %s
+                        LIMIT 1
+                    )
+                    SELECT COALESCE(input_period.id, matched_period.id),
+                           COALESCE(input_period.name, matched_period.name, 'Periode ' || COALESCE(input_period.period_number, matched_period.period_number)::text),
+                           COALESCE(input_period.status, matched_period.status),
+                           t.status,
+                           wi.status
+                    FROM timesheet t
+                    LEFT JOIN week_input wi ON TRUE
+                    LEFT JOIN payroll_periods input_period ON input_period.id = wi.payroll_period_id
+                    LEFT JOIN matched_period ON TRUE;
+                    """,
+                    (timesheet_id, timesheet_id),
+                )
+                row = cursor.fetchone()
+    except Exception:
+        return {"locked": False}
+    if not row:
+        return {"locked": False}
+    normalized_values = {
+        str(value or "").strip().lower().replace(" ", "_")
+        for value in (row[2], row[3], row[4])
+    }
+    locked = "archief" in normalized_values or any(status in normalized_values for status in PAYROLL_LOCKED_STATUSES)
+    return {
+        "locked": locked,
+        "period_id": row[0],
+        "period_name": row[1] or "",
+        "reason": "Gevalideerd voor loonbetaling" if locked else "",
+    }
+
+
+def reopen_payroll_period_for_editing(period_id: int) -> dict:
+    if not period_id:
+        return {"timesheets": 0, "bookings": 0, "week_inputs": 0}
+    _ensure_dashboard_tables_for_read()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT start_date, end_date
+                FROM payroll_periods
+                WHERE id = %s;
+                """,
+                (period_id,),
+            )
+            period_row = cursor.fetchone()
+            if not period_row:
+                return {"timesheets": 0, "bookings": 0, "week_inputs": 0}
+            start_date, end_date = period_row
+            cursor.execute(
+                """
+                UPDATE whatsapp_timesheet_inbox
+                SET status = %s,
+                    payroll_sent_at = NULL,
+                    updated_at = NOW()
+                WHERE deleted_at IS NULL
+                  AND archived_at IS NULL
+                  AND COALESCE(work_date, received_at::date) BETWEEN %s AND %s
+                  AND LOWER(REPLACE(COALESCE(status, ''), ' ', '_')) = ANY(%s);
+                """,
+                (PAYROLL_EDITABLE_AFTER_REOPEN_STATUS, start_date, end_date, list(PAYROLL_LOCKED_STATUSES)),
+            )
+            timesheets = cursor.rowcount
+            cursor.execute(
+                """
+                UPDATE project_time_bookings b
+                SET status = %s,
+                    updated_at = NOW()
+                FROM whatsapp_timesheet_inbox w
+                WHERE b.timesheet_inbox_id = w.id
+                  AND COALESCE(w.work_date, w.received_at::date) BETWEEN %s AND %s
+                  AND LOWER(REPLACE(COALESCE(b.status, ''), ' ', '_')) = ANY(%s);
+                """,
+                (PAYROLL_EDITABLE_AFTER_REOPEN_STATUS, start_date, end_date, list(PAYROLL_LOCKED_STATUSES)),
+            )
+            bookings = cursor.rowcount
+            cursor.execute(
+                """
+                UPDATE payroll_week_inputs
+                SET status = %s,
+                    updated_at = NOW()
+                WHERE payroll_period_id = %s
+                  AND LOWER(REPLACE(COALESCE(status, ''), ' ', '_')) = ANY(%s);
+                """,
+                (PAYROLL_EDITABLE_AFTER_REOPEN_STATUS, period_id, list(PAYROLL_LOCKED_STATUSES)),
+            )
+            week_inputs = cursor.rowcount
+            cursor.execute(
+                """
+                UPDATE payroll_periods
+                SET status = 'Open',
+                    updated_at = NOW()
+                WHERE id = %s;
+                """,
+                (period_id,),
+            )
+        conn.commit()
+    return {"timesheets": timesheets, "bookings": bookings, "week_inputs": week_inputs}
 
 
 def finalize_payroll_period_for_payment(period_id: int) -> dict:

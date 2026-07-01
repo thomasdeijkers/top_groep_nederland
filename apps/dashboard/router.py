@@ -32,6 +32,7 @@ from apps.dashboard.records import (
     get_cao_setting,
     get_payroll_parameter_version,
     get_payroll_period,
+    get_timesheet_payroll_lock,
     get_project,
     get_overview_data,
     get_payroll_period_defaults,
@@ -61,6 +62,7 @@ from apps.dashboard.records import (
     list_vacancy_statuses,
     list_whatsapp_timesheets,
     log_audit_event,
+    reopen_payroll_period_for_editing,
     save_payroll_workbook_cell,
     search_candidate_matches,
     update_cao_setting,
@@ -289,6 +291,17 @@ def _attach_timesheet_payroll_period_link(item: dict, periods: list[dict]) -> No
         return
     item["payroll_period_url"] = f"/dashboard/periods?period={period['id']}#periode-verloning"
     item["payroll_period_title"] = period.get("name") or f"Periode {period.get('period_number')}"
+
+
+def _timesheet_locked_response(timesheet_id: int, request: Request | None = None):
+    lock = get_timesheet_payroll_lock(timesheet_id)
+    if not lock.get("locked"):
+        return None
+    message = "Dit urenbriefje is gevalideerd voor loonbetaling en staat op slot. Zet de loonperiode terug om weer te wijzigen."
+    if request and request.headers.get("X-Requested-With") == "fetch":
+        return JSONResponse({"ok": False, "locked": True, "error": message}, status_code=423)
+    query = urlencode({"tab": "task", "stage": "archief", "timesheet": timesheet_id, "locked": "1"})
+    return RedirectResponse(f"/dashboard/timesheets?{query}#digital-timesheet", status_code=303)
 
 
 def _matching_payroll_period_for_timesheet(item: dict, periods: list[dict]) -> dict | None:
@@ -541,6 +554,7 @@ def _dashboard_context(
                 "archief": "Archief",
             }.get(item["workflow_stage"], "Te controleren")
             _attach_timesheet_payroll_period_link(item, timesheet_payroll_periods)
+            item["payroll_locked"] = item["workflow_stage"] == "archief"
         except Exception as exc:
             print(f"DASHBOARD_CONTEXT_SECTION_ERROR {data_page}.timesheet_row: {type(exc).__name__}: {exc}")
             item.setdefault("parsed_map", {})
@@ -882,6 +896,9 @@ def clear_payroll_workspace_for_testing(return_to: str = Form("timesheets")):
 
 @router.post("/api/whatsapp/timesheet/{timesheet_id}/corrections")
 async def correct_whatsapp_timesheet(timesheet_id: int, request: Request):
+    locked_response = _timesheet_locked_response(timesheet_id, request)
+    if locked_response:
+        return locked_response
     form = await request.form()
     corrections = {
         key.removeprefix("field_"): value
@@ -929,6 +946,9 @@ def create_candidate_from_timesheet(
     city: str = Form(""),
     email: str = Form(""),
 ):
+    locked_response = _timesheet_locked_response(timesheet_id)
+    if locked_response:
+        return locked_response
     first_name, last_name = _split_candidate_name(candidate_name)
     record_id = create_candidate(
         {
@@ -961,6 +981,9 @@ def search_principals(q: str = "", limit: int = Query(120, ge=1, le=500)):
 
 @router.post("/api/whatsapp/timesheet/{timesheet_id}/reparse")
 def reparse_whatsapp_timesheet(timesheet_id: int):
+    locked_response = _timesheet_locked_response(timesheet_id)
+    if locked_response:
+        return locked_response
     reparse_timesheet_upload(timesheet_id, allow_openai=True)
     _audit("Urenbriefje met OCR en OpenAI geparsed", "urenbriefje", timesheet_id, f"Urenbriefje {timesheet_id}", "OCR/OpenAI parsing opnieuw uitgevoerd voor alle weekstaatvelden.", "Controle")
     return RedirectResponse(f"/dashboard/timesheets?tab=task&stage=controle&timesheet={timesheet_id}#digital-timesheet", status_code=303)
@@ -973,6 +996,9 @@ def validate_whatsapp_timesheet(
     principal_id: int | None = Form(None),
     project_id: int | None = Form(None),
 ):
+    locked_response = _timesheet_locked_response(timesheet_id)
+    if locked_response:
+        return locked_response
     try:
         selected_candidate_id = ensure_relation_for_candidate_match(matched_relation_id)
         if selected_candidate_id:
@@ -987,6 +1013,9 @@ def validate_whatsapp_timesheet(
 
 @router.post("/api/whatsapp/timesheet/{timesheet_id}/payroll")
 def payroll_whatsapp_timesheet(timesheet_id: int):
+    locked_response = _timesheet_locked_response(timesheet_id)
+    if locked_response:
+        return locked_response
     send_to_payroll(timesheet_id)
     _audit("Doorgestuurd naar loonadministratie", "urenbriefje", timesheet_id, f"Urenbriefje {timesheet_id}", "Urenbriefje is doorgestuurd voor loonadministratie.", "Accorderen")
     return RedirectResponse("/dashboard/periods#periodes", status_code=303)
@@ -994,6 +1023,9 @@ def payroll_whatsapp_timesheet(timesheet_id: int):
 
 @router.post("/api/whatsapp/timesheet/{timesheet_id}/archive")
 def archive_whatsapp_message(timesheet_id: int):
+    locked_response = _timesheet_locked_response(timesheet_id)
+    if locked_response:
+        return locked_response
     archive_whatsapp_timesheet(timesheet_id)
     _audit("Urenbriefje gearchiveerd", "urenbriefje", timesheet_id, f"Urenbriefje {timesheet_id}", "Urenbriefje is uit de actieve werklijst gehaald.", "Archief")
     return RedirectResponse("/dashboard/timesheets", status_code=303)
@@ -1001,6 +1033,9 @@ def archive_whatsapp_message(timesheet_id: int):
 
 @router.post("/api/whatsapp/timesheet/{timesheet_id}/delete")
 def delete_whatsapp_message(timesheet_id: int):
+    locked_response = _timesheet_locked_response(timesheet_id)
+    if locked_response:
+        return locked_response
     delete_whatsapp_timesheet(timesheet_id)
     _audit("Urenbriefje verwijderd", "urenbriefje", timesheet_id, f"Urenbriefje {timesheet_id}", "Urenbriefje is verwijderd uit de actieve verwerking.", "Verwijderd")
     return RedirectResponse("/dashboard/timesheets", status_code=303)
@@ -1289,7 +1324,7 @@ def _safe_download_filename(value: str) -> str:
 async def save_payroll_period_workbook_cell(period_id: int, request: Request):
     payload = await request.json()
     result = save_payroll_workbook_cell(period_id, payload)
-    status_code = 200 if result.get("ok") else 400
+    status_code = 200 if result.get("ok") else 423 if result.get("locked") else 400
     return JSONResponse(result, status_code=status_code)
 
 
@@ -1343,8 +1378,20 @@ def approve_period(period_id: int):
 
 @router.post("/api/periods/{period_id}/restore")
 def restore_period(period_id: int):
-    archive_payroll_period(period_id, archived=False)
-    _audit("Periode teruggezet", "periode", period_id, f"Periode {period_id}", "Loonperiode teruggezet uit het archief.", "Periodes")
+    result = reopen_payroll_period_for_editing(period_id)
+    _audit(
+        "Periode teruggezet",
+        "periode",
+        period_id,
+        f"Periode {period_id}",
+        f"Loonperiode teruggezet uit het archief; {result['timesheets']} urenbriefjes zijn weer bewerkbaar voor loonberekening.",
+        "Periodes",
+        metadata={
+            "reopened_timesheets": result["timesheets"],
+            "reopened_bookings": result["bookings"],
+            "reopened_week_inputs": result["week_inputs"],
+        },
+    )
     return RedirectResponse("/dashboard/periods#periodes", status_code=303)
 
 

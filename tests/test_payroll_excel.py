@@ -1290,6 +1290,26 @@ class DashboardContextSafetyTests(unittest.TestCase):
         self.assertIn("UPDATE payroll_week_inputs", records_source)
         self.assertIn("SET status = 'Archief'", records_source)
 
+    def test_payroll_payment_approval_locks_timesheet_edits_until_period_restore(self):
+        template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
+        router_source = Path("apps/dashboard/router.py").read_text(encoding="utf-8-sig")
+        records_source = Path("apps/dashboard/records.py").read_text(encoding="utf-8-sig")
+
+        self.assertIn("get_timesheet_payroll_lock", router_source)
+        self.assertIn("_timesheet_locked_response(timesheet_id", router_source)
+        self.assertIn("status_code=423", router_source)
+        self.assertIn("reopen_payroll_period_for_editing", router_source)
+        self.assertIn("PAYROLL_LOCKED_STATUSES", records_source)
+        self.assertIn("def get_timesheet_payroll_lock", records_source)
+        self.assertIn("def is_payroll_period_locked_for_payment", records_source)
+        self.assertIn("def reopen_payroll_period_for_editing", records_source)
+        self.assertIn("payroll_sent_at = NULL", records_source)
+        self.assertIn("Deze loonperiode is al gevalideerd voor loonbetaling en staat op slot", records_source)
+        self.assertIn("selected_message.payroll_locked", template)
+        self.assertIn("selected_payroll_period.is_locked_for_payment", template)
+        self.assertIn("Gevalideerd voor loonbetaling", template)
+        self.assertIn("disabled title", template)
+
 
 class PayrollPeriodDetailSafetyTests(unittest.TestCase):
     def test_period_detail_uses_safe_defaults_and_warning(self):
