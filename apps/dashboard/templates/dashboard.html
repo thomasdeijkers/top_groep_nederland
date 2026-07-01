@@ -321,6 +321,33 @@
                                     </div>
                                 </div>
 
+                                <form class="payroll-settings-form payroll-settings-form--compact payroll-parameter-form" action="/api/settings/payroll-parameters" method="post">
+                                    <label>Parameter
+                                        <select name="parameter_id" required>
+                                            <option value="">Kies parameter</option>
+                                            {% for parameter in payroll_parameters %}
+                                            <option value="{{ parameter.id }}">{{ parameter.name }} ({{ parameter.parameter_key }})</option>
+                                            {% endfor %}
+                                        </select>
+                                    </label>
+                                    <label>Jaar <input type="number" name="year" value="2026" min="2020" max="2100" required></label>
+                                    <label>Periode <input type="number" name="period_number" value="1" min="1" max="13" required></label>
+                                    <label>Ingangsdatum <input type="date" name="effective_from"></label>
+                                    <label>Bouwplaats <input type="text" inputmode="decimal" name="build_value" placeholder="0,28"></label>
+                                    <label>UTA <input type="text" inputmode="decimal" name="uta_value" placeholder="0,25"></label>
+                                    <label>Tekstwaarde <input type="text" name="text_value" placeholder="Bij tekstparameters"></label>
+                                    <label>Status
+                                        <select name="version_status">
+                                            <option value="active">Actief</option>
+                                            <option value="concept">Concept</option>
+                                            <option value="archived">Archief</option>
+                                        </select>
+                                    </label>
+                                    <label class="payroll-settings-form__notes">Bron <input type="text" name="version_source_reference" placeholder="Cao-artikel, leeswijzer of afspraak"></label>
+                                    <label class="payroll-settings-form__notes">Toelichting <input type="text" name="notes" placeholder="Waarom deze wijziging geldt"></label>
+                                    <button class="ghost-button" type="submit">Nieuwe versie opslaan</button>
+                                </form>
+
                                 <div class="table-wrap payroll-settings-table">
                                     <table>
                                         <thead>
@@ -332,6 +359,7 @@
                                                 <th>UTA</th>
                                                 <th>Eenheid</th>
                                                 <th>Bron</th>
+                                                <th>Toelichting</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -348,6 +376,7 @@
                                                     <td>{{ version.uta_value }}</td>
                                                     <td>{{ parameter.unit }}</td>
                                                     <td>{{ version.source_reference or parameter.source_reference or '-' }}</td>
+                                                    <td>{{ version.notes or '-' }}</td>
                                                 </tr>
                                                 {% else %}
                                                 <tr>
@@ -361,11 +390,12 @@
                                                     <td>-</td>
                                                     <td>{{ parameter.unit }}</td>
                                                     <td>{{ parameter.source_reference or '-' }}</td>
+                                                    <td>{{ parameter.description or '-' }}</td>
                                                 </tr>
                                                 {% endfor %}
                                             {% else %}
                                             <tr>
-                                                <td colspan="7">
+                                                <td colspan="8">
                                                     <div class="empty-state">
                                                         <strong>Nog geen grondslag parameters</strong>
                                                         <span>De migratie vult de eerste set met waarden uit de blauwdruk.</span>

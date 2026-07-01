@@ -24,6 +24,7 @@ from apps.dashboard.records import (
     create_project,
     create_payroll_period,
     create_payroll_period_batch,
+    create_payroll_parameter_version,
     clear_payroll_test_workspace,
     delete_payroll_period,
     get_cao_setting,
@@ -993,6 +994,34 @@ def edit_cao_setting(
     update_cao_setting(setting_id, locals())
     _audit("CAO bijgewerkt", "cao", setting_id, name or "CAO instelling", "CAO-regelset bijgewerkt voor toekomstige berekeningen.", "Instellingen")
     return RedirectResponse(f"/dashboard/settings?cao={setting_id}#cao-instellingen", status_code=303)
+
+
+@router.post("/api/settings/payroll-parameters")
+def save_payroll_parameter_version(
+    parameter_id: str = Form(""),
+    parameter_key: str = Form(""),
+    name: str = Form(""),
+    category: str = Form("grondslag"),
+    unit: str = Form("decimal"),
+    value_type: str = Form("decimal"),
+    applies_to: str = Form("both"),
+    description: str = Form(""),
+    source_reference: str = Form(""),
+    year: str = Form(""),
+    period_number: str = Form(""),
+    effective_from: str = Form(""),
+    effective_until: str = Form(""),
+    build_value: str = Form(""),
+    uta_value: str = Form(""),
+    text_value: str = Form(""),
+    version_source_reference: str = Form(""),
+    notes: str = Form(""),
+    version_status: str = Form("active"),
+):
+    version_id = create_payroll_parameter_version(locals())
+    label = name or parameter_key or f"parameter {parameter_id}"
+    _audit("Grondslag parameter opgeslagen", "payroll_parameter", version_id, label, "Periodegebonden parameter-versie opgeslagen.", "Instellingen")
+    return RedirectResponse("/dashboard/settings#grondslag-parameters", status_code=303)
 
 
 @router.get("/api/health")

@@ -4069,6 +4069,106 @@ def list_payroll_parameters(limit: int = 200) -> list[dict]:
         return []
 
 
+def create_payroll_parameter_version(data: dict) -> int:
+    _ensure_dashboard_tables_for_read()
+    parameter_id = _int_or_none(data.get("parameter_id"))
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            if not parameter_id:
+                parameter_key = (_empty_to_none(data.get("parameter_key")) or "").lower().replace(" ", "_")
+                if not parameter_key:
+                    raise ValueError("parameter_key is required for a new parameter")
+                cursor.execute(
+                    """
+                    INSERT INTO payroll_parameters (
+                        parameter_key,
+                        name,
+                        category,
+                        unit,
+                        value_type,
+                        applies_to,
+                        source_reference,
+                        description,
+                        status,
+                        created_at,
+                        updated_at
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'active', NOW(), NOW())
+                    ON CONFLICT (parameter_key)
+                    DO UPDATE SET
+                        name = EXCLUDED.name,
+                        category = EXCLUDED.category,
+                        unit = EXCLUDED.unit,
+                        value_type = EXCLUDED.value_type,
+                        applies_to = EXCLUDED.applies_to,
+                        source_reference = EXCLUDED.source_reference,
+                        description = EXCLUDED.description,
+                        updated_at = NOW()
+                    RETURNING id;
+                    """,
+                    (
+                        parameter_key,
+                        _empty_to_none(data.get("name")) or parameter_key,
+                        _empty_to_none(data.get("category")) or "grondslag",
+                        _empty_to_none(data.get("unit")) or "decimal",
+                        _empty_to_none(data.get("value_type")) or "decimal",
+                        _empty_to_none(data.get("applies_to")) or "both",
+                        _empty_to_none(data.get("source_reference")),
+                        _empty_to_none(data.get("description")),
+                    ),
+                )
+                parameter_id = cursor.fetchone()[0]
+
+            cursor.execute(
+                """
+                INSERT INTO payroll_parameter_versions (
+                    parameter_id,
+                    year,
+                    period_number,
+                    effective_from,
+                    effective_until,
+                    build_value,
+                    uta_value,
+                    text_value,
+                    source_reference,
+                    notes,
+                    status,
+                    created_at,
+                    updated_at
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+                ON CONFLICT (parameter_id, year, period_number)
+                DO UPDATE SET
+                    effective_from = EXCLUDED.effective_from,
+                    effective_until = EXCLUDED.effective_until,
+                    build_value = EXCLUDED.build_value,
+                    uta_value = EXCLUDED.uta_value,
+                    text_value = EXCLUDED.text_value,
+                    source_reference = EXCLUDED.source_reference,
+                    notes = EXCLUDED.notes,
+                    status = EXCLUDED.status,
+                    updated_at = NOW()
+                RETURNING id;
+                """,
+                (
+                    parameter_id,
+                    _int_or_none(data.get("year")),
+                    _int_or_none(data.get("period_number")),
+                    _date_or_none(data.get("effective_from")),
+                    _date_or_none(data.get("effective_until")),
+                    _number_or_none(data.get("build_value")),
+                    _number_or_none(data.get("uta_value")),
+                    _empty_to_none(data.get("text_value")),
+                    _empty_to_none(data.get("version_source_reference")) or _empty_to_none(data.get("source_reference")),
+                    _empty_to_none(data.get("notes")),
+                    _empty_to_none(data.get("version_status")) or "active",
+                ),
+            )
+            version_id = cursor.fetchone()[0]
+        conn.commit()
+    return version_id
+
+
 def _format_parameter_value(value, unit: str = "") -> str:
     if value is None:
         return "-"

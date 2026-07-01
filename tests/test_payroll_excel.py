@@ -287,6 +287,36 @@ class PayrollEmployeeArrangementTests(unittest.TestCase):
 
 
 class PayrollParameterTests(unittest.TestCase):
+    def test_parameter_management_migration_is_applied(self):
+        data_store = Path("apps/dashboard/data_store.py").read_text(encoding="utf-8")
+
+        self.assertIn("048_payroll_parameter_management.sql", data_store)
+
+    def test_parameter_management_seeds_blueprint_values(self):
+        migration = Path("migrations/048_payroll_parameter_management.sql").read_text(encoding="utf-8")
+
+        self.assertIn("vacation_days_18_plus", migration)
+        self.assertIn("rv_days_build", migration)
+        self.assertIn("training_reservation_percent", migration)
+        self.assertIn("s3_shoes_annual", migration)
+        self.assertIn("net_workable_days_per_year", migration)
+
+    def test_settings_screen_can_save_parameter_versions(self):
+        template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8")
+        router_source = Path("apps/dashboard/router.py").read_text(encoding="utf-8")
+
+        self.assertIn('/api/settings/payroll-parameters', template)
+        self.assertIn('name="effective_from"', template)
+        self.assertIn('name="version_source_reference"', template)
+        self.assertIn('name="notes"', template)
+        self.assertIn('@router.post("/api/settings/payroll-parameters")', router_source)
+
+    def test_parameter_versions_keep_period_uniqueness(self):
+        migration = Path("migrations/031_payroll_parameters.sql").read_text(encoding="utf-8")
+
+        self.assertIn("UNIQUE (parameter_id, year, period_number)", migration)
+        self.assertIn("period_number BETWEEN 1 AND 13", migration)
+
     def test_formats_parameter_percentages_for_display(self):
         self.assertEqual(records._format_parameter_value("0.0833", "percentage"), "8.33%")
         self.assertEqual(records._format_parameter_value("0.0800", "percentage"), "8%")

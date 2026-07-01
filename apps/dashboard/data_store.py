@@ -72,6 +72,7 @@ def ensure_dashboard_tables():
         Path("migrations/045_restore_payroll_period_calendar.sql"),
         Path("migrations/046_clear_legacy_timesheet_candidate_fk.sql"),
         Path("migrations/047_deduplicate_project_time_bookings.sql"),
+        Path("migrations/048_payroll_parameter_management.sql"),
     ]
 
     optional_migrations = set()
