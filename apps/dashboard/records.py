@@ -2648,7 +2648,7 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                                    ELSE 0
                                END
                            ) AS hours,
-                           COALESCE(pc.booking_status, i.status) AS status,
+                           COALESCE(i.status, pc.booking_status, 'concept') AS status,
                            r.payroll_license_plate,
                            r.payroll_choice_budget,
                            r.payroll_phase,

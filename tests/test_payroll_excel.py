@@ -1142,11 +1142,14 @@ class CompletePeriodTimesheetImportTests(unittest.TestCase):
         self.assertIn("def update_payroll_payment_status", records_source)
         self.assertIn('"uit_te_betalen"', records_source)
         self.assertIn('"uitbetaald"', records_source)
+        self.assertIn("COALESCE(i.status, pc.booking_status, 'concept') AS status", records_source)
+        self.assertNotIn("COALESCE(pc.booking_status, i.status) AS status", records_source)
         self.assertIn("payment_source_tabs", calculations_source)
         self.assertIn('row.get("payroll_status") == "loon_berekenen"', calculations_source)
         self.assertIn('target_tab = "Uitbetaald" if result.get("status") == "uitbetaald" else "Uit te betalen"', router_source)
         self.assertIn("PAYROLL_PREPAYMENT_STATUSES", records_source)
         self.assertIn("def _active_timesheet_condition", records_source)
+        self.assertIn("declaraties", template)
 
     def test_deleted_timesheets_are_removed_from_payroll_periods(self):
         actions_source = Path("apps/dashboard/whatsapp_actions.py").read_text(encoding="utf-8-sig")
@@ -1443,7 +1446,8 @@ class DashboardContextSafetyTests(unittest.TestCase):
         router_source = Path("apps/dashboard/router.py").read_text(encoding="utf-8-sig")
         records_source = Path("apps/dashboard/records.py").read_text(encoding="utf-8-sig")
 
-        self.assertIn("Valideer voor loonbetaling", template)
+        self.assertNotIn('/api/periods/{{ selected_payroll_period.id }}/approve', template)
+        self.assertIn("Uitbetalen", template)
         self.assertIn("finalize_payroll_period_for_payment", router_source)
         self.assertIn("Loonperiode gevalideerd voor loonbetaling", router_source)
         self.assertIn("processed_timesheets", router_source)

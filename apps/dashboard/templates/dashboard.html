@@ -1901,15 +1901,15 @@ Metadata:
                                     <strong>{{ tab.label }}</strong>
                                     {% if tab.kind == 'week' and tab.summary %}
                                     <small>{{ tab.summary.total_hours }} uur · {{ tab.summary.booking_count }} regels</small>
+                                    <small>{{ tab.summary.booking_count }} declaraties</small>
+                                    {% elif tab.kind in ['payment', 'paid'] %}
+                                    <small>{{ tab.rows|length }} declaraties</small>
                                     {% endif %}
                                 </button>
                                 {% endfor %}
                                 <div class="payroll-workbook-actions">
                                     <a class="payroll-workbook-action" href="/api/periods/{{ selected_payroll_period.id }}/excel/export">Excel TGN-opzet</a>
                                     <a class="payroll-workbook-action" href="/dashboard/audit#auditspoor">Auditspoor</a>
-                                    <form class="payroll-workbook-action-form" action="/api/periods/{{ selected_payroll_period.id }}/approve" method="post" onsubmit="return confirm('Valideer deze loonperiode definitief voor loonbetaling en verplaats de periode naar het archief?');">
-                                        <button class="payroll-workbook-action" type="submit" {% if selected_payroll_period.is_locked_for_payment or not selected_payroll_period.payroll_phase_status.can_approve %}disabled title="{% if selected_payroll_period.is_locked_for_payment %}Deze loonperiode is al gevalideerd voor loonbetaling.{% else %}Los eerst blokkerende payroll-uitzonderingen op.{% endif %}"{% endif %}>{% if selected_payroll_period.is_locked_for_payment %}Gevalideerd{% else %}Valideer voor loonbetaling{% endif %}</button>
-                                    </form>
                                     <a class="payroll-workbook-action" href="/dashboard/periods#periodes">Sluiten</a>
                                 </div>
                             </div>
