@@ -14,8 +14,10 @@ from apps.dashboard.payroll_excel import analyze_payroll_workbook, build_payroll
 
 try:
     from openpyxl import Workbook, load_workbook
+    from openpyxl.styles import PatternFill
 except ImportError:  # pragma: no cover
     Workbook = None
+    PatternFill = None
 
 
 @unittest.skipIf(Workbook is None, "openpyxl is niet beschikbaar")
@@ -140,15 +142,21 @@ class PayrollCalculationTests(unittest.TestCase):
         template["Periode"]["G8"] = "40"
         template["Periode"]["N8"] = "=L8+M8"
         template["WK21"]["B7"] = "Werknemer"
+        template["WK21"]["B2"] = "ALLEEN GEKLEURDE LETTERS EN CIJFERS INGEVEN!"
+        template["WK21"]["B2"].fill = PatternFill("solid", fgColor="FFFF00")
         template["WK21"]["B8"] = "=Periode!B8"
         template["WK21"]["C8"] = "=Periode!G8"
         template["WK21"]["K8"] = "=(Periode!BB8*E8/40)"
         template["WK21"]["Q8"] = "=K8+O8+P8"
         template["WK21"]["R8"] = "oude opmerking"
         template["WK21"]["S8"] = "oude projectinfo"
+        template["WK21"]["R8"].fill = PatternFill("solid", fgColor="CC0000")
         template["WK21"]["R14"] = "4 wekelijkse betaling"
+        template["WK21"]["R14"].fill = PatternFill("solid", fgColor="CC0000")
         template["WK21"]["AA20"] = "=1+1"
+        template["WK21"]["AA20"].fill = PatternFill("solid", fgColor="FFFF99")
         template["WK21"]["BB20"] = "oude losse template tekst"
+        template["WK21"]["BB20"].fill = PatternFill("solid", fgColor="FFFF99")
         template["WK21"]["S130"] = "Loonbeslag Belastingdienst NL89"
         template["WK21"].sheet_view.topLeftCell = "R45"
         template["WK21"].sheet_view.selection[0].activeCell = "R45"
@@ -189,9 +197,15 @@ class PayrollCalculationTests(unittest.TestCase):
         self.assertEqual(workbook["WK17"]["E8"].value, 40)
         self.assertEqual(workbook["WK17"]["R8"].value, "dashboard opmerking")
         self.assertEqual(workbook["WK17"]["S8"].value, "Project A")
+        self.assertIsNone(workbook["WK17"]["B2"].value)
+        self.assertIsNone(workbook["WK17"]["B2"].fill.fill_type)
         self.assertIsNone(workbook["WK17"]["R14"].value)
+        self.assertIsNone(workbook["WK17"]["R8"].fill.fill_type)
+        self.assertIsNone(workbook["WK17"]["R14"].fill.fill_type)
         self.assertEqual(workbook["WK17"]["AA20"].value, "=1+1")
+        self.assertIsNone(workbook["WK17"]["AA20"].fill.fill_type)
         self.assertIsNone(workbook["WK17"]["BB20"].value)
+        self.assertIsNone(workbook["WK17"]["BB20"].fill.fill_type)
         self.assertIsNone(workbook["WK17"]["S130"].value)
         self.assertEqual(workbook["Loonstrook"]["P8"].value, "controle")
         self.assertIsNone(workbook["Loonstrook"]["R30"].value)

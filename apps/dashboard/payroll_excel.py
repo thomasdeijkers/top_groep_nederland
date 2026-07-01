@@ -312,9 +312,33 @@ def _clear_template_data_area(worksheet, start_row: int = 8) -> None:
         for cell in row:
             if MergedCell and isinstance(cell, MergedCell):
                 continue
+            _clear_cell_fill(cell)
             if _is_formula_cell(cell):
                 continue
             cell.value = None
+
+
+def _clear_template_instruction_area(worksheet, max_row: int = 4) -> None:
+    try:
+        from openpyxl.cell.cell import MergedCell
+    except ImportError:
+        MergedCell = ()
+
+    for row in worksheet.iter_rows(min_row=1, max_row=min(max_row, worksheet.max_row), max_col=worksheet.max_column):
+        for cell in row:
+            if MergedCell and isinstance(cell, MergedCell):
+                continue
+            _clear_cell_fill(cell)
+            if not _is_formula_cell(cell):
+                cell.value = None
+
+
+def _clear_cell_fill(cell) -> None:
+    try:
+        from openpyxl.styles import PatternFill
+    except ImportError:
+        return
+    cell.fill = PatternFill(fill_type=None)
 
 
 def _is_formula_cell(cell) -> bool:
@@ -372,6 +396,7 @@ def _fill_template_period_sheet(worksheet, rows: list[dict]) -> dict[str, int]:
 
 
 def _clear_template_period_inputs(worksheet) -> None:
+    _clear_template_instruction_area(worksheet)
     _clear_template_data_area(worksheet)
 
 
@@ -396,6 +421,7 @@ def _fill_template_week_sheet(worksheet, rows: list[dict], row_map: dict[str, in
 
 
 def _clear_template_week_inputs(worksheet) -> None:
+    _clear_template_instruction_area(worksheet)
     _clear_template_data_area(worksheet)
 
 
@@ -409,6 +435,7 @@ def _fill_template_payslip_notes(worksheet, rows: list[dict], row_map: dict[str,
 
 
 def _clear_template_payslip_notes(worksheet) -> None:
+    _clear_template_instruction_area(worksheet)
     _clear_template_data_area(worksheet)
 
 
