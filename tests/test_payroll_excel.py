@@ -147,11 +147,17 @@ class PayrollCalculationTests(unittest.TestCase):
         template["WK21"]["R8"] = "oude opmerking"
         template["WK21"]["S8"] = "oude projectinfo"
         template["WK21"]["R14"] = "4 wekelijkse betaling"
+        template["WK21"]["AA20"] = "=1+1"
+        template["WK21"]["BB20"] = "oude losse template tekst"
         template["WK21"]["S130"] = "Loonbeslag Belastingdienst NL89"
+        template["WK21"].sheet_view.topLeftCell = "R45"
+        template["WK21"].sheet_view.selection[0].activeCell = "R45"
+        template["WK21"].sheet_view.selection[0].sqref = "R45"
         template["Loonstrook"]["B7"] = "Werknemer"
         template["Loonstrook"]["B8"] = "=Periode!B8"
         template["Loonstrook"]["D8"] = "='WK21'!D8+'WK22'!D8+'WK23'!D8+'WK24'!D8"
         template["Loonstrook"]["P8"] = "oude loonstrooknotitie"
+        template["Loonstrook"]["R30"] = "oude toelichting"
 
         period = {
             "workbook_tabs": [
@@ -184,10 +190,16 @@ class PayrollCalculationTests(unittest.TestCase):
         self.assertEqual(workbook["WK17"]["R8"].value, "dashboard opmerking")
         self.assertEqual(workbook["WK17"]["S8"].value, "Project A")
         self.assertIsNone(workbook["WK17"]["R14"].value)
+        self.assertEqual(workbook["WK17"]["AA20"].value, "=1+1")
+        self.assertIsNone(workbook["WK17"]["BB20"].value)
         self.assertIsNone(workbook["WK17"]["S130"].value)
         self.assertEqual(workbook["Loonstrook"]["P8"].value, "controle")
+        self.assertIsNone(workbook["Loonstrook"]["R30"].value)
         self.assertEqual(workbook["WK17"]["K8"].value, "=(Periode!BB8*E8/40)")
         self.assertIn("'WK17'!D8", workbook["Loonstrook"]["D8"].value)
+        self.assertEqual(workbook.active.title, "WK17")
+        self.assertEqual(workbook["WK17"].sheet_view.topLeftCell, "A1")
+        self.assertEqual(workbook["WK17"].sheet_view.selection[0].activeCell, "A1")
 
     @unittest.skipIf(Workbook is None, "openpyxl is niet beschikbaar")
     def test_tgn_template_export_leaves_empty_notes_empty(self):

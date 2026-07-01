@@ -241,6 +241,7 @@ def build_tgn_template_output_workbook(path: str | Path, period: dict, template_
     if payslip_tab and "Loonstrook" in workbook.sheetnames:
         _fill_template_payslip_notes(workbook["Loonstrook"], payslip_tab.get("rows", []), row_map)
 
+    _reset_workbook_view(workbook)
     workbook.save(output_path)
     return output_path
 
@@ -288,9 +289,54 @@ def _template_employee_rows(worksheet) -> list[int]:
 
 
 def _clear_columns(worksheet, columns: tuple[str, ...], start_row: int = 8) -> None:
+    try:
+        from openpyxl.cell.cell import MergedCell
+    except ImportError:
+        MergedCell = ()
+
     for row_index in range(start_row, worksheet.max_row + 1):
         for column in columns:
-            worksheet[f"{column}{row_index}"].value = None
+            cell = worksheet[f"{column}{row_index}"]
+            if MergedCell and isinstance(cell, MergedCell):
+                continue
+            cell.value = None
+
+
+def _clear_template_data_area(worksheet, start_row: int = 8) -> None:
+    try:
+        from openpyxl.cell.cell import MergedCell
+    except ImportError:
+        MergedCell = ()
+
+    for row in worksheet.iter_rows(min_row=start_row, max_row=worksheet.max_row, max_col=worksheet.max_column):
+        for cell in row:
+            if MergedCell and isinstance(cell, MergedCell):
+                continue
+            if _is_formula_cell(cell):
+                continue
+            cell.value = None
+
+
+def _is_formula_cell(cell) -> bool:
+    value = cell.value
+    return cell.data_type == "f" or (isinstance(value, str) and value.startswith("="))
+
+
+def _reset_workbook_view(workbook) -> None:
+    try:
+        from openpyxl.worksheet.views import Selection
+    except ImportError:
+        Selection = None
+
+    workbook.active = 0
+    for worksheet in workbook.worksheets:
+        worksheet.sheet_view.topLeftCell = "A1"
+        if Selection:
+            worksheet.sheet_view.selection = [Selection(activeCell="A1", sqref="A1")]
+        else:
+            for selection in worksheet.sheet_view.selection:
+                selection.activeCell = "A1"
+                selection.sqref = "A1"
 
 
 def _fill_template_period_sheet(worksheet, rows: list[dict]) -> dict[str, int]:
@@ -326,14 +372,7 @@ def _fill_template_period_sheet(worksheet, rows: list[dict]) -> dict[str, int]:
 
 
 def _clear_template_period_inputs(worksheet) -> None:
-    _clear_columns(
-        worksheet,
-        (
-            "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "O", "Q",
-            "T", "V", "W", "Y", "AC", "AD", "AE", "AH", "AI", "AK", "AN",
-            "AS", "AT", "AU", "AV", "AW", "AX", "AZ", "BB", "BC", "BG",
-        ),
-    )
+    _clear_template_data_area(worksheet)
 
 
 def _fill_template_week_sheet(worksheet, rows: list[dict], row_map: dict[str, int]) -> None:
@@ -357,7 +396,7 @@ def _fill_template_week_sheet(worksheet, rows: list[dict], row_map: dict[str, in
 
 
 def _clear_template_week_inputs(worksheet) -> None:
-    _clear_columns(worksheet, ("D", "E", "F", "G", "H", "I", "J", "L", "M", "O", "P", "R", "S"))
+    _clear_template_data_area(worksheet)
 
 
 def _fill_template_payslip_notes(worksheet, rows: list[dict], row_map: dict[str, int]) -> None:
@@ -370,7 +409,7 @@ def _fill_template_payslip_notes(worksheet, rows: list[dict], row_map: dict[str,
 
 
 def _clear_template_payslip_notes(worksheet) -> None:
-    _clear_columns(worksheet, ("P", "Q", "R", "S"), start_row=8)
+    _clear_template_data_area(worksheet)
 
 
 def _set(worksheet, row: int, column: str, value) -> None:
