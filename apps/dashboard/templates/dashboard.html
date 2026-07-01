@@ -2414,10 +2414,10 @@ Metadata:
                                     <small>{{ tab.description }}</small>
                                 </a>
                                 {% endfor %}
-                                <a href="/dashboard/periods#periodes" class="timesheet-status-tile timesheet-status-tile--link">
+                                <a href="{{ timesheet_payroll_period_shortcut.url }}" class="timesheet-status-tile timesheet-status-tile--link {% if timesheet_payroll_period_shortcut.matched %}timesheet-status-tile--active{% endif %}">
                                     <span>Loonperiodes</span>
-                                    <strong>Open</strong>
-                                    <small>Laatste controle en accorderen in loonperiodes.</small>
+                                    <strong>{{ timesheet_payroll_period_shortcut.title }}</strong>
+                                    <small>{{ timesheet_payroll_period_shortcut.description }}</small>
                                 </a>
                             </div>
 

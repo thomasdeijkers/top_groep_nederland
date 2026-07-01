@@ -1163,6 +1163,41 @@ class DashboardContextSafetyTests(unittest.TestCase):
         self.assertIn("selected_payroll_period", router_source)
         self.assertIn("timesheet_row", router_source)
 
+    def test_timesheet_overview_links_directly_to_matching_payroll_period(self):
+        shortcut = dashboard_router._timesheet_payroll_period_shortcut(
+            [
+                {
+                    "workflow_stage": "loon",
+                    "work_date": date(2026, 5, 18),
+                    "received_at": datetime(2026, 5, 18, 8, 0),
+                }
+            ],
+            [
+                {
+                    "id": 5,
+                    "name": "Periode 5 2026",
+                    "period_number": 5,
+                    "raw_start_date": date(2026, 5, 4),
+                    "raw_end_date": date(2026, 5, 31),
+                }
+            ],
+        )
+
+        self.assertEqual(shortcut["url"], "/dashboard/periods?period=5#periode-verloning")
+        self.assertTrue(shortcut["matched"])
+        self.assertIn("Periode 5 2026", shortcut["title"])
+
+    def test_timesheet_period_tile_uses_context_shortcut(self):
+        template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
+        router_source = Path("apps/dashboard/router.py").read_text(encoding="utf-8-sig")
+        records_source = Path("apps/dashboard/records.py").read_text(encoding="utf-8-sig")
+
+        self.assertIn("timesheet_payroll_period_shortcut.url", template)
+        self.assertIn("timesheet_payroll_period_shortcut.title", template)
+        self.assertIn("_timesheet_payroll_period_shortcut(timesheet_stage_items, payroll_periods)", router_source)
+        self.assertIn('data_page in {"periods", "timesheets"}', router_source)
+        self.assertIn('"raw_start_date"', records_source)
+
 
 class PayrollPeriodDetailSafetyTests(unittest.TestCase):
     def test_period_detail_uses_safe_defaults_and_warning(self):

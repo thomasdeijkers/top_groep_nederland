@@ -1564,6 +1564,8 @@ def list_payroll_periods(limit: int = 25, archived: bool = False) -> list[dict]:
                         "year": row[1],
                         "period_number": row[2],
                         "name": _payroll_period_name(row[2], row[4], row[5]) if row[4] and row[5] else row[3],
+                        "raw_start_date": row[4],
+                        "raw_end_date": row[5],
                         "start_date": row[4].strftime("%d-%m-%Y") if row[4] else "-",
                         "end_date": row[5].strftime("%d-%m-%Y") if row[5] else "-",
                         "status": row[6] or "concept",

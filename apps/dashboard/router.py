@@ -242,6 +242,44 @@ def _timesheet_workflow_tabs(items: list[dict], active_stage: str) -> list[dict]
     ]
 
 
+def _timesheet_payroll_period_shortcut(items: list[dict], periods: list[dict]) -> dict:
+    fallback = {
+        "url": "/dashboard/periods#periodes",
+        "title": "Open",
+        "description": "Laatste controle en accorderen in loonperiodes.",
+        "matched": False,
+    }
+    if not items or not periods:
+        return fallback
+    eligible_items = [item for item in items if item.get("workflow_stage") == "loon"] or items
+    period_hits: dict[int, dict] = {}
+    for item in eligible_items:
+        work_date = item.get("work_date") or (item.get("received_at").date() if item.get("received_at") else None)
+        if not work_date:
+            continue
+        for period in periods:
+            start_date = period.get("raw_start_date")
+            end_date = period.get("raw_end_date")
+            if start_date and end_date and start_date <= work_date <= end_date:
+                hit = period_hits.setdefault(period["id"], {"period": period, "count": 0})
+                hit["count"] += 1
+                break
+    if not period_hits:
+        return fallback
+    best = sorted(
+        period_hits.values(),
+        key=lambda item: (item["count"], item["period"].get("raw_start_date") or ""),
+        reverse=True,
+    )[0]
+    period = best["period"]
+    return {
+        "url": f"/dashboard/periods?period={period['id']}#periode-verloning",
+        "title": period.get("name") or f"Periode {period.get('period_number')}",
+        "description": f"Open loonverwerking voor {best['count']} taak/taken in deze periode.",
+        "matched": True,
+    }
+
+
 def _filter_timesheets(items: list[dict], query: str, workflow_stage: str) -> list[dict]:
     filtered = items if workflow_stage == "all" else [item for item in items if item.get("workflow_stage") == workflow_stage]
     search = (query or "").strip().lower()
@@ -430,7 +468,7 @@ def _dashboard_context(
     project_options = _context_value(data_page, "project_options", [], list_project_options) if data_page in {"timesheets", "projects", "periods"} else []
     projects = _context_value(data_page, "projects", [], lambda: list_projects(query=query)) if data_page == "projects" else []
     selected_project = _context_value(data_page, "selected_project", None, lambda: get_project(project_id)) if data_page == "projects" and project_id else None
-    payroll_periods = _context_value(data_page, "payroll_periods", [], list_payroll_periods) if data_page == "periods" else []
+    payroll_periods = _context_value(data_page, "payroll_periods", [], list_payroll_periods) if data_page in {"periods", "timesheets"} else []
     archived_payroll_periods = _context_value(data_page, "archived_payroll_periods", [], lambda: list_payroll_periods(archived=True)) if data_page == "periods" else []
     payroll_year_overview = _context_value(data_page, "payroll_year_overview", [], list_payroll_year_overview) if data_page == "periods" else []
     payroll_datamodel_status = _context_value(data_page, "payroll_datamodel_status", [], lambda: list_payroll_datamodel_status(limit=40)) if data_page == "periods" else []
@@ -486,6 +524,7 @@ def _dashboard_context(
     workflow_stage = workflow_stage if workflow_stage in {"all", "controle", "valideren", "loon"} else "all"
     timesheet_tab = timesheet_tab if timesheet_tab in {"overview", "task"} else "overview"
     timesheet_stage_items = _filter_timesheets(whatsapp_inbox, query, workflow_stage)
+    timesheet_payroll_period_shortcut = _timesheet_payroll_period_shortcut(timesheet_stage_items, payroll_periods)
     selected_timesheet = next((item for item in whatsapp_inbox if item["id"] == timesheet_id), None) if timesheet_id else None
     if timesheet_tab == "task" and not selected_timesheet:
         timesheet_tab = "overview"
@@ -520,6 +559,7 @@ def _dashboard_context(
         "timesheet_stage": workflow_stage,
         "timesheet_stage_items": timesheet_stage_items,
         "timesheet_workflow_tabs": _timesheet_workflow_tabs(whatsapp_inbox, workflow_stage),
+        "timesheet_payroll_period_shortcut": timesheet_payroll_period_shortcut,
         "timesheet_tab": timesheet_tab,
         "relation_tab": relation_tab,
         "show_relation_form": show_relation_form,
