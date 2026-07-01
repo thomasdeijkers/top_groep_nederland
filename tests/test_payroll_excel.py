@@ -1198,6 +1198,37 @@ class DashboardContextSafetyTests(unittest.TestCase):
         self.assertIn('data_page in {"periods", "timesheets"}', router_source)
         self.assertIn('"raw_start_date"', records_source)
 
+    def test_timesheet_processed_status_moves_to_archive_stage(self):
+        self.assertEqual(dashboard_router._timesheet_stage("processed"), "archief")
+        self.assertEqual(dashboard_router._timesheet_stage("doorgestuurd_naar_loonadministratie"), "archief")
+        self.assertEqual(dashboard_router._timesheet_stage("loon_te_berekenen"), "loon")
+
+        tabs = dashboard_router._timesheet_workflow_tabs(
+            [
+                {"workflow_stage": "loon"},
+                {"workflow_stage": "archief"},
+            ],
+            "loon",
+        )
+
+        self.assertEqual(next(tab for tab in tabs if tab["key"] == "loon")["count"], 1)
+        self.assertEqual(next(tab for tab in tabs if tab["key"] == "archief")["count"], 1)
+
+    def test_period_approval_finalizes_timesheets_and_archives_period(self):
+        template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
+        router_source = Path("apps/dashboard/router.py").read_text(encoding="utf-8-sig")
+        records_source = Path("apps/dashboard/records.py").read_text(encoding="utf-8-sig")
+
+        self.assertIn("Valideer voor loonbetaling", template)
+        self.assertIn("finalize_payroll_period_for_payment", router_source)
+        self.assertIn("Loonperiode gevalideerd voor loonbetaling", router_source)
+        self.assertIn("processed_timesheets", router_source)
+        self.assertIn("def finalize_payroll_period_for_payment", records_source)
+        self.assertIn("UPDATE whatsapp_timesheet_inbox", records_source)
+        self.assertIn("UPDATE project_time_bookings", records_source)
+        self.assertIn("UPDATE payroll_week_inputs", records_source)
+        self.assertIn("SET status = 'Archief'", records_source)
+
 
 class PayrollPeriodDetailSafetyTests(unittest.TestCase):
     def test_period_detail_uses_safe_defaults_and_warning(self):

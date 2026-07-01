@@ -28,6 +28,7 @@ from apps.dashboard.records import (
     create_payroll_running_balance_mutation,
     clear_payroll_test_workspace,
     delete_payroll_period,
+    finalize_payroll_period_for_payment,
     get_cao_setting,
     get_payroll_parameter_version,
     get_payroll_period,
@@ -64,7 +65,6 @@ from apps.dashboard.records import (
     search_candidate_matches,
     update_cao_setting,
     update_payroll_employee_arrangement,
-    update_payroll_period_status,
     update_payroll_running_balance_account,
 )
 from apps.dashboard.relations import (
@@ -214,11 +214,11 @@ def _audit_relation_fields(data: dict) -> str:
 
 def _timesheet_stage(status: str) -> str:
     normalized = (status or "").strip().lower().replace(" ", "_")
+    if normalized in {"doorgestuurd_naar_loonadministratie", "verwerkt", "processed", "definitief_loonbetaling"}:
+        return "archief"
     if normalized in {"goed_te_keuren", "approval", "akkoord_nodig"}:
         return "valideren"
     if normalized in {"loon_te_berekenen", "loon_berekenen", "loon"}:
-        return "loon"
-    if normalized in {"doorgestuurd_naar_loonadministratie", "verwerkt", "processed"}:
         return "loon"
     return "controle"
 
@@ -229,6 +229,7 @@ def _timesheet_workflow_tabs(items: list[dict], active_stage: str) -> list[dict]
         "controle": ("Controle", "Ingekomen urenstaten openen en corrigeren"),
         "valideren": ("Valideren", "Gecontroleerde uren boeken op opdrachtgever en project"),
         "loon": ("Loon berekenen", "Gevalideerde uren klaarzetten voor loonberekening"),
+        "archief": ("Archief", "Definitief gevalideerde urenbriefjes"),
     }
     return [
         {
@@ -521,7 +522,7 @@ def _dashboard_context(
             item["workflow_stage"] = "controle"
             item["workflow_stage_label"] = "Te controleren"
 
-    workflow_stage = workflow_stage if workflow_stage in {"all", "controle", "valideren", "loon"} else "all"
+    workflow_stage = workflow_stage if workflow_stage in {"all", "controle", "valideren", "loon", "archief"} else "all"
     timesheet_tab = timesheet_tab if timesheet_tab in {"overview", "task"} else "overview"
     timesheet_stage_items = _filter_timesheets(whatsapp_inbox, query, workflow_stage)
     timesheet_payroll_period_shortcut = _timesheet_payroll_period_shortcut(timesheet_stage_items, payroll_periods)
@@ -1295,21 +1296,24 @@ def approve_period(period_id: int):
         )
         return RedirectResponse(f"/dashboard/periods?period={period_id}#periode-verloning", status_code=303)
 
-    update_payroll_period_status(period_id, "Akkoord")
+    result = finalize_payroll_period_for_payment(period_id)
     _audit(
-        "Loonperiode geaccordeerd",
+        "Loonperiode gevalideerd voor loonbetaling",
         "periode",
         period_id,
         (period or {}).get("name") or f"Periode {period_id}",
-        f"Laatste controle akkoord. Payroll-controle: {phase_status.get('audit_summary', 'geen blokkades')}.",
-        "Akkoord",
+        f"Definitief gevalideerd voor salarisadministratie. {result['timesheets']} urenbriefjes en {result['bookings']} projectboekingen verwerkt. Payroll-controle: {phase_status.get('audit_summary', 'geen blokkades')}.",
+        "Archief",
         metadata={
             "blocking_exceptions": exception_summary.get("blocking", 0),
             "warning_exceptions": exception_summary.get("warning", 0),
             "phase_status": phase_status.get("label", "Akkoord"),
+            "processed_timesheets": result["timesheets"],
+            "processed_bookings": result["bookings"],
+            "processed_week_inputs": result["week_inputs"],
         },
     )
-    return RedirectResponse(f"/dashboard/periods?period={period_id}#periode-verloning", status_code=303)
+    return RedirectResponse("/dashboard/periods#periode-archief", status_code=303)
 
 
 @router.post("/api/periods/{period_id}/restore")

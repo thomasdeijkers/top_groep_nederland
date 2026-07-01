@@ -3532,6 +3532,90 @@ def archive_payroll_period(period_id: int, archived: bool = True) -> None:
         conn.commit()
 
 
+def finalize_payroll_period_for_payment(period_id: int) -> dict:
+    if not period_id:
+        return {"timesheets": 0, "bookings": 0, "week_inputs": 0}
+    _ensure_dashboard_tables_for_read()
+    final_status = "processed"
+    payroll_statuses = (
+        "loon_te_berekenen",
+        "loon_berekenen",
+        "loon",
+        "doorgestuurd_naar_loonadministratie",
+        "verwerkt",
+        "processed",
+    )
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT start_date, end_date
+                FROM payroll_periods
+                WHERE id = %s;
+                """,
+                (period_id,),
+            )
+            period_row = cursor.fetchone()
+            if not period_row:
+                return {"timesheets": 0, "bookings": 0, "week_inputs": 0}
+            start_date, end_date = period_row
+            cursor.execute(
+                """
+                WITH target_timesheets AS (
+                    SELECT id
+                    FROM whatsapp_timesheet_inbox
+                    WHERE deleted_at IS NULL
+                      AND archived_at IS NULL
+                      AND COALESCE(work_date, received_at::date) BETWEEN %s AND %s
+                      AND LOWER(REPLACE(COALESCE(status, ''), ' ', '_')) = ANY(%s)
+                )
+                UPDATE whatsapp_timesheet_inbox w
+                SET status = %s,
+                    payroll_sent_at = COALESCE(payroll_sent_at, NOW()),
+                    updated_at = NOW()
+                FROM target_timesheets t
+                WHERE w.id = t.id;
+                """,
+                (start_date, end_date, list(payroll_statuses), final_status),
+            )
+            timesheets = cursor.rowcount
+            cursor.execute(
+                """
+                UPDATE project_time_bookings b
+                SET status = %s,
+                    updated_at = NOW()
+                FROM whatsapp_timesheet_inbox w
+                WHERE b.timesheet_inbox_id = w.id
+                  AND COALESCE(w.work_date, w.received_at::date) BETWEEN %s AND %s
+                  AND LOWER(REPLACE(COALESCE(b.status, ''), ' ', '_')) = ANY(%s);
+                """,
+                (final_status, start_date, end_date, list(payroll_statuses)),
+            )
+            bookings = cursor.rowcount
+            cursor.execute(
+                """
+                UPDATE payroll_week_inputs
+                SET status = %s,
+                    updated_at = NOW()
+                WHERE payroll_period_id = %s
+                  AND LOWER(REPLACE(COALESCE(status, ''), ' ', '_')) = ANY(%s);
+                """,
+                (final_status, period_id, list(payroll_statuses)),
+            )
+            week_inputs = cursor.rowcount
+            cursor.execute(
+                """
+                UPDATE payroll_periods
+                SET status = 'Archief',
+                    updated_at = NOW()
+                WHERE id = %s;
+                """,
+                (period_id,),
+            )
+        conn.commit()
+    return {"timesheets": timesheets, "bookings": bookings, "week_inputs": week_inputs}
+
+
 def delete_payroll_period(period_id: int) -> None:
     if not period_id:
         return
