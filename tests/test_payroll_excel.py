@@ -172,7 +172,19 @@ class PayrollCalculationTests(unittest.TestCase):
                 {
                     "label": "WK17",
                     "kind": "week",
-                    "rows": [{"employee_name": "Thomas", "worked_days": "5", "worked_hours": "40", "single_trip_km": "12", "remarks": "dashboard opmerking", "project_info": "Project A"}],
+                    "rows": [{
+                        "employee_name": "Thomas",
+                        "contract_hours": "40",
+                        "worked_days": "5",
+                        "worked_hours": "40",
+                        "single_trip_km": "12",
+                        "work_km": "4",
+                        "total_km": "124",
+                        "net_amount": "515,63",
+                        "net_advance": "250",
+                        "remarks": "dashboard opmerking",
+                        "project_info": "Project A",
+                    }],
                 },
                 {"label": "WK18", "kind": "week", "rows": []},
                 {"label": "WK19", "kind": "week", "rows": []},
@@ -194,7 +206,14 @@ class PayrollCalculationTests(unittest.TestCase):
 
         self.assertIn("WK17", workbook.sheetnames)
         self.assertEqual(workbook["Periode"]["B8"].value, "Thomas")
+        self.assertEqual(workbook["WK17"]["B8"].value, "Thomas")
+        self.assertEqual(workbook["WK17"]["C8"].value, 40)
         self.assertEqual(workbook["WK17"]["E8"].value, 40)
+        self.assertEqual(workbook["WK17"]["K8"].value, 515.63)
+        self.assertEqual(workbook["WK17"]["L8"].value, 12)
+        self.assertEqual(workbook["WK17"]["M8"].value, 4)
+        self.assertEqual(workbook["WK17"]["N8"].value, 124)
+        self.assertEqual(workbook["WK17"]["Q8"].value, 250)
         self.assertEqual(workbook["WK17"]["R8"].value, "dashboard opmerking")
         self.assertEqual(workbook["WK17"]["S8"].value, "Project A")
         self.assertIsNone(workbook["WK17"]["B2"].value)
@@ -202,14 +221,13 @@ class PayrollCalculationTests(unittest.TestCase):
         self.assertIsNone(workbook["WK17"]["R14"].value)
         self.assertIsNone(workbook["WK17"]["R8"].fill.fill_type)
         self.assertIsNone(workbook["WK17"]["R14"].fill.fill_type)
-        self.assertEqual(workbook["WK17"]["AA20"].value, "=1+1")
+        self.assertIsNone(workbook["WK17"]["AA20"].value)
         self.assertIsNone(workbook["WK17"]["AA20"].fill.fill_type)
         self.assertIsNone(workbook["WK17"]["BB20"].value)
         self.assertIsNone(workbook["WK17"]["BB20"].fill.fill_type)
         self.assertIsNone(workbook["WK17"]["S130"].value)
         self.assertEqual(workbook["Loonstrook"]["P8"].value, "controle")
         self.assertIsNone(workbook["Loonstrook"]["R30"].value)
-        self.assertEqual(workbook["WK17"]["K8"].value, "=(Periode!BB8*E8/40)")
         self.assertIn("'WK17'!D8", workbook["Loonstrook"]["D8"].value)
         self.assertEqual(workbook.active.title, "WK17")
         self.assertEqual(workbook["WK17"].sheet_view.topLeftCell, "A1")

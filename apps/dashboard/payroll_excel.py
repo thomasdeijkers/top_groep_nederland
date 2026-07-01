@@ -7,6 +7,7 @@ from apps.dashboard.payroll_calculations import PAYSLIP_SHEET_COLUMNS, PERIOD_SH
 
 TGN_TEMPLATE_PATH = Path("Hulp documenten/templates/TGN verloning template.xlsx")
 TGN_TEMPLATE_WEEK_SHEETS = ("WK21", "WK22", "WK23", "WK24")
+TEMPLATE_DATA_START_ROW = 8
 WEEK_SHEET_RE = re.compile(r"^WK\s*(\d{1,2})$", re.IGNORECASE)
 PERIOD_SHEET = "periode"
 PAYSLIP_SHEET = "loonstrook"
@@ -318,6 +319,73 @@ def _clear_template_data_area(worksheet, start_row: int = 8) -> None:
             cell.value = None
 
 
+def _prepare_clean_template_body(worksheet, start_row: int | None = None) -> dict[int, str]:
+    start_row = start_row or _template_data_start_row(worksheet)
+    formulas = {
+        cell.column: cell.value
+        for cell in worksheet[start_row]
+        if _is_formula_cell(cell)
+    }
+    _unmerge_template_data_area(worksheet, start_row)
+    try:
+        from openpyxl.cell.cell import MergedCell
+        from openpyxl.styles import Alignment, Border, Font, PatternFill, Protection
+    except ImportError:
+        MergedCell = ()
+        Alignment = Border = Font = PatternFill = Protection = None
+
+    max_column = max(worksheet.max_column, 60)
+    for row in worksheet.iter_rows(min_row=start_row, max_row=worksheet.max_row, max_col=max_column):
+        for cell in row:
+            if MergedCell and isinstance(cell, MergedCell):
+                continue
+            cell.value = None
+            if PatternFill:
+                cell.fill = PatternFill(fill_type=None)
+            if Border:
+                cell.border = Border()
+            if Font:
+                cell.font = Font(name="Calibri", size=11, color="000000")
+            if Alignment:
+                cell.alignment = Alignment(vertical="center")
+            if Protection:
+                cell.protection = Protection(locked=False)
+    return formulas
+
+
+def _template_data_start_row(worksheet) -> int:
+    freeze_panes = str(worksheet.freeze_panes or "").strip()
+    match = re.search(r"(\d+)$", freeze_panes)
+    if match:
+        return max(int(match.group(1)), TEMPLATE_DATA_START_ROW)
+    return TEMPLATE_DATA_START_ROW
+
+
+def _unmerge_template_data_area(worksheet, start_row: int) -> None:
+    for merged_range in list(worksheet.merged_cells.ranges):
+        if merged_range.max_row >= start_row:
+            worksheet.unmerge_cells(str(merged_range))
+
+
+def _apply_template_formulas(worksheet, row: int, formulas: dict[int, str]) -> None:
+    if not formulas:
+        return
+    try:
+        from openpyxl.formula.translate import Translator
+    except ImportError:
+        Translator = None
+    origin_row = _template_data_start_row(worksheet)
+    for column_index, formula in formulas.items():
+        cell = worksheet.cell(row, column_index)
+        if cell.value not in (None, ""):
+            continue
+        if Translator:
+            origin = worksheet.cell(origin_row, column_index).coordinate
+            cell.value = Translator(formula, origin=origin).translate_formula(cell.coordinate)
+        else:
+            cell.value = formula
+
+
 def _clear_template_instruction_area(worksheet, max_row: int = 4) -> None:
     try:
         from openpyxl.cell.cell import MergedCell
@@ -364,10 +432,12 @@ def _reset_workbook_view(workbook) -> None:
 
 
 def _fill_template_period_sheet(worksheet, rows: list[dict]) -> dict[str, int]:
-    target_rows = _template_employee_rows(worksheet)
+    start_row = _template_data_start_row(worksheet)
+    formulas = _prepare_clean_template_body(worksheet, start_row)
     _clear_template_period_inputs(worksheet)
     row_map = {}
-    for target_row, source in zip(target_rows, rows):
+    for row_offset, source in enumerate(rows):
+        target_row = start_row + row_offset
         employee_name = source.get("employee_name") or ""
         row_map[_key(employee_name)] = target_row
         _set(worksheet, target_row, "B", employee_name)
@@ -392,20 +462,22 @@ def _fill_template_period_sheet(worksheet, rows: list[dict]) -> dict[str, int]:
         _set(worksheet, target_row, "AI", source.get("rv_flex"))
         _set(worksheet, target_row, "BB", source.get("net_period_basis"))
         _set(worksheet, target_row, "BG", source.get("notes"))
+        _apply_template_formulas(worksheet, target_row, formulas)
     return row_map
 
 
 def _clear_template_period_inputs(worksheet) -> None:
     _clear_template_instruction_area(worksheet)
-    _clear_template_data_area(worksheet)
 
 
 def _fill_template_week_sheet(worksheet, rows: list[dict], row_map: dict[str, int]) -> None:
+    start_row = _template_data_start_row(worksheet)
+    formulas = _prepare_clean_template_body(worksheet, start_row)
     _clear_template_week_inputs(worksheet)
-    for source in rows:
-        target_row = row_map.get(_key(source.get("employee_name")))
-        if not target_row:
-            continue
+    for row_offset, source in enumerate(rows):
+        target_row = start_row + row_offset
+        _set(worksheet, target_row, "B", source.get("employee_name"))
+        _set(worksheet, target_row, "C", source.get("contract_hours"))
         _set(worksheet, target_row, "D", source.get("worked_days"))
         _set(worksheet, target_row, "E", source.get("worked_hours"))
         _set(worksheet, target_row, "F", source.get("vacation_hours"))
@@ -413,30 +485,48 @@ def _fill_template_week_sheet(worksheet, rows: list[dict], row_map: dict[str, in
         _set(worksheet, target_row, "H", source.get("rv_hours"))
         _set(worksheet, target_row, "I", source.get("kv_hours"))
         _set(worksheet, target_row, "J", source.get("holiday_hours"))
-        _set(worksheet, target_row, "L", source.get("single_trip_km"))
+        _set(worksheet, target_row, "K", source.get("net_amount"))
+        _set(worksheet, target_row, "L", source.get("single_trip_km") or source.get("commute_km"))
         _set(worksheet, target_row, "M", source.get("work_km"))
+        _set(worksheet, target_row, "N", source.get("total_km"))
+        _set(worksheet, target_row, "O", source.get("fuel_amount"))
         _set(worksheet, target_row, "P", source.get("extra_reimbursement"))
+        _set(worksheet, target_row, "Q", source.get("net_advance"))
         _set(worksheet, target_row, "R", source.get("remarks"))
         _set(worksheet, target_row, "S", source.get("project_info"))
+        _apply_template_formulas(worksheet, target_row, formulas)
 
 
 def _clear_template_week_inputs(worksheet) -> None:
     _clear_template_instruction_area(worksheet)
-    _clear_template_data_area(worksheet)
 
 
 def _fill_template_payslip_notes(worksheet, rows: list[dict], row_map: dict[str, int]) -> None:
+    start_row = _template_data_start_row(worksheet)
+    formulas = _prepare_clean_template_body(worksheet, start_row)
     _clear_template_payslip_notes(worksheet)
-    for source in rows:
-        target_row = row_map.get(_key(source.get("employee_name")))
-        if not target_row:
-            continue
+    for row_offset, source in enumerate(rows):
+        target_row = start_row + row_offset
+        _set(worksheet, target_row, "B", source.get("employee_name"))
+        _set(worksheet, target_row, "C", source.get("cao_name"))
+        _set(worksheet, target_row, "D", source.get("total_worked_days"))
+        _set(worksheet, target_row, "E", source.get("total_worked_hours"))
+        _set(worksheet, target_row, "F", source.get("total_vacation_hours"))
+        _set(worksheet, target_row, "G", source.get("total_sickness_hours"))
+        _set(worksheet, target_row, "H", source.get("total_rv_hours"))
+        _set(worksheet, target_row, "I", source.get("total_kv_hours"))
+        _set(worksheet, target_row, "J", source.get("total_holiday_hours"))
+        _set(worksheet, target_row, "K", source.get("total_km"))
+        _set(worksheet, target_row, "L", source.get("extra_reimbursements"))
+        _set(worksheet, target_row, "M", source.get("already_received_net"))
+        _set(worksheet, target_row, "N", source.get("net_to_receive"))
+        _set(worksheet, target_row, "O", source.get("period_total"))
         _set(worksheet, target_row, "P", source.get("notes"))
+        _apply_template_formulas(worksheet, target_row, formulas)
 
 
 def _clear_template_payslip_notes(worksheet) -> None:
     _clear_template_instruction_area(worksheet)
-    _clear_template_data_area(worksheet)
 
 
 def _set(worksheet, row: int, column: str, value) -> None:
