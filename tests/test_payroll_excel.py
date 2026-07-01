@@ -1200,6 +1200,11 @@ class CompletePeriodTimesheetImportTests(unittest.TestCase):
         self.assertIn("payroll_blocker_message", calculations_source)
         self.assertIn("week_blockers", records_source)
         self.assertIn("Medewerkerinrichting ontbreekt", records_source)
+        self.assertIn("Medewerker-inrichting mist:", records_source)
+        self.assertIn("contracturen", records_source)
+        self.assertIn("netto basisloon 40 uur", records_source)
+        self.assertIn("bruto uurloon", records_source)
+        self.assertIn("pensioenregeling", records_source)
         self.assertIn("data-payroll-blocked-payment", template)
         self.assertIn("Uitbetalen kan nog niet", Path("apps/dashboard/static/dashboard.js").read_text(encoding="utf-8-sig"))
 

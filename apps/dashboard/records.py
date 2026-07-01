@@ -2340,6 +2340,32 @@ def payroll_phase_status(week_result_summary: dict | None, exception_summary: di
     }
 
 
+def _payroll_arrangement_missing_fields_text(
+    arrangement_id,
+    contract_hours,
+    net_base_40h,
+    gross_hourly_wage=None,
+    phase=None,
+    pension_scheme=None,
+) -> str:
+    if not arrangement_id:
+        return "Geen geldige medewerker-inrichting voor deze loonperiode."
+    missing = []
+    if contract_hours is None:
+        missing.append("contracturen")
+    if net_base_40h is None:
+        missing.append("netto basisloon 40 uur")
+    if gross_hourly_wage is None:
+        missing.append("bruto uurloon")
+    if not phase:
+        missing.append("fase")
+    if not pension_scheme:
+        missing.append("pensioenregeling")
+    if not missing:
+        return ""
+    return "Medewerker-inrichting mist: " + ", ".join(missing) + "."
+
+
 def list_payroll_period_exceptions(period_id: int, limit: int = 100) -> list[dict]:
     if not period_id:
         return []
@@ -2381,16 +2407,40 @@ def list_payroll_period_exceptions(period_id: int, limit: int = 100) -> list[dic
                                COUNT(*) AS occurrence_count,
                                STRING_AGG(DISTINCT COALESCE(i.week_number::text, '-'), ', ' ORDER BY COALESCE(i.week_number::text, '-')) AS week_numbers,
                                'Medewerkerinrichting ontbreekt' AS title,
-                               'Leg de verloningsinrichting vast op de medewerkerkaart voor deze periode.' AS detail,
+                               COALESCE(
+                                   STRING_AGG(
+                                       DISTINCT NULLIF(
+                                           CONCAT_WS(', ',
+                                               CASE WHEN i.arrangement_id IS NULL THEN 'geen geldige medewerker-inrichting voor deze loonperiode' END,
+                                               CASE WHEN a.contract_hours_4w IS NULL THEN 'contracturen' END,
+                                               CASE WHEN a.net_base_40h IS NULL THEN 'netto basisloon 40 uur' END,
+                                               CASE WHEN a.gross_hourly_wage IS NULL THEN 'bruto uurloon' END,
+                                               CASE WHEN COALESCE(a.phase, '') = '' THEN 'fase' END,
+                                               CASE WHEN COALESCE(a.pension_scheme, '') = '' THEN 'pensioenregeling' END
+                                           ),
+                                           ''
+                                       ),
+                                       '; '
+                                   ),
+                                   'Leg de verloningsinrichting vast op de medewerkerkaart voor deze periode.'
+                               ) AS detail,
                                'Medewerkerkaart openen' AS next_step
                         FROM payroll_week_inputs i
                         JOIN payroll_periods p ON p.id = i.payroll_period_id
+                        LEFT JOIN payroll_employee_arrangements a ON a.id = i.arrangement_id
                         LEFT JOIN whatsapp_timesheet_inbox wi ON wi.id = i.timesheet_inbox_id
                         WHERE i.payroll_period_id = %s
                           AND LOWER(REPLACE(COALESCE(i.status, ''), ' ', '_')) = ANY(%s)
                           AND """ + _active_timesheet_condition("i", "wi") + """
                           AND i.relation_id IS NOT NULL
-                          AND i.arrangement_id IS NULL
+                          AND (
+                              i.arrangement_id IS NULL
+                              OR a.contract_hours_4w IS NULL
+                              OR a.net_base_40h IS NULL
+                              OR a.gross_hourly_wage IS NULL
+                              OR COALESCE(a.phase, '') = ''
+                              OR COALESCE(a.pension_scheme, '') = ''
+                          )
                         GROUP BY i.relation_id, i.employee_name
 
                         UNION ALL
@@ -2667,7 +2717,12 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                            COALESCE(NULLIF(dc.day_km, 0), i.total_km, 0) AS total_km,
                            i.arrangement_id,
                            COALESCE(wr.calculation_status, '') AS calculation_status,
-                           COALESCE(pc.project_count, 0) AS project_count
+                           COALESCE(pc.project_count, 0) AS project_count,
+                           a.contract_hours_4w,
+                           a.net_base_40h,
+                           a.gross_hourly_wage,
+                           a.phase,
+                           a.pension_scheme
                     FROM payroll_week_inputs i
                     JOIN payroll_periods pp
                         ON pp.id = i.payroll_period_id
@@ -2684,6 +2739,8 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                         ON wi.id = i.timesheet_inbox_id
                     LEFT JOIN relations r
                         ON r.id = i.relation_id
+                    LEFT JOIN payroll_employee_arrangements a
+                        ON a.id = i.arrangement_id
                     LEFT JOIN payroll_cao_settings c
                         ON c.id = pc.payroll_cao_setting_id
                     WHERE i.payroll_period_id = %s
@@ -2744,9 +2801,10 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                     row_blockers = set()
                     if not row[1]:
                         row_blockers.add("Kandidaatkoppeling ontbreekt.")
-                    if row[1] and not row[26]:
-                        row_blockers.add("Medewerkerinrichting ontbreekt: leg de verloningsinrichting vast op de medewerkerkaart.")
-                    if row[27] == "mist_netto_basisloon":
+                    arrangement_missing = _payroll_arrangement_missing_fields_text(row[26], row[29], row[30], row[31], row[32], row[33])
+                    if row[1] and arrangement_missing:
+                        row_blockers.add(arrangement_missing)
+                    if row[27] == "mist_netto_basisloon" and not arrangement_missing:
                         row_blockers.add("Netto basisloon ontbreekt.")
                     if hours > 0 and not int(row[28] or 0):
                         row_blockers.add("Projectregel ontbreekt: controleer opdrachtgever/project voor facturatie en CAO-context.")
@@ -4649,6 +4707,10 @@ def recalculate_open_payroll_for_relation(relation_id: int | None) -> dict:
                            p.period_number,
                            a.cao_branch,
                            a.net_base_40h,
+                           a.contract_hours_4w,
+                           a.gross_hourly_wage,
+                           a.phase,
+                           a.pension_scheme,
                            a.vacation_rate_40h,
                            a.sickness_rate_40h,
                            a.holiday_rate_40h,
@@ -4756,6 +4818,10 @@ def recalculate_open_payroll_for_relation(relation_id: int | None) -> dict:
                        selected_travel_rate,
                        CASE
                            WHEN arrangement_id IS NULL THEN 'mist_inrichting'
+                           WHEN contract_hours_4w IS NULL
+                                OR gross_hourly_wage IS NULL
+                                OR COALESCE(phase, '') = ''
+                                OR COALESCE(pension_scheme, '') = '' THEN 'mist_inrichting'
                            WHEN net_base_40h IS NULL THEN 'mist_netto_basisloon'
                            ELSE 'concept'
                        END,
