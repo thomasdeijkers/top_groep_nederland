@@ -10,6 +10,54 @@ class TimesheetValidationError(ValueError):
     pass
 
 
+def approve_timesheet_control(timesheet_id: int, matched_relation_id: int | None = None) -> None:
+    ensure_dashboard_tables()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            if matched_relation_id:
+                cursor.execute(
+                    """
+                    SELECT name, phone
+                    FROM relations
+                    WHERE id = %s
+                      AND relation_type = 'candidate'
+                      AND archived_at IS NULL;
+                    """,
+                    (matched_relation_id,),
+                )
+                row = cursor.fetchone()
+                if not row:
+                    raise TimesheetValidationError("De gekoppelde kandidaat bestaat niet meer of is gearchiveerd.")
+                candidate_name, candidate_phone = row
+                cursor.execute(
+                    """
+                    UPDATE whatsapp_timesheet_inbox
+                    SET matched_relation_id = %s,
+                        matched_candidate_name = %s,
+                        employee_name = COALESCE(%s, employee_name),
+                        sender_phone = COALESCE(%s, sender_phone),
+                        status = 'goed_te_keuren',
+                        updated_at = NOW()
+                    WHERE id = %s;
+                    """,
+                    (matched_relation_id, candidate_name, candidate_name, candidate_phone, timesheet_id),
+                )
+            else:
+                cursor.execute(
+                    """
+                    UPDATE whatsapp_timesheet_inbox
+                    SET status = 'goed_te_keuren',
+                        updated_at = NOW()
+                    WHERE id = %s
+                      AND matched_relation_id IS NOT NULL;
+                    """,
+                    (timesheet_id,),
+                )
+                if cursor.rowcount == 0:
+                    raise TimesheetValidationError("Koppel eerst een kandidaat voordat je dit urenbriefje naar Valideren zet.")
+        conn.commit()
+
+
 def save_field_corrections(
     timesheet_id: int,
     corrections: dict[str, str],

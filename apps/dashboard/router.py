@@ -89,7 +89,7 @@ from apps.dashboard.relations import (
     update_vacancy,
 )
 from apps.dashboard.stats import get_dashboard_stats, get_database_status, get_empty_dashboard_stats, get_health, get_server_overview
-from apps.dashboard.timesheet_corrections import TimesheetValidationError, save_field_corrections, send_to_payroll, validate_timesheet
+from apps.dashboard.timesheet_corrections import TimesheetValidationError, approve_timesheet_control, save_field_corrections, send_to_payroll, validate_timesheet
 from apps.dashboard.timesheet_uploads import import_complete_period_timesheets, reparse_timesheet_upload, save_timesheet_upload
 from apps.dashboard.whatsapp_actions import archive_whatsapp_timesheet, delete_whatsapp_timesheet
 from jobs.imports.otys_export import import_otys_organizations, parse_otys_csv
@@ -1008,6 +1008,24 @@ def validate_whatsapp_timesheet(
         return RedirectResponse(f"/dashboard/timesheets?{query}#digital-timesheet", status_code=303)
     _audit("Urenbriefje gevalideerd", "urenbriefje", timesheet_id, f"Urenbriefje {timesheet_id}", "Uren zijn gekoppeld aan kandidaat, opdrachtgever en project.", "Loon berekenen")
     return RedirectResponse(f"/dashboard/timesheets?stage=loon&timesheet={timesheet_id}", status_code=303)
+
+
+@router.post("/api/whatsapp/timesheet/{timesheet_id}/approve-control")
+def approve_control_whatsapp_timesheet(
+    timesheet_id: int,
+    matched_relation_id: str = Form(""),
+):
+    locked_response = _timesheet_locked_response(timesheet_id)
+    if locked_response:
+        return locked_response
+    try:
+        selected_candidate_id = ensure_relation_for_candidate_match(matched_relation_id)
+        approve_timesheet_control(timesheet_id, selected_candidate_id)
+    except TimesheetValidationError as exc:
+        query = urlencode({"tab": "task", "stage": "controle", "timesheet": timesheet_id, "validate_error": str(exc)})
+        return RedirectResponse(f"/dashboard/timesheets?{query}#digital-timesheet", status_code=303)
+    _audit("Controle urenbriefje akkoord", "urenbriefje", timesheet_id, f"Urenbriefje {timesheet_id}", "Controle is afgerond; urenbriefje staat klaar voor validatie.", "Valideren")
+    return RedirectResponse(f"/dashboard/timesheets?tab=task&stage=valideren&timesheet={timesheet_id}#digital-timesheet", status_code=303)
 
 
 @router.post("/api/whatsapp/timesheet/{timesheet_id}/payroll")

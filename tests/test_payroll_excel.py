@@ -1119,9 +1119,25 @@ class TimesheetCandidateValidationTests(unittest.TestCase):
 
         self.assertIn("data-workflow-candidate-id", script)
         self.assertIn("data-workflow-validate-button", script)
+        self.assertIn('canApproveControl = validateButton?.dataset.canApproveControl === "1"', script)
         self.assertIn('canSendToPayroll = validateButton?.dataset.canSendToPayroll === "1"', script)
-        self.assertIn("validateButton.disabled = !canSendToPayroll", script)
+        self.assertIn("canUseWorkflowButton = canApproveControl || canSendToPayroll", script)
+        self.assertIn("validateButton.disabled = !canUseWorkflowButton", script)
         self.assertIn("workflowCandidateTarget.value = option.value", script)
+
+    def test_control_stage_can_advance_to_validation_without_payroll(self):
+        template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
+        router_source = Path("apps/dashboard/router.py").read_text(encoding="utf-8-sig")
+        correction_source = Path("apps/dashboard/timesheet_corrections.py").read_text(encoding="utf-8-sig")
+
+        self.assertIn("approve-control", template)
+        self.assertIn("Naar valideren", template)
+        self.assertIn("data-can-approve-control", template)
+        self.assertIn('@router.post("/api/whatsapp/timesheet/{timesheet_id}/approve-control")', router_source)
+        self.assertIn("approve_timesheet_control", router_source)
+        self.assertIn("Controle urenbriefje akkoord", router_source)
+        self.assertIn("def approve_timesheet_control", correction_source)
+        self.assertIn("status = 'goed_te_keuren'", correction_source)
 
     def test_failed_parse_can_be_completed_manually_with_audit_marker(self):
         template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
@@ -1327,7 +1343,7 @@ class DashboardContextSafetyTests(unittest.TestCase):
         self.assertIn('{"controle", "valideren", "loon", "archief"} else "controle"', router_source)
         self.assertIn("Doorzetten naar loon berekenen", template)
         self.assertIn("selected_message.workflow_stage == 'valideren'", template)
-        self.assertIn("Eerst controleren", template)
+        self.assertIn("Naar valideren", template)
         self.assertIn("data-can-send-to-payroll", template)
         self.assertIn("canSendToPayroll", script_source)
 

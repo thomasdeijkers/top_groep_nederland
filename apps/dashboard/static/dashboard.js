@@ -715,7 +715,9 @@
         const candidateNote = document.querySelector("[data-workflow-candidate-note]");
         const createCandidatePanel = document.querySelector("[data-candidate-create-panel]");
         const searchUrl = select.dataset.candidateSearchUrl;
+        const canApproveControl = validateButton?.dataset.canApproveControl === "1";
         const canSendToPayroll = validateButton?.dataset.canSendToPayroll === "1";
+        const canUseWorkflowButton = canApproveControl || canSendToPayroll;
         let candidateSearchTimer = null;
         let candidateSearchSequence = 0;
 
@@ -783,9 +785,9 @@
                 }
                 if (validateButton) {
                     validateButton.disabled = true;
-                    validateButton.title = canSendToPayroll
+                    validateButton.title = canUseWorkflowButton
                         ? "Koppel eerst een kandidaat"
-                        : "Rond eerst de controle af; daarna staat dit briefje onder Valideren.";
+                        : "Deze actie is nu niet beschikbaar.";
                 }
                 if (candidateNote) {
                     candidateNote.hidden = false;
@@ -815,15 +817,15 @@
                 workflowCandidateTarget.value = option.value;
             }
             if (validateButton) {
-                validateButton.disabled = !canSendToPayroll;
-                if (canSendToPayroll) {
+                validateButton.disabled = !canUseWorkflowButton;
+                if (canUseWorkflowButton) {
                     validateButton.removeAttribute("title");
                 } else {
-                    validateButton.title = "Rond eerst de controle af; daarna staat dit briefje onder Valideren.";
+                    validateButton.title = "Deze actie is nu niet beschikbaar.";
                 }
             }
             if (candidateNote) {
-                candidateNote.hidden = canSendToPayroll;
+                candidateNote.hidden = canUseWorkflowButton;
             }
             if (createCandidatePanel) {
                 createCandidatePanel.hidden = true;
