@@ -2015,7 +2015,7 @@ def get_payroll_period(period_id: int | None) -> dict | None:
             period["payroll_exceptions"] = list_payroll_period_exceptions(period_id)
             period["payroll_exception_summary"] = summarize_payroll_exceptions(period["payroll_exceptions"])
             period["payroll_phase_status"] = payroll_phase_status(period["week_result_summary"], period["payroll_exception_summary"])
-            period["period_settlements"] = list_payroll_period_settlements(period_id)
+            period["period_settlements"] = list_payroll_period_settlements(period_id) if period.get("is_locked_for_payment") else []
             period["employee_week_results"] = period["period_settlements"] or list_payroll_employee_week_results(period_id)
             period["payroll_rows"] = list_payroll_period_payroll(period_id)
             period["payroll_totals"] = _payroll_period_totals(period["payroll_rows"])
@@ -4400,7 +4400,253 @@ def update_payroll_employee_arrangement(arrangement_id: int, data: dict) -> str:
             )
             row = cursor.fetchone()
         conn.commit()
-    return f"Medewerker-inrichting #{arrangement_id} bijgewerkt voor relatie #{row[0]}." if row else f"Medewerker-inrichting #{arrangement_id} niet gevonden."
+    if not row:
+        return f"Medewerker-inrichting #{arrangement_id} niet gevonden."
+    recalculation = recalculate_open_payroll_for_relation(row[0])
+    suffix = (
+        f" {recalculation['week_inputs']} actieve weekregel(s) en "
+        f"{recalculation['week_results']} loonresultaat/resultaten opnieuw berekend."
+        if recalculation["week_inputs"] or recalculation["week_results"]
+        else " Geen open loonregels om opnieuw te berekenen."
+    )
+    return f"Medewerker-inrichting #{arrangement_id} bijgewerkt voor relatie #{row[0]}.{suffix}"
+
+
+def recalculate_open_payroll_for_relation(relation_id: int | None) -> dict:
+    if not relation_id:
+        return {"week_inputs": 0, "week_results": 0, "settlements_cleared": 0}
+    ensure_dashboard_tables()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                WITH target_inputs AS (
+                    SELECT i.id,
+                           i.payroll_period_id,
+                           p.year,
+                           p.period_number
+                    FROM payroll_week_inputs i
+                    JOIN payroll_periods p ON p.id = i.payroll_period_id
+                    WHERE i.relation_id = %s
+                      AND LOWER(COALESCE(p.status, '')) <> 'archief'
+                      AND LOWER(REPLACE(COALESCE(i.status, ''), ' ', '_')) = ANY(%s)
+                ), chosen AS (
+                    SELECT t.id AS payroll_week_input_id,
+                           a.id AS arrangement_id
+                    FROM target_inputs t
+                    LEFT JOIN LATERAL (
+                        SELECT candidate.id
+                        FROM payroll_employee_arrangements candidate
+                        WHERE candidate.relation_id = %s
+                          AND COALESCE(candidate.status, 'active') <> 'archief'
+                          AND (
+                              candidate.valid_from_year < t.year
+                              OR (
+                                  candidate.valid_from_year = t.year
+                                  AND candidate.valid_from_period_number <= t.period_number
+                              )
+                          )
+                        ORDER BY candidate.valid_from_year DESC,
+                                 candidate.valid_from_period_number DESC,
+                                 candidate.id DESC
+                        LIMIT 1
+                    ) a ON TRUE
+                )
+                UPDATE payroll_week_inputs i
+                SET arrangement_id = chosen.arrangement_id,
+                    updated_at = NOW()
+                FROM chosen
+                WHERE i.id = chosen.payroll_week_input_id
+                RETURNING i.id;
+                """,
+                (relation_id, list(PAYROLL_VALIDATION_STATUSES), relation_id),
+            )
+            input_ids = [row[0] for row in cursor.fetchall()]
+            if not input_ids:
+                conn.commit()
+                return {"week_inputs": 0, "week_results": 0, "settlements_cleared": 0}
+            cursor.execute(
+                """
+                WITH input_base AS (
+                    SELECT i.id AS payroll_week_input_id,
+                           i.payroll_period_id,
+                           i.payroll_period_week_id,
+                           i.relation_id,
+                           i.arrangement_id,
+                           i.employee_name,
+                           i.week_number,
+                           i.worked_hours,
+                           i.total_km,
+                           p.year,
+                           p.period_number,
+                           a.cao_branch,
+                           a.net_base_40h,
+                           a.vacation_rate_40h,
+                           a.sickness_rate_40h,
+                           a.holiday_rate_40h,
+                           a.company_car,
+                           a.own_transport_km_rate,
+                           COALESCE(day_totals.worked_days, 0) AS worked_days,
+                           COALESCE(day_totals.vacation_hours, 0) AS vacation_hours,
+                           COALESCE(day_totals.sickness_hours, 0) AS sickness_hours,
+                           COALESCE(day_totals.rv_hours, 0) AS rv_hours,
+                           COALESCE(day_totals.kv_hours, 0) AS kv_hours,
+                           COALESCE(day_totals.holiday_hours, 0) AS holiday_hours,
+                           COALESCE(allowance_totals.day_allowance_amount, 0) AS day_allowance_per_day
+                    FROM payroll_week_inputs i
+                    JOIN payroll_periods p ON p.id = i.payroll_period_id
+                    LEFT JOIN payroll_employee_arrangements a ON a.id = i.arrangement_id
+                    LEFT JOIN LATERAL (
+                        SELECT COUNT(*) FILTER (WHERE d.hours > 0) AS worked_days,
+                               SUM(CASE WHEN UPPER(COALESCE(d.day_code, '')) = 'V' THEN d.hours ELSE 0 END) AS vacation_hours,
+                               SUM(CASE WHEN UPPER(COALESCE(d.day_code, '')) IN ('Z', 'ZW') THEN d.hours ELSE 0 END) AS sickness_hours,
+                               SUM(CASE WHEN UPPER(COALESCE(d.day_code, '')) = 'RV' THEN d.hours ELSE 0 END) AS rv_hours,
+                               SUM(CASE WHEN UPPER(COALESCE(d.day_code, '')) IN ('KV', 'C', 'A') THEN d.hours ELSE 0 END) AS kv_hours,
+                               SUM(CASE WHEN UPPER(COALESCE(d.day_code, '')) = 'F' THEN d.hours ELSE 0 END) AS holiday_hours
+                        FROM payroll_week_input_days d
+                        WHERE d.payroll_week_input_id = i.id
+                    ) day_totals ON TRUE
+                    LEFT JOIN LATERAL (
+                        SELECT SUM(COALESCE(pa.amount, 0)) AS day_allowance_amount
+                        FROM payroll_employee_allowances pa
+                        WHERE pa.arrangement_id = i.arrangement_id
+                          AND pa.unit = 'day'
+                    ) allowance_totals ON TRUE
+                    WHERE i.id = ANY(%s)
+                ), parameter_rates AS (
+                    SELECT b.*,
+                           COALESCE(
+                               b.own_transport_km_rate,
+                               CASE
+                                   WHEN LOWER(COALESCE(b.cao_branch, '')) LIKE '%%uta%%' THEN uta_rate.uta_value
+                                   ELSE build_rate.build_value
+                               END,
+                               0
+                           ) AS selected_travel_rate
+                    FROM input_base b
+                    LEFT JOIN LATERAL (
+                        SELECT v.uta_value
+                        FROM payroll_parameters p
+                        JOIN payroll_parameter_versions v ON v.parameter_id = p.id
+                        WHERE p.parameter_key = 'travel_km_net_uta'
+                          AND (v.year = b.year OR v.year IS NULL)
+                          AND (v.period_number <= b.period_number OR v.period_number IS NULL)
+                        ORDER BY v.year DESC NULLS LAST, v.period_number DESC NULLS LAST, v.id DESC
+                        LIMIT 1
+                    ) uta_rate ON TRUE
+                    LEFT JOIN LATERAL (
+                        SELECT v.build_value
+                        FROM payroll_parameters p
+                        JOIN payroll_parameter_versions v ON v.parameter_id = p.id
+                        WHERE p.parameter_key = 'travel_km_net_build'
+                          AND (v.year = b.year OR v.year IS NULL)
+                          AND (v.period_number <= b.period_number OR v.period_number IS NULL)
+                        ORDER BY v.year DESC NULLS LAST, v.period_number DESC NULLS LAST, v.id DESC
+                        LIMIT 1
+                    ) build_rate ON TRUE
+                ), calculated AS (
+                    SELECT *,
+                           ROUND(COALESCE(net_base_40h, 0) * COALESCE(worked_hours, 0) / 40, 2) AS calculated_net_wage,
+                           ROUND(COALESCE(vacation_rate_40h, net_base_40h, 0) * COALESCE(vacation_hours + rv_hours + kv_hours, 0) / 40, 2) AS calculated_leave_wage,
+                           ROUND(COALESCE(sickness_rate_40h, vacation_rate_40h, net_base_40h, 0) * COALESCE(sickness_hours, 0) / 40, 2) AS calculated_sickness_wage,
+                           ROUND(COALESCE(holiday_rate_40h, vacation_rate_40h, net_base_40h, 0) * COALESCE(holiday_hours, 0) / 40, 2) AS calculated_holiday_wage,
+                           CASE
+                               WHEN company_car THEN 0
+                               ELSE ROUND(COALESCE(total_km, 0) * COALESCE(selected_travel_rate, 0), 2)
+                           END AS calculated_travel,
+                           ROUND(COALESCE(worked_days, 0) * COALESCE(day_allowance_per_day, 0), 2) AS calculated_day_allowance
+                    FROM parameter_rates
+                )
+                INSERT INTO payroll_week_results (
+                    payroll_week_input_id, payroll_period_id, payroll_period_week_id, relation_id,
+                    arrangement_id, employee_name, week_number, worked_days, worked_hours,
+                    vacation_hours, sickness_hours, rv_hours, kv_hours, holiday_hours, total_km,
+                    net_wage_amount, travel_amount, day_allowance_amount, extra_net_amount,
+                    net_week_total, travel_rate, calculation_status, calculation_details,
+                    calculated_at, created_at, updated_at
+                )
+                SELECT payroll_week_input_id,
+                       payroll_period_id,
+                       payroll_period_week_id,
+                       relation_id,
+                       arrangement_id,
+                       employee_name,
+                       week_number,
+                       worked_days,
+                       worked_hours,
+                       vacation_hours,
+                       sickness_hours,
+                       rv_hours,
+                       kv_hours,
+                       holiday_hours,
+                       total_km,
+                       calculated_net_wage + calculated_leave_wage + calculated_sickness_wage + calculated_holiday_wage,
+                       calculated_travel,
+                       calculated_day_allowance,
+                       0,
+                       calculated_net_wage + calculated_leave_wage + calculated_sickness_wage + calculated_holiday_wage + calculated_travel + calculated_day_allowance,
+                       selected_travel_rate,
+                       CASE
+                           WHEN arrangement_id IS NULL THEN 'mist_inrichting'
+                           WHEN net_base_40h IS NULL THEN 'mist_netto_basisloon'
+                           ELSE 'concept'
+                       END,
+                       jsonb_build_object(
+                           'formula', 'netto loon per uursoort + reiskosten + dagvergoedingen',
+                           'net_base_40h', net_base_40h,
+                           'travel_rate', selected_travel_rate,
+                           'company_car', company_car,
+                           'day_allowance_per_day', day_allowance_per_day,
+                           'source', 'arrangement_update'
+                       ),
+                       NOW(),
+                       NOW(),
+                       NOW()
+                FROM calculated
+                ON CONFLICT (payroll_week_input_id)
+                DO UPDATE SET
+                    payroll_period_id = EXCLUDED.payroll_period_id,
+                    payroll_period_week_id = EXCLUDED.payroll_period_week_id,
+                    relation_id = EXCLUDED.relation_id,
+                    arrangement_id = EXCLUDED.arrangement_id,
+                    employee_name = EXCLUDED.employee_name,
+                    week_number = EXCLUDED.week_number,
+                    worked_days = EXCLUDED.worked_days,
+                    worked_hours = EXCLUDED.worked_hours,
+                    vacation_hours = EXCLUDED.vacation_hours,
+                    sickness_hours = EXCLUDED.sickness_hours,
+                    rv_hours = EXCLUDED.rv_hours,
+                    kv_hours = EXCLUDED.kv_hours,
+                    holiday_hours = EXCLUDED.holiday_hours,
+                    total_km = EXCLUDED.total_km,
+                    net_wage_amount = EXCLUDED.net_wage_amount,
+                    travel_amount = EXCLUDED.travel_amount,
+                    day_allowance_amount = EXCLUDED.day_allowance_amount,
+                    extra_net_amount = EXCLUDED.extra_net_amount,
+                    net_week_total = EXCLUDED.net_week_total,
+                    travel_rate = EXCLUDED.travel_rate,
+                    calculation_status = EXCLUDED.calculation_status,
+                    calculation_details = EXCLUDED.calculation_details,
+                    calculated_at = NOW(),
+                    updated_at = NOW()
+                RETURNING payroll_week_input_id;
+                """,
+                (input_ids,),
+            )
+            week_results = cursor.rowcount
+            cursor.execute(
+                """
+                DELETE FROM payroll_period_settlements s
+                USING payroll_periods p
+                WHERE p.id = s.payroll_period_id
+                  AND s.relation_id = %s
+                  AND LOWER(COALESCE(p.status, '')) <> 'archief';
+                """,
+                (relation_id,),
+            )
+            settlements_cleared = cursor.rowcount
+        conn.commit()
+    return {"week_inputs": len(input_ids), "week_results": week_results, "settlements_cleared": settlements_cleared}
 
 
 def update_payroll_running_balance_account(account_id: int, data: dict) -> str:

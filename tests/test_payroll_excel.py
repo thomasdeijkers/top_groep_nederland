@@ -1320,6 +1320,18 @@ class DashboardContextSafetyTests(unittest.TestCase):
         self.assertIn("LOWER(COALESCE(p.status, '')) <> 'archief'", records_source)
         self.assertIn("LOWER(REPLACE(COALESCE({alias}.status, ''), ' ', '_')) = ANY(%s)", records_source)
 
+    def test_employee_arrangement_update_recalculates_only_open_payroll(self):
+        records_source = Path("apps/dashboard/records.py").read_text(encoding="utf-8-sig")
+
+        self.assertIn("recalculate_open_payroll_for_relation(row[0])", records_source)
+        self.assertIn("def recalculate_open_payroll_for_relation", records_source)
+        self.assertIn("LOWER(COALESCE(p.status, '')) <> 'archief'", records_source)
+        self.assertIn("list(PAYROLL_VALIDATION_STATUSES)", records_source)
+        self.assertIn("ON CONFLICT (payroll_week_input_id)", records_source)
+        self.assertIn("'source', 'arrangement_update'", records_source)
+        self.assertIn("DELETE FROM payroll_period_settlements", records_source)
+        self.assertIn('period["period_settlements"] = list_payroll_period_settlements(period_id) if period.get("is_locked_for_payment") else []', records_source)
+
     def test_payroll_payment_approval_locks_timesheet_edits_until_period_restore(self):
         template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
         router_source = Path("apps/dashboard/router.py").read_text(encoding="utf-8-sig")
