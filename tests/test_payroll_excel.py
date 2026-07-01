@@ -1135,6 +1135,11 @@ class CompletePeriodTimesheetImportTests(unittest.TestCase):
         self.assertIn('"label": "Uit te betalen"', calculations_source)
         self.assertIn('"label": "Uitbetaald"', calculations_source)
         self.assertIn('"key": "payment_action"', calculations_source)
+        payment_columns = calculations_source[
+            calculations_source.index("PAYMENT_SHEET_COLUMNS = ["):
+            calculations_source.index("DEFAULT_RULES = [")
+        ]
+        self.assertNotIn('"key": "payroll_status_label"', payment_columns)
         self.assertIn("/api/periods/{{ selected_payroll_period.id }}/payment-status", template)
         self.assertIn("Uitbetalen", template)
         self.assertIn("Uitbetaald", template)

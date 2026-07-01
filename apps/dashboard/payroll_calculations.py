@@ -106,7 +106,6 @@ PAYMENT_SHEET_COLUMNS = [
     {"label": "Km", "key": "total_km"},
     {"label": "Netto bedrag", "key": "net_amount"},
     {"label": "Project", "key": "project_info"},
-    {"label": "Status", "key": "payroll_status_label"},
     {"label": "Actie", "key": "payment_action"},
 ]
 
