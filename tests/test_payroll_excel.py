@@ -160,10 +160,12 @@ class PayrollCalculationTests(unittest.TestCase):
     def test_period_excel_endpoint_uses_tgn_template_export(self):
         source = Path("apps/dashboard/router.py").read_text(encoding="utf-8")
         template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8")
+        requirements = Path("requirements.txt").read_text(encoding="utf-8-sig")
 
         self.assertIn("use_tgn_template=True", source)
         self.assertIn("TGN-templateopzet", source)
         self.assertIn("Excel TGN-opzet", template)
+        self.assertIn("openpyxl==", requirements)
 
     def test_week_workbook_rows_link_to_timesheets(self):
         from apps.dashboard.payroll_calculations import WEEK_SHEET_COLUMNS, build_week_sheet_rows
