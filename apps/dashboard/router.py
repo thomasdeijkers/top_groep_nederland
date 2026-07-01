@@ -1349,7 +1349,10 @@ async def save_payroll_period_workbook_cell(period_id: int, request: Request):
 async def save_payroll_period_payment_status(period_id: int, request: Request):
     form = await request.form()
     result = update_payroll_payment_status(period_id, dict(form))
-    target_tab = "Uitbetaald" if result.get("status") == "uitbetaald" else "Uit te betalen"
+    target_tab = {
+        "uitbetaald": "Uitbetaald",
+        "uit_te_betalen": "Uit te betalen",
+    }.get(result.get("status"), "")
     if not result.get("ok"):
         target_tab = str(form.get("tab") or "")
         _audit(

@@ -315,6 +315,36 @@
             activatePayrollTab(requestedTab);
         }
 
+        const summaryParseNumber = (value) => {
+            let normalized = String(value || "").replace(/[^\d,.-]/g, "").trim();
+            if (normalized.includes(",") && normalized.includes(".")) {
+                normalized = normalized.replace(/\./g, "").replace(",", ".");
+            } else if (normalized.includes(",")) {
+                normalized = normalized.replace(",", ".");
+            }
+            const parsed = Number.parseFloat(normalized);
+            return Number.isFinite(parsed) ? parsed : 0;
+        };
+        const summaryFormatMoney = (value) => new Intl.NumberFormat("nl-NL", {
+            style: "currency",
+            currency: "EUR",
+        }).format(value || 0);
+        const recalculatePaymentSummary = () => {
+            const totals = { "Uit te betalen": 0, "Uitbetaald": 0 };
+            workbook.querySelectorAll('[data-payroll-panel="Uit te betalen"], [data-payroll-panel="Uitbetaald"]').forEach((panel) => {
+                const label = panel.dataset.payrollPanel;
+                panel.querySelectorAll(".payroll-col-net-amount [data-payroll-cell]").forEach((input) => {
+                    totals[label] += summaryParseNumber(input.value);
+                });
+            });
+            Object.entries(totals).forEach(([label, total]) => {
+                const target = document.querySelector(`[data-payroll-summary-total="${label}"]`);
+                if (target) {
+                    target.textContent = summaryFormatMoney(total);
+                }
+            });
+        };
+
         workbook.querySelectorAll("[data-payroll-blocked-payment]").forEach((button) => {
             button.addEventListener("click", () => {
                 const reason = button.dataset.blockReason || "Deze loonregel mist nog gegevens.";
@@ -474,6 +504,7 @@
                     if (meta) {
                         meta.textContent = `Vorig: ${result.previous_value || "-"} · Mutatie: ${result.updated_at || "-"}`;
                     }
+                    recalculatePaymentSummary();
                 } catch (error) {
                     input.classList.add("payroll-cell-input--error");
                 } finally {
@@ -483,12 +514,14 @@
             input.addEventListener("input", () => {
                 input.classList.add("payroll-cell-input--dirty");
                 recalculateWorkbookRow();
+                recalculatePaymentSummary();
                 window.clearTimeout(saveTimer);
                 saveTimer = window.setTimeout(save, 650);
             });
             input.addEventListener("change", () => {
                 input.classList.add("payroll-cell-input--dirty");
                 recalculateWorkbookRow();
+                recalculatePaymentSummary();
                 window.clearTimeout(saveTimer);
                 save();
             });

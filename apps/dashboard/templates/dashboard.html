@@ -1760,12 +1760,12 @@ Metadata:
                         <div class="project-detail-summary">
                             <div>
                                 <span>Uit te betalen loon</span>
-                                <strong>{{ payment_summary.payable_total }}</strong>
+                                <strong data-payroll-summary-total="Uit te betalen">{{ payment_summary.payable_total }}</strong>
                                 <small>{{ payment_summary.payable_count }} declaraties</small>
                             </div>
                             <div>
                                 <span>Uitbetaald loon</span>
-                                <strong>{{ payment_summary.paid_total }}</strong>
+                                <strong data-payroll-summary-total="Uitbetaald">{{ payment_summary.paid_total }}</strong>
                                 <small>{{ payment_summary.paid_count }} declaraties</small>
                             </div>
                             <div>
@@ -1944,7 +1944,11 @@ Metadata:
                                                         {% endif %}
                                                     {% elif column.key == 'payment_action' %}
                                                         {% if row.payroll_status == 'uitbetaald' %}
-                                                        <span class="status-tag">Afgerond</span>
+                                                        <form class="payroll-workbook-action-form" action="/api/periods/{{ selected_payroll_period.id }}/payment-status" method="post">
+                                                            <input type="hidden" name="timesheet_ids" value="{{ row.timesheet_ids }}">
+                                                            <input type="hidden" name="status" value="uit_te_betalen">
+                                                            <button class="payroll-workbook-link" type="submit" {% if selected_payroll_period.is_locked_for_payment %}disabled title="Deze loonperiode staat op slot"{% endif %}>Terug naar uit te betalen</button>
+                                                        </form>
                                                         {% elif row.payroll_blocker_message %}
                                                         <button class="payroll-workbook-link" type="button" data-payroll-blocked-payment data-block-reason="{{ row.payroll_blocker_message }}">Uitbetalen</button>
                                                         {% elif row.timesheet_ids %}
@@ -1953,6 +1957,13 @@ Metadata:
                                                             <input type="hidden" name="status" value="{{ 'uitbetaald' if row.payroll_status == 'uit_te_betalen' else 'uit_te_betalen' }}">
                                                             <button class="payroll-workbook-link" type="submit" {% if selected_payroll_period.is_locked_for_payment %}disabled title="Deze loonperiode staat op slot"{% endif %}>{{ 'Uitbetaald' if row.payroll_status == 'uit_te_betalen' else 'Uitbetalen' }}</button>
                                                         </form>
+                                                        {% if row.payroll_status == 'uit_te_betalen' %}
+                                                        <form class="payroll-workbook-action-form" action="/api/periods/{{ selected_payroll_period.id }}/payment-status" method="post">
+                                                            <input type="hidden" name="timesheet_ids" value="{{ row.timesheet_ids }}">
+                                                            <input type="hidden" name="status" value="loon_berekenen">
+                                                            <button class="payroll-workbook-link payroll-workbook-link--secondary" type="submit" {% if selected_payroll_period.is_locked_for_payment %}disabled title="Deze loonperiode staat op slot"{% endif %}>Terug naar loonregels</button>
+                                                        </form>
+                                                        {% endif %}
                                                         {% else %}
                                                         <span class="payroll-muted">Geen urenbriefje</span>
                                                         {% endif %}

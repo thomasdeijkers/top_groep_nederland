@@ -3396,7 +3396,7 @@ def update_payroll_payment_status(period_id: int, payload: dict) -> dict:
     if is_payroll_period_locked_for_payment(period_id):
         return {"ok": False, "error": "Deze loonperiode is al gevalideerd voor loonbetaling en staat op slot.", "locked": True}
     raw_status = str(payload.get("status") or "").strip().lower().replace(" ", "_")
-    if raw_status not in {"uit_te_betalen", "uitbetaald"}:
+    if raw_status not in {"loon_berekenen", "uit_te_betalen", "uitbetaald"}:
         return {"ok": False, "error": "Onbekende betaalstatus."}
     raw_ids = str(payload.get("timesheet_ids") or payload.get("timesheet_id") or "").replace(";", ",")
     timesheet_ids = [
@@ -3443,7 +3443,11 @@ def update_payroll_payment_status(period_id: int, payload: dict) -> dict:
             )
         conn.commit()
     employee_names = sorted({row[2] for row in updated_inputs if row[2]})
-    status_label = "Uitbetaald" if raw_status == "uitbetaald" else "Uit te betalen"
+    status_label = {
+        "loon_berekenen": "Loon berekenen",
+        "uit_te_betalen": "Uit te betalen",
+        "uitbetaald": "Uitbetaald",
+    }[raw_status]
     log_audit_event(
         action="Loon betaalstatus aangepast",
         entity_type="payroll_period",
