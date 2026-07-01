@@ -1213,13 +1213,14 @@ class DashboardContextSafetyTests(unittest.TestCase):
         self.assertTrue(shortcut["matched"])
         self.assertIn("Periode 5 2026", shortcut["title"])
 
-    def test_timesheet_period_tile_uses_context_shortcut(self):
+    def test_timesheet_period_context_still_matches_rows(self):
         template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
         router_source = Path("apps/dashboard/router.py").read_text(encoding="utf-8-sig")
         records_source = Path("apps/dashboard/records.py").read_text(encoding="utf-8-sig")
 
-        self.assertIn("timesheet_payroll_period_shortcut.url", template)
-        self.assertIn("timesheet_payroll_period_shortcut.title", template)
+        self.assertNotIn("timesheet_payroll_period_shortcut.url", template)
+        self.assertIn("Open loonperiode", template)
+        self.assertIn("message.payroll_period_url", template)
         self.assertIn("_timesheet_payroll_period_shortcut(timesheet_stage_items, timesheet_payroll_periods)", router_source)
         self.assertIn('data_page in {"periods", "timesheets"}', router_source)
         self.assertIn('"raw_start_date"', records_source)
