@@ -1126,6 +1126,23 @@ class CompletePeriodTimesheetImportTests(unittest.TestCase):
         self.assertIn("_active_period_payroll_status_condition(\"i\", \"pp\")", block)
         self.assertNotIn("FROM whatsapp_timesheet_inbox w", block)
 
+    def test_payroll_payment_flow_has_workbook_tabs_and_actions(self):
+        calculations_source = Path("apps/dashboard/payroll_calculations.py").read_text(encoding="utf-8-sig")
+        template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
+        router_source = Path("apps/dashboard/router.py").read_text(encoding="utf-8-sig")
+        records_source = Path("apps/dashboard/records.py").read_text(encoding="utf-8-sig")
+
+        self.assertIn('"label": "Uit te betalen"', calculations_source)
+        self.assertIn('"label": "Uitbetaald"', calculations_source)
+        self.assertIn('"key": "payment_action"', calculations_source)
+        self.assertIn("/api/periods/{{ selected_payroll_period.id }}/payment-status", template)
+        self.assertIn("Uitbetalen", template)
+        self.assertIn("Uitbetaald", template)
+        self.assertIn("def save_payroll_period_payment_status", router_source)
+        self.assertIn("def update_payroll_payment_status", records_source)
+        self.assertIn('"uit_te_betalen"', records_source)
+        self.assertIn('"uitbetaald"', records_source)
+
 
 class DashboardDatabaseStatusTests(unittest.TestCase):
     def test_non_overview_pages_use_real_database_status(self):

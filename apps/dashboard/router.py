@@ -66,6 +66,7 @@ from apps.dashboard.records import (
     search_candidate_matches,
     update_cao_setting,
     update_payroll_employee_arrangement,
+    update_payroll_payment_status,
     update_payroll_running_balance_account,
 )
 from apps.dashboard.relations import (
@@ -1342,6 +1343,23 @@ async def save_payroll_period_workbook_cell(period_id: int, request: Request):
     result = save_payroll_workbook_cell(period_id, payload)
     status_code = 200 if result.get("ok") else 423 if result.get("locked") else 400
     return JSONResponse(result, status_code=status_code)
+
+
+@router.post("/api/periods/{period_id}/payment-status")
+async def save_payroll_period_payment_status(period_id: int, request: Request):
+    form = await request.form()
+    result = update_payroll_payment_status(period_id, dict(form))
+    if not result.get("ok"):
+        _audit(
+            "Loon betaalstatus geblokkeerd",
+            "periode",
+            period_id,
+            f"Periode {period_id}",
+            result.get("error") or "Betaalstatus kon niet worden aangepast.",
+            "Controle vereist",
+            metadata={"status": form.get("status"), "timesheet_ids": form.get("timesheet_ids")},
+        )
+    return RedirectResponse(f"/dashboard/periods?period={period_id}#periode-verloning", status_code=303)
 
 
 @router.post("/api/periods/{period_id}/archive")

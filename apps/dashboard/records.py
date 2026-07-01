@@ -21,8 +21,15 @@ from shared.db.connection import get_connection
 
 PAYROLL_PERIODS_PER_YEAR = 13
 PAYROLL_CALENDAR_START_2026 = date(2026, 1, 5)
-PAYROLL_VALIDATION_STATUSES = ("loon_te_berekenen", "loon_berekenen", "loon", "doorgestuurd_naar_loonadministratie")
-PAYROLL_LOCKED_STATUSES = ("processed", "definitief_loonbetaling", "verwerkt")
+PAYROLL_VALIDATION_STATUSES = (
+    "loon_te_berekenen",
+    "loon_berekenen",
+    "loon",
+    "doorgestuurd_naar_loonadministratie",
+    "uit_te_betalen",
+    "uitbetaald",
+)
+PAYROLL_LOCKED_STATUSES = ("processed", "definitief_loonbetaling", "verwerkt", "uitbetaald")
 PAYROLL_EDITABLE_AFTER_REOPEN_STATUS = "loon_te_berekenen"
 
 
@@ -2677,6 +2684,7 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                             "week_days_raw": [Decimal("0"), Decimal("0"), Decimal("0"), Decimal("0")],
                             "week_km_raw": [Decimal("0"), Decimal("0"), Decimal("0"), Decimal("0")],
                             "week_timesheet_ids": [[], [], [], []],
+                            "week_statuses": [set(), set(), set(), set()],
                             "total_km_raw": Decimal("0"),
                             "relation_id": row[1],
                             "payroll_license_plate": row[13] or "",
@@ -2714,6 +2722,7 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                         item["week_km_raw"][week_index_from_input - 1] += total_km
                         if row[0]:
                             item["week_timesheet_ids"][week_index_from_input - 1].append(row[0])
+                        item["week_statuses"][week_index_from_input - 1].add(row[12] or "concept")
                     elif row[10]:
                         item["dates"].add(row[10])
                         for week_index, week_start, week_end in weeks:
@@ -2723,6 +2732,7 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                                 item["week_km_raw"][week_index - 1] += total_km
                                 if row[0]:
                                     item["week_timesheet_ids"][week_index - 1].append(row[0])
+                                item["week_statuses"][week_index - 1].add(row[12] or "concept")
                                 break
                 rows = []
                 for item in aggregates.values():
@@ -2747,6 +2757,7 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                             "week_worked_days": [_format_number(value) for value in item["week_days_raw"]],
                             "week_total_km": [_format_number(value) for value in item["week_km_raw"]],
                             "week_timesheet_ids": item["week_timesheet_ids"],
+                            "week_statuses": [sorted(statuses) for statuses in item["week_statuses"]],
                             "total_km": _format_number(item["total_km_raw"]),
                             "normal_hours": _format_number(normal_hours),
                             "overtime_hours": _format_number(overtime_hours),
@@ -3232,6 +3243,82 @@ def save_payroll_workbook_cell(period_id: int, payload: dict) -> dict:
         "previous_value": row[0] or "",
         "value": row[1] or "",
         "updated_at": row[2].strftime("%d-%m-%Y %H:%M") if row[2] else "",
+    }
+
+
+def update_payroll_payment_status(period_id: int, payload: dict) -> dict:
+    _ensure_dashboard_tables_for_read()
+    if is_payroll_period_locked_for_payment(period_id):
+        return {"ok": False, "error": "Deze loonperiode is al gevalideerd voor loonbetaling en staat op slot.", "locked": True}
+    raw_status = str(payload.get("status") or "").strip().lower().replace(" ", "_")
+    if raw_status not in {"uit_te_betalen", "uitbetaald"}:
+        return {"ok": False, "error": "Onbekende betaalstatus."}
+    raw_ids = str(payload.get("timesheet_ids") or payload.get("timesheet_id") or "").replace(";", ",")
+    timesheet_ids = [
+        int(value)
+        for value in raw_ids.split(",")
+        if value.strip().isdigit()
+    ]
+    if not timesheet_ids:
+        return {"ok": False, "error": "Geen urenbriefje gekoppeld aan deze betaalregel."}
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE payroll_week_inputs
+                SET status = %s,
+                    updated_at = NOW()
+                WHERE payroll_period_id = %s
+                  AND timesheet_inbox_id = ANY(%s)
+                RETURNING id, timesheet_inbox_id, employee_name;
+                """,
+                (raw_status, period_id, timesheet_ids),
+            )
+            updated_inputs = cursor.fetchall()
+            if not updated_inputs:
+                return {"ok": False, "error": "Geen weekregel gevonden in deze loonperiode."}
+            updated_timesheet_ids = [row[1] for row in updated_inputs if row[1]]
+            cursor.execute(
+                """
+                UPDATE whatsapp_timesheet_inbox
+                SET status = %s,
+                    updated_at = NOW()
+                WHERE id = ANY(%s);
+                """,
+                (raw_status, updated_timesheet_ids),
+            )
+            cursor.execute(
+                """
+                UPDATE project_time_bookings
+                SET status = %s,
+                    updated_at = NOW()
+                WHERE timesheet_inbox_id = ANY(%s);
+                """,
+                (raw_status, updated_timesheet_ids),
+            )
+        conn.commit()
+    employee_names = sorted({row[2] for row in updated_inputs if row[2]})
+    status_label = "Uitbetaald" if raw_status == "uitbetaald" else "Uit te betalen"
+    log_audit_event(
+        action="Loon betaalstatus aangepast",
+        entity_type="payroll_period",
+        entity_id=period_id,
+        entity_label=", ".join(employee_names) or f"Periode {period_id}",
+        description=f"{len(updated_inputs)} weekregel(s) gezet op {status_label}.",
+        status=status_label,
+        metadata={
+            "payroll_period_id": period_id,
+            "timesheet_ids": updated_timesheet_ids,
+            "status": raw_status,
+            "employee_names": employee_names,
+        },
+    )
+    return {
+        "ok": True,
+        "status": raw_status,
+        "status_label": status_label,
+        "updated_inputs": len(updated_inputs),
+        "timesheet_ids": updated_timesheet_ids,
     }
 
 

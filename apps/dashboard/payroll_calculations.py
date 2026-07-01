@@ -25,6 +25,7 @@ WEEK_SHEET_COLUMNS = [
     {"label": "Controle uren", "key": "hours_check", "hidden_in_excel": True},
     {"label": "Controle km", "key": "km_check", "hidden_in_excel": True},
     {"label": "Bron", "key": "source", "hidden_in_excel": True},
+    {"label": "Betaling", "key": "payment_action"},
 ]
 
 PERIOD_SHEET_COLUMNS = [
@@ -97,6 +98,18 @@ PAYSLIP_SHEET_COLUMNS = [
     {"label": "Controlekolom Excel", "key": "excel_control", "hidden_in_excel": True},
 ]
 
+PAYMENT_SHEET_COLUMNS = [
+    {"label": "Week", "key": "week_label"},
+    {"label": "Werknemer", "key": "employee_name"},
+    {"label": "Urenbriefje", "key": "timesheet_link"},
+    {"label": "Uren", "key": "worked_hours"},
+    {"label": "Km", "key": "total_km"},
+    {"label": "Netto bedrag", "key": "net_amount"},
+    {"label": "Project", "key": "project_info"},
+    {"label": "Status", "key": "payroll_status_label"},
+    {"label": "Actie", "key": "payment_action"},
+]
+
 
 DEFAULT_RULES = [
     {
@@ -148,10 +161,14 @@ def build_workbook_tabs(period_weeks: list[dict], candidates: list[dict], payrol
     aggregated_totals = aggregate_week_sheet_totals(week_tabs)
     period_rows = build_period_sheet_rows(workbook_candidates, payroll_rows)
     payslip_rows = build_payslip_sheet_rows(period_rows, aggregated_totals)
+    payable_rows = build_payment_sheet_rows(week_tabs, "uit_te_betalen")
+    paid_rows = build_payment_sheet_rows(week_tabs, "uitbetaald")
     return [
         *week_tabs,
         {"label": "Periode", "kind": "period", "columns": PERIOD_SHEET_COLUMNS, "rows": period_rows},
         {"label": "Loonstrook", "kind": "payslip", "columns": PAYSLIP_SHEET_COLUMNS, "rows": payslip_rows},
+        {"label": "Uit te betalen", "kind": "payment", "columns": PAYMENT_SHEET_COLUMNS, "rows": payable_rows},
+        {"label": "Uitbetaald", "kind": "paid", "columns": PAYMENT_SHEET_COLUMNS, "rows": paid_rows},
     ]
 
 
@@ -173,6 +190,9 @@ def build_week_sheet_rows(sheet_label: str, candidates: list[dict], payroll_rows
         week_timesheet_ids = payroll_row.get("week_timesheet_ids", [])
         timesheet_ids = week_timesheet_ids[week_index - 1] if len(week_timesheet_ids) >= week_index else []
         timesheet_label = "Open" if len(timesheet_ids) <= 1 else f"Open ({len(timesheet_ids)})"
+        weekly_statuses = payroll_row.get("week_statuses", [])
+        payroll_statuses = weekly_statuses[week_index - 1] if len(weekly_statuses) >= week_index else []
+        payroll_status = _payment_status(payroll_statuses)
         worked_days = _decimal(weekly_days[week_index - 1] if len(weekly_days) >= week_index else "") or _decimal(payroll_row.get("worked_days") or payroll_row.get("days_worked"))
         single_trip_km = _decimal(payroll_row.get("single_trip_km"))
         work_km = _decimal(payroll_row.get("work_km"))
@@ -182,6 +202,7 @@ def build_week_sheet_rows(sheet_label: str, candidates: list[dict], payroll_rows
             {
                 "employee_name": employee_name,
                 "timesheet_id": timesheet_ids[0] if timesheet_ids else "",
+                "timesheet_ids": ",".join(str(timesheet_id) for timesheet_id in timesheet_ids if timesheet_id),
                 "timesheet_link": timesheet_label if timesheet_ids else "-",
                 "relation_id": payroll_row.get("relation_id") or candidate.get("id"),
                 "contract_hours": payroll_row.get("standard_week_hours") or payroll_row.get("payroll_cao_hours") or "",
@@ -205,8 +226,64 @@ def build_week_sheet_rows(sheet_label: str, candidates: list[dict], payroll_rows
                 "hours_check": "urenverwerking",
                 "km_check": "urenverwerking",
                 "source": "urenverwerking",
+                "payroll_status": payroll_status,
+                "payroll_status_label": _payment_status_label(payroll_status),
+                "payment_action": _payment_action_label(payroll_status),
             }
         )
+    return rows
+
+
+def _payment_status(statuses) -> str:
+    normalized = {
+        str(status or "").strip().lower().replace(" ", "_")
+        for status in (statuses or [])
+        if str(status or "").strip()
+    }
+    if "uitbetaald" in normalized:
+        return "uitbetaald"
+    if "uit_te_betalen" in normalized:
+        return "uit_te_betalen"
+    return "loon_berekenen"
+
+
+def _payment_status_label(status: str) -> str:
+    return {
+        "uit_te_betalen": "Uit te betalen",
+        "uitbetaald": "Uitbetaald",
+    }.get(status, "Loon berekenen")
+
+
+def _payment_action_label(status: str) -> str:
+    if status == "uit_te_betalen":
+        return "Uitbetaald"
+    if status == "uitbetaald":
+        return "Afgerond"
+    return "Uitbetalen"
+
+
+def build_payment_sheet_rows(week_tabs: list[dict], target_status: str) -> list[dict]:
+    rows = []
+    for tab in week_tabs:
+        for row in tab.get("rows", []):
+            if row.get("payroll_status") != target_status:
+                continue
+            payment_row = {
+                "week_label": tab.get("label") or "",
+                "employee_name": row.get("employee_name") or "",
+                "timesheet_id": row.get("timesheet_id") or "",
+                "timesheet_ids": row.get("timesheet_ids") or "",
+                "timesheet_link": row.get("timesheet_link") or "-",
+                "relation_id": row.get("relation_id") or "",
+                "worked_hours": row.get("worked_hours") or "",
+                "total_km": row.get("total_km") or "",
+                "net_amount": row.get("net_amount") or "",
+                "project_info": row.get("project_info") or "",
+                "payroll_status": row.get("payroll_status") or "",
+                "payroll_status_label": row.get("payroll_status_label") or "",
+                "payment_action": row.get("payment_action") or "",
+            }
+            rows.append(payment_row)
     return rows
 
 

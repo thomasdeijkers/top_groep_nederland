@@ -1943,6 +1943,18 @@ Metadata:
                                                         {% else %}
                                                         <span class="payroll-muted">-</span>
                                                         {% endif %}
+                                                    {% elif column.key == 'payment_action' %}
+                                                        {% if row.payroll_status == 'uitbetaald' %}
+                                                        <span class="status-tag">Afgerond</span>
+                                                        {% elif row.timesheet_ids %}
+                                                        <form class="payroll-workbook-action-form" action="/api/periods/{{ selected_payroll_period.id }}/payment-status" method="post">
+                                                            <input type="hidden" name="timesheet_ids" value="{{ row.timesheet_ids }}">
+                                                            <input type="hidden" name="status" value="{{ 'uitbetaald' if row.payroll_status == 'uit_te_betalen' else 'uit_te_betalen' }}">
+                                                            <button class="payroll-workbook-link" type="submit" {% if selected_payroll_period.is_locked_for_payment %}disabled title="Deze loonperiode staat op slot"{% endif %}>{{ 'Uitbetaald' if row.payroll_status == 'uit_te_betalen' else 'Uitbetalen' }}</button>
+                                                        </form>
+                                                        {% else %}
+                                                        <span class="payroll-muted">Geen urenbriefje</span>
+                                                        {% endif %}
                                                     {% elif column.options is defined %}
                                                         <select class="payroll-cell-input" data-payroll-cell data-save-url="/api/periods/{{ selected_payroll_period.id }}/workbook-cell" data-tab-label="{{ tab.label }}" data-row-key="{{ row._row_key }}" data-employee-name="{{ row.employee_name }}" data-relation-id="{{ row.relation_id or '' }}" data-column-key="{{ column.key }}" data-column-label="{{ column.label }}" data-original-value="{{ cell_value }}" data-previous-value="{{ cell_mutation.previous_value if cell_mutation else cell_value }}" aria-label="{{ column.label }} {{ row.employee_name }}" {% if selected_payroll_period.is_locked_for_payment %}disabled{% endif %}>
                                                             {% for option in column.options %}
