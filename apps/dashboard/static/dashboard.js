@@ -715,6 +715,7 @@
         const candidateNote = document.querySelector("[data-workflow-candidate-note]");
         const createCandidatePanel = document.querySelector("[data-candidate-create-panel]");
         const searchUrl = select.dataset.candidateSearchUrl;
+        const canSendToPayroll = validateButton?.dataset.canSendToPayroll === "1";
         let candidateSearchTimer = null;
         let candidateSearchSequence = 0;
 
@@ -782,7 +783,9 @@
                 }
                 if (validateButton) {
                     validateButton.disabled = true;
-                    validateButton.title = "Koppel eerst een kandidaat";
+                    validateButton.title = canSendToPayroll
+                        ? "Koppel eerst een kandidaat"
+                        : "Rond eerst de controle af; daarna staat dit briefje onder Valideren.";
                 }
                 if (candidateNote) {
                     candidateNote.hidden = false;
@@ -812,11 +815,15 @@
                 workflowCandidateTarget.value = option.value;
             }
             if (validateButton) {
-                validateButton.disabled = false;
-                validateButton.removeAttribute("title");
+                validateButton.disabled = !canSendToPayroll;
+                if (canSendToPayroll) {
+                    validateButton.removeAttribute("title");
+                } else {
+                    validateButton.title = "Rond eerst de controle af; daarna staat dit briefje onder Valideren.";
+                }
             }
             if (candidateNote) {
-                candidateNote.hidden = true;
+                candidateNote.hidden = canSendToPayroll;
             }
             if (createCandidatePanel) {
                 createCandidatePanel.hidden = true;

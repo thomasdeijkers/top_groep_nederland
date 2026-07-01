@@ -1119,7 +1119,8 @@ class TimesheetCandidateValidationTests(unittest.TestCase):
 
         self.assertIn("data-workflow-candidate-id", script)
         self.assertIn("data-workflow-validate-button", script)
-        self.assertIn("validateButton.disabled = false", script)
+        self.assertIn('canSendToPayroll = validateButton?.dataset.canSendToPayroll === "1"', script)
+        self.assertIn("validateButton.disabled = !canSendToPayroll", script)
         self.assertIn("workflowCandidateTarget.value = option.value", script)
 
     def test_failed_parse_can_be_completed_manually_with_audit_marker(self):
@@ -1291,8 +1292,24 @@ class DashboardContextSafetyTests(unittest.TestCase):
             "loon",
         )
 
+        self.assertNotIn("all", [tab["key"] for tab in tabs])
         self.assertEqual(next(tab for tab in tabs if tab["key"] == "loon")["count"], 1)
         self.assertEqual(next(tab for tab in tabs if tab["key"] == "archief")["count"], 1)
+
+    def test_timesheet_workflow_starts_at_control_and_uses_validation_layer(self):
+        template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
+        router_source = Path("apps/dashboard/router.py").read_text(encoding="utf-8-sig")
+        script_source = Path("apps/dashboard/static/dashboard.js").read_text(encoding="utf-8-sig")
+
+        self.assertNotIn("Alle taken", router_source)
+        self.assertIn('workflow_stage: str = "controle"', router_source)
+        self.assertIn('stage: str = "controle"', router_source)
+        self.assertIn('{"controle", "valideren", "loon", "archief"} else "controle"', router_source)
+        self.assertIn("Doorzetten naar loon berekenen", template)
+        self.assertIn("selected_message.workflow_stage == 'valideren'", template)
+        self.assertIn("Eerst controleren", template)
+        self.assertIn("data-can-send-to-payroll", template)
+        self.assertIn("canSendToPayroll", script_source)
 
     def test_period_approval_finalizes_timesheets_and_archives_period(self):
         template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")

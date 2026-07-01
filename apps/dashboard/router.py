@@ -227,7 +227,6 @@ def _timesheet_stage(status: str) -> str:
 
 def _timesheet_workflow_tabs(items: list[dict], active_stage: str) -> list[dict]:
     labels = {
-        "all": ("Alle taken", "Alle open urenbriefjes"),
         "controle": ("Controle", "Ingekomen urenstaten openen en corrigeren"),
         "valideren": ("Valideren", "Gecontroleerde uren boeken op opdrachtgever en project"),
         "loon": ("Loon berekenen", "Gevalideerde uren klaarzetten voor loonberekening"),
@@ -238,7 +237,7 @@ def _timesheet_workflow_tabs(items: list[dict], active_stage: str) -> list[dict]
             "key": key,
             "label": label,
             "description": description,
-            "count": len(items) if key == "all" else sum(1 for item in items if item.get("workflow_stage") == key),
+            "count": sum(1 for item in items if item.get("workflow_stage") == key),
             "active": key == active_stage,
         }
         for key, (label, description) in labels.items()
@@ -317,7 +316,7 @@ def _matching_payroll_period_for_timesheet(item: dict, periods: list[dict]) -> d
 
 
 def _filter_timesheets(items: list[dict], query: str, workflow_stage: str) -> list[dict]:
-    filtered = items if workflow_stage == "all" else [item for item in items if item.get("workflow_stage") == workflow_stage]
+    filtered = [item for item in items if item.get("workflow_stage") == workflow_stage]
     search = (query or "").strip().lower()
     if not search:
         return filtered
@@ -345,7 +344,7 @@ def _dashboard_context(
     edit_id: int | None = None,
     query: str = "",
     timesheet_id: int | None = None,
-    workflow_stage: str = "all",
+    workflow_stage: str = "controle",
     timesheet_tab: str = "overview",
     relation_tab: str = "candidates",
     status_filter: str = "",
@@ -380,7 +379,7 @@ def _dashboard_context(
             "import_steps": IMPORT_STEPS,
             "whatsapp_inbox": [],
             "selected_timesheet": None,
-            "timesheet_stage": "all",
+            "timesheet_stage": "controle",
             "timesheet_stage_items": [],
             "timesheet_workflow_tabs": [],
             "timesheet_tab": "overview",
@@ -561,7 +560,7 @@ def _dashboard_context(
             item["workflow_stage"] = "controle"
             item["workflow_stage_label"] = "Te controleren"
 
-    workflow_stage = workflow_stage if workflow_stage in {"all", "controle", "valideren", "loon", "archief"} else "all"
+    workflow_stage = workflow_stage if workflow_stage in {"controle", "valideren", "loon", "archief"} else "controle"
     timesheet_tab = timesheet_tab if timesheet_tab in {"overview", "task"} else "overview"
     timesheet_stage_items = _filter_timesheets(whatsapp_inbox, query, workflow_stage)
     timesheet_payroll_period_shortcut = _timesheet_payroll_period_shortcut(timesheet_stage_items, timesheet_payroll_periods)
@@ -689,7 +688,7 @@ def _render_dashboard(
     edit_id: int | None = None,
     query: str = "",
     timesheet_id: int | None = None,
-    workflow_stage: str = "all",
+    workflow_stage: str = "controle",
     timesheet_tab: str = "overview",
     relation_tab: str = "candidates",
     status_filter: str = "",
@@ -797,7 +796,7 @@ def whatsapp_page(request: Request):
 
 
 @router.get("/dashboard/timesheets", response_class=HTMLResponse)
-def timesheets_page(request: Request, stage: str = "all", timesheet: int | None = None, tab: str = "overview", q: str = ""):
+def timesheets_page(request: Request, stage: str = "controle", timesheet: int | None = None, tab: str = "overview", q: str = ""):
     return _render_dashboard(request, "timesheets", query=q, timesheet_id=timesheet, workflow_stage=stage, timesheet_tab=tab)
 
 
@@ -831,16 +830,16 @@ async def upload_whatsapp_timesheet(
             allow_openai=True,
         )
         _audit("Urenbriefje geupload", "urenbriefje", record_id, file.filename or "urenbriefje.jpg", "Nieuw urenbriefje ontvangen en klaargezet voor controle.", "Urenverwerking")
-        return RedirectResponse(f"/dashboard/timesheets?tab=overview&stage=all&uploaded={record_id}#timesheet-inbox", status_code=303)
+        return RedirectResponse(f"/dashboard/timesheets?tab=overview&stage=controle&uploaded={record_id}#timesheet-inbox", status_code=303)
     except Exception as exc:
         print(f"TIMESHEET_UPLOAD_ERROR {type(exc).__name__}: {_db_error_detail(exc)}")
-        query = urlencode({"tab": "overview", "stage": "all", "upload_error": type(exc).__name__})
+        query = urlencode({"tab": "overview", "stage": "controle", "upload_error": type(exc).__name__})
         return RedirectResponse(f"/dashboard/timesheets?{query}#timesheet-inbox", status_code=303)
 
 
 @router.get("/api/whatsapp/complete-period-import")
 def import_complete_period_timesheet_set_get():
-    return RedirectResponse("/dashboard/timesheets?tab=overview&stage=all#timesheet-inbox", status_code=303)
+    return RedirectResponse("/dashboard/timesheets?tab=overview&stage=controle#timesheet-inbox", status_code=303)
 
 
 @router.post("/api/whatsapp/complete-period-import")
@@ -867,12 +866,12 @@ async def import_complete_period_timesheet_set(
             },
         )
         return RedirectResponse(
-            f"/dashboard/timesheets?tab=overview&stage=all&complete_imported={result['imported']}&complete_replaced={result['replaced']}&complete_skipped={len(result['skipped'])}#timesheet-inbox",
+            f"/dashboard/timesheets?tab=overview&stage=controle&complete_imported={result['imported']}&complete_replaced={result['replaced']}&complete_skipped={len(result['skipped'])}#timesheet-inbox",
             status_code=303,
         )
     except Exception as exc:
         print(f"COMPLETE_PERIOD_IMPORT_ERROR {type(exc).__name__}: {_db_error_detail(exc)}")
-        query = urlencode({"tab": "overview", "stage": "all", "import_error": type(exc).__name__})
+        query = urlencode({"tab": "overview", "stage": "controle", "import_error": type(exc).__name__})
         return RedirectResponse(f"/dashboard/timesheets?{query}#timesheet-inbox", status_code=303)
 
 
@@ -886,7 +885,7 @@ def clear_payroll_workspace_for_testing(return_to: str = Form("timesheets")):
     target = (
         f"/dashboard/periods?{query}#periodes"
         if return_to == "periods"
-        else f"/dashboard/timesheets?tab=overview&stage=all&{query}#timesheet-inbox"
+        else f"/dashboard/timesheets?tab=overview&stage=controle&{query}#timesheet-inbox"
     )
     return RedirectResponse(
         target,

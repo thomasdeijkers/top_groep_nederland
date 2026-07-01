@@ -2857,12 +2857,15 @@ Metadata:
                                 <form id="timesheet-force-parse-form" action="/api/whatsapp/timesheet/{{ selected_message.id }}/reparse" method="post"></form>
                                 <form id="timesheet-create-candidate-form" action="/api/whatsapp/timesheet/{{ selected_message.id }}/candidate" method="post"></form>
                                 <div class="workflow-action-row">
+                                {% set can_send_to_payroll = selected_message.workflow_stage == 'valideren' and selected_message.matched_relation_id and not selected_message.payroll_locked %}
                                 <form class="workflow-actions" action="/api/whatsapp/timesheet/{{ selected_message.id }}/validate" method="post">
                                     <input type="hidden" name="matched_relation_id" value="{{ selected_message.matched_relation_id or '' }}" data-workflow-candidate-id>
                                     <input type="hidden" name="principal_id" value="{{ selected_message.selected_principal_id or '' }}" data-workflow-principal-id>
                                     <input type="hidden" name="project_id" value="{{ selected_message.selected_project_id or '' }}" data-workflow-project-id>
-                                    <button class="ghost-button" type="submit" data-workflow-validate-button {% if selected_message.payroll_locked or not selected_message.matched_relation_id %}disabled title="{% if selected_message.payroll_locked %}Dit urenbriefje is gevalideerd voor loonbetaling.{% else %}Koppel eerst een kandidaat{% endif %}"{% endif %}>Valideren</button>
-                                    {% if not selected_message.matched_relation_id %}
+                                    <button class="ghost-button" type="submit" data-workflow-validate-button data-can-send-to-payroll="{{ '1' if selected_message.workflow_stage == 'valideren' and not selected_message.payroll_locked else '0' }}" {% if not can_send_to_payroll %}disabled title="{% if selected_message.payroll_locked %}Dit urenbriefje is gevalideerd voor loonbetaling.{% elif selected_message.workflow_stage != 'valideren' %}Rond eerst de controle af; daarna staat dit briefje onder Valideren.{% else %}Koppel eerst een kandidaat{% endif %}"{% endif %}>{{ 'Doorzetten naar loon berekenen' if selected_message.workflow_stage == 'valideren' else 'Eerst controleren' }}</button>
+                                    {% if selected_message.workflow_stage != 'valideren' and not selected_message.payroll_locked %}
+                                    <span class="workflow-action-note" data-workflow-candidate-note>Rond eerst de controle af; daarna staat dit briefje onder Valideren.</span>
+                                    {% elif not selected_message.matched_relation_id %}
                                     <span class="workflow-action-note" data-workflow-candidate-note>Koppel of maak eerst een kandidaat aan.</span>
                                     {% endif %}
                                 </form>
