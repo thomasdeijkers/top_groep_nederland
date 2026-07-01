@@ -315,6 +315,13 @@
             activatePayrollTab(requestedTab);
         }
 
+        workbook.querySelectorAll("[data-payroll-blocked-payment]").forEach((button) => {
+            button.addEventListener("click", () => {
+                const reason = button.dataset.blockReason || "Deze loonregel mist nog gegevens.";
+                window.alert(`Uitbetalen kan nog niet.\n\n${reason}`);
+            });
+        });
+
         workbook.querySelectorAll("[data-workbook-table]").forEach((table) => {
             const tbody = table.tBodies[0];
             table.querySelectorAll("[data-workbook-sort-column]").forEach((button) => {

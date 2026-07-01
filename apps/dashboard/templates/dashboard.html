@@ -1945,6 +1945,8 @@ Metadata:
                                                     {% elif column.key == 'payment_action' %}
                                                         {% if row.payroll_status == 'uitbetaald' %}
                                                         <span class="status-tag">Afgerond</span>
+                                                        {% elif row.payroll_blocker_message %}
+                                                        <button class="payroll-workbook-link" type="button" data-payroll-blocked-payment data-block-reason="{{ row.payroll_blocker_message }}">Uitbetalen</button>
                                                         {% elif row.timesheet_ids %}
                                                         <form class="payroll-workbook-action-form" action="/api/periods/{{ selected_payroll_period.id }}/payment-status" method="post">
                                                             <input type="hidden" name="timesheet_ids" value="{{ row.timesheet_ids }}">

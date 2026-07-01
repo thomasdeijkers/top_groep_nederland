@@ -1162,6 +1162,11 @@ class CompletePeriodTimesheetImportTests(unittest.TestCase):
         self.assertIn("Uitbetaald loon", template)
         self.assertIn("Open loonregels", template)
         self.assertIn("Blokkades", template)
+        self.assertIn("payroll_blocker_message", calculations_source)
+        self.assertIn("week_blockers", records_source)
+        self.assertIn("Medewerkerinrichting ontbreekt", records_source)
+        self.assertIn("data-payroll-blocked-payment", template)
+        self.assertIn("Uitbetalen kan nog niet", Path("apps/dashboard/static/dashboard.js").read_text(encoding="utf-8-sig"))
 
     def test_deleted_timesheets_are_removed_from_payroll_periods(self):
         actions_source = Path("apps/dashboard/whatsapp_actions.py").read_text(encoding="utf-8-sig")

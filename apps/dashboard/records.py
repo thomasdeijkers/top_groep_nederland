@@ -2620,7 +2620,8 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                                STRING_AGG(DISTINCT COALESCE(v.title, '-'), ', ' ORDER BY COALESCE(v.title, '-')) AS project_name,
                                STRING_AGG(DISTINCT COALESCE(pr.name, '-'), ', ' ORDER BY COALESCE(pr.name, '-')) AS principal_name,
                                MAX(COALESCE(b.payroll_cao_setting_id, v.payroll_cao_setting_id)) AS payroll_cao_setting_id,
-                               STRING_AGG(DISTINCT COALESCE(pip.status, b.status, 'concept'), ', ' ORDER BY COALESCE(pip.status, b.status, 'concept')) AS booking_status
+                               STRING_AGG(DISTINCT COALESCE(pip.status, b.status, 'concept'), ', ' ORDER BY COALESCE(pip.status, b.status, 'concept')) AS booking_status,
+                               COUNT(*) AS project_count
                         FROM payroll_week_input_projects pip
                         LEFT JOIN project_time_bookings b
                             ON b.id = pip.project_time_booking_id
@@ -2663,7 +2664,10 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                            COALESCE(i.raw_fields, '{}'::jsonb) AS parsed_fields,
                            COALESCE(pw.week_index, 0) AS week_index,
                            COALESCE(NULLIF(dc.worked_days, 0), 0) AS worked_days,
-                           COALESCE(NULLIF(dc.day_km, 0), i.total_km, 0) AS total_km
+                           COALESCE(NULLIF(dc.day_km, 0), i.total_km, 0) AS total_km,
+                           i.arrangement_id,
+                           COALESCE(wr.calculation_status, '') AS calculation_status,
+                           COALESCE(pc.project_count, 0) AS project_count
                     FROM payroll_week_inputs i
                     JOIN payroll_periods pp
                         ON pp.id = i.payroll_period_id
@@ -2674,6 +2678,8 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                         ON dc.payroll_week_input_id = i.id
                     LEFT JOIN project_context pc
                         ON pc.payroll_week_input_id = i.id
+                    LEFT JOIN payroll_week_results wr
+                        ON wr.payroll_week_input_id = i.id
                     LEFT JOIN whatsapp_timesheet_inbox wi
                         ON wi.id = i.timesheet_inbox_id
                     LEFT JOIN relations r
@@ -2710,6 +2716,7 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                             "week_km_raw": [Decimal("0"), Decimal("0"), Decimal("0"), Decimal("0")],
                             "week_timesheet_ids": [[], [], [], []],
                             "week_statuses": [set(), set(), set(), set()],
+                            "week_blockers": [set(), set(), set(), set()],
                             "total_km_raw": Decimal("0"),
                             "relation_id": row[1],
                             "payroll_license_plate": row[13] or "",
@@ -2734,6 +2741,15 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                     total_km = Decimal(str(row[25] or 0))
                     if not total_km:
                         total_km = _parsed_total_km(parsed_fields)
+                    row_blockers = set()
+                    if not row[1]:
+                        row_blockers.add("Kandidaatkoppeling ontbreekt.")
+                    if row[1] and not row[26]:
+                        row_blockers.add("Medewerkerinrichting ontbreekt: leg de verloningsinrichting vast op de medewerkerkaart.")
+                    if row[27] == "mist_netto_basisloon":
+                        row_blockers.add("Netto basisloon ontbreekt.")
+                    if hours > 0 and not int(row[28] or 0):
+                        row_blockers.add("Projectregel ontbreekt: controleer opdrachtgever/project voor facturatie en CAO-context.")
                     item["booking_count"] += 1
                     item["total_hours_raw"] += hours
                     item["total_km_raw"] += total_km
@@ -2748,6 +2764,7 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                         if row[0]:
                             item["week_timesheet_ids"][week_index_from_input - 1].append(row[0])
                         item["week_statuses"][week_index_from_input - 1].add(row[12] or "concept")
+                        item["week_blockers"][week_index_from_input - 1].update(row_blockers)
                     elif row[10]:
                         item["dates"].add(row[10])
                         for week_index, week_start, week_end in weeks:
@@ -2758,6 +2775,7 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                                 if row[0]:
                                     item["week_timesheet_ids"][week_index - 1].append(row[0])
                                 item["week_statuses"][week_index - 1].add(row[12] or "concept")
+                                item["week_blockers"][week_index - 1].update(row_blockers)
                                 break
                 rows = []
                 for item in aggregates.values():
@@ -2783,6 +2801,7 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                             "week_total_km": [_format_number(value) for value in item["week_km_raw"]],
                             "week_timesheet_ids": item["week_timesheet_ids"],
                             "week_statuses": [sorted(statuses) for statuses in item["week_statuses"]],
+                            "week_blockers": [sorted(blockers) for blockers in item["week_blockers"]],
                             "total_km": _format_number(item["total_km_raw"]),
                             "normal_hours": _format_number(normal_hours),
                             "overtime_hours": _format_number(overtime_hours),
