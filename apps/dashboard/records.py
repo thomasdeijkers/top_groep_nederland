@@ -3370,23 +3370,16 @@ def _available_payroll_period_numbers(year: int, count: int) -> list[int]:
     return numbers
 
 
-def _count_existing_table(cursor, table_name: str) -> int:
-    cursor.execute("SELECT to_regclass(%s);", (f"public.{table_name}",))
-    if not cursor.fetchone()[0]:
-        return 0
-    cursor.execute(f"SELECT COUNT(*) FROM {table_name};")
-    return cursor.fetchone()[0]
-
-
-def _truncate_existing_tables(cursor, table_names: tuple[str, ...]) -> None:
-    existing = []
+def _delete_all_existing_tables(cursor, table_names: tuple[str, ...]) -> dict[str, int]:
+    deleted_counts: dict[str, int] = {}
     for table_name in table_names:
         cursor.execute("SELECT to_regclass(%s);", (f"public.{table_name}",))
-        if cursor.fetchone()[0]:
-            existing.append(table_name)
-    if existing:
-        quoted_tables = ", ".join(f'"{table_name}"' for table_name in existing)
-        cursor.execute(f"TRUNCATE TABLE {quoted_tables} RESTART IDENTITY CASCADE;")
+        if not cursor.fetchone()[0]:
+            deleted_counts[table_name] = 0
+            continue
+        cursor.execute(f'DELETE FROM "{table_name}";')
+        deleted_counts[table_name] = cursor.rowcount if cursor.rowcount >= 0 else 0
+    return deleted_counts
 
 
 def clear_payroll_test_workspace() -> dict:
@@ -3394,9 +3387,9 @@ def clear_payroll_test_workspace() -> dict:
     with get_connection() as conn:
         with conn.cursor() as cursor:
             reset_tables = (
-                "payroll_workbook_cell_overrides",
                 "openai_api_audit_events",
                 "openai_usage_events",
+                "payroll_workbook_cell_overrides",
                 "payroll_running_balance_mutations",
                 "payroll_running_balance_accounts",
                 "payroll_period_settlements",
@@ -3414,10 +3407,7 @@ def clear_payroll_test_workspace() -> dict:
                 "whatsapp_timesheet_inbox",
                 "audit_log",
             )
-            deleted_counts = {}
-            for table_name in reset_tables:
-                deleted_counts[table_name] = _count_existing_table(cursor, table_name)
-            _truncate_existing_tables(cursor, reset_tables)
+            deleted_counts = _delete_all_existing_tables(cursor, reset_tables)
             deleted_bookings = deleted_counts.get("project_time_bookings", 0)
             deleted_timesheets = deleted_counts.get("whatsapp_timesheet_inbox", 0)
             deleted_periods = 0
@@ -3427,6 +3417,7 @@ def clear_payroll_test_workspace() -> dict:
                 if table not in {"project_time_bookings", "whatsapp_timesheet_inbox"}
             )
         conn.commit()
+    ensure_payroll_period_calendar(2026)
     log_audit_event(
         action="Testfase uren en loonperiodes geleegd",
         entity_type="payroll_test_reset",
