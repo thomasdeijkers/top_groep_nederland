@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 from apps.dashboard import openai_usage, records, router as dashboard_router, timesheet_corrections, timesheet_parser, timesheet_uploads
 from apps.dashboard.payroll_calculations import derived_period_total_rows
-from apps.dashboard.payroll_excel import analyze_payroll_workbook, build_payroll_output_workbook
+from apps.dashboard.payroll_excel import analyze_payroll_workbook, build_payroll_output_workbook, build_tgn_template_output_workbook
 
 
 try:
@@ -106,6 +106,64 @@ class PayrollCalculationTests(unittest.TestCase):
             workbook = load_workbook(path)
 
         self.assertEqual(workbook.sheetnames, ["WK17", "Periode", "Loonstrook"])
+
+    @unittest.skipIf(Workbook is None, "openpyxl is niet beschikbaar")
+    def test_exports_tgn_template_layout_with_formulas(self):
+        template = Workbook()
+        template.active.title = "WK21"
+        for sheet_name in ["WK22", "WK23", "WK24", "Periode", "Loonstrook", "Grondslag bouw & infra", "SAVG"]:
+            template.create_sheet(sheet_name)
+        template["Periode"]["B7"] = "Werknemer"
+        template["Periode"]["B8"] = "Oud"
+        template["Periode"]["G8"] = "40"
+        template["Periode"]["N8"] = "=L8+M8"
+        template["WK21"]["B7"] = "Werknemer"
+        template["WK21"]["B8"] = "=Periode!B8"
+        template["WK21"]["C8"] = "=Periode!G8"
+        template["WK21"]["K8"] = "=(Periode!BB8*E8/40)"
+        template["WK21"]["Q8"] = "=K8+O8+P8"
+        template["Loonstrook"]["B7"] = "Werknemer"
+        template["Loonstrook"]["B8"] = "=Periode!B8"
+        template["Loonstrook"]["D8"] = "='WK21'!D8+'WK22'!D8+'WK23'!D8+'WK24'!D8"
+
+        period = {
+            "workbook_tabs": [
+                {
+                    "label": "WK17",
+                    "kind": "week",
+                    "rows": [{"employee_name": "Thomas", "worked_days": "5", "worked_hours": "40", "single_trip_km": "12"}],
+                },
+                {"label": "WK18", "kind": "week", "rows": []},
+                {"label": "WK19", "kind": "week", "rows": []},
+                {"label": "WK20", "kind": "week", "rows": []},
+                {
+                    "label": "Periode",
+                    "kind": "period",
+                    "rows": [{"employee_name": "Thomas", "contract_hours": "40", "gross_hourly_wage": "21,50", "net_period_basis": "650"}],
+                },
+                {"label": "Loonstrook", "kind": "payslip", "rows": [{"employee_name": "Thomas", "notes": "controle"}]},
+            ]
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            template_path = Path(tmp_dir) / "template.xlsx"
+            output_path = Path(tmp_dir) / "output.xlsx"
+            template.save(template_path)
+            build_tgn_template_output_workbook(output_path, period, template_path)
+            workbook = load_workbook(output_path, data_only=False)
+
+        self.assertIn("WK17", workbook.sheetnames)
+        self.assertEqual(workbook["Periode"]["B8"].value, "Thomas")
+        self.assertEqual(workbook["WK17"]["E8"].value, 40)
+        self.assertEqual(workbook["WK17"]["K8"].value, "=(Periode!BB8*E8/40)")
+        self.assertIn("'WK17'!D8", workbook["Loonstrook"]["D8"].value)
+
+    def test_period_excel_endpoint_uses_tgn_template_export(self):
+        source = Path("apps/dashboard/router.py").read_text(encoding="utf-8")
+        template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8")
+
+        self.assertIn("use_tgn_template=True", source)
+        self.assertIn("TGN-templateopzet", source)
+        self.assertIn("Excel TGN-opzet", template)
 
     def test_week_workbook_rows_link_to_timesheets(self):
         from apps.dashboard.payroll_calculations import WEEK_SHEET_COLUMNS, build_week_sheet_rows

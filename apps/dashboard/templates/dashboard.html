@@ -1828,7 +1828,7 @@ Metadata:
                                 </button>
                                 {% endfor %}
                                 <div class="payroll-workbook-actions">
-                                    <a class="payroll-workbook-action" href="/api/periods/{{ selected_payroll_period.id }}/excel/export">Excel downloaden</a>
+                                    <a class="payroll-workbook-action" href="/api/periods/{{ selected_payroll_period.id }}/excel/export">Excel TGN-opzet</a>
                                     <a class="payroll-workbook-action" href="/dashboard/audit#auditspoor">Auditspoor</a>
                                     <form class="payroll-workbook-action-form" action="/api/periods/{{ selected_payroll_period.id }}/approve" method="post">
                                         <button class="payroll-workbook-action" type="submit" {% if not selected_payroll_period.payroll_phase_status.can_approve %}disabled title="Los eerst blokkerende payroll-uitzonderingen op."{% endif %}>Accorderen</button>

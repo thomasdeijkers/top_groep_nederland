@@ -5,6 +5,8 @@ from pathlib import Path
 from apps.dashboard.payroll_calculations import PAYSLIP_SHEET_COLUMNS, PERIOD_SHEET_COLUMNS
 
 
+TGN_TEMPLATE_PATH = Path("Hulp documenten/templates/TGN verloning template.xlsx")
+TGN_TEMPLATE_WEEK_SHEETS = ("WK21", "WK22", "WK23", "WK24")
 WEEK_SHEET_RE = re.compile(r"^WK\s*(\d{1,2})$", re.IGNORECASE)
 PERIOD_SHEET = "periode"
 PAYSLIP_SHEET = "loonstrook"
@@ -127,6 +129,10 @@ def _normalize(value: object) -> str:
     return re.sub(r"\s+", " ", str(value or "").strip().lower())
 
 
+def _key(value: object) -> str:
+    return _normalize(value)
+
+
 def _map_headers(worksheet, aliases: dict[str, tuple[str, ...]]) -> dict:
     mapped = {}
     for row in worksheet.iter_rows(min_row=1, max_row=min(40, worksheet.max_row), max_col=min(80, worksheet.max_column)):
@@ -152,7 +158,10 @@ def _collect_formulas(worksheet, sheet_name: str) -> list[dict]:
     return formulas
 
 
-def build_payroll_output_workbook(path: str | Path, period: dict) -> Path:
+def build_payroll_output_workbook(path: str | Path, period: dict, use_tgn_template: bool = False) -> Path:
+    if use_tgn_template and TGN_TEMPLATE_PATH.exists():
+        return build_tgn_template_output_workbook(path, period, TGN_TEMPLATE_PATH)
+
     try:
         from openpyxl import Workbook
         from openpyxl.styles import Alignment, Font, PatternFill
@@ -202,6 +211,158 @@ def build_payroll_output_workbook(path: str | Path, period: dict) -> Path:
     return output_path
 
 
+def build_tgn_template_output_workbook(path: str | Path, period: dict, template_path: str | Path = TGN_TEMPLATE_PATH) -> Path:
+    try:
+        from openpyxl import load_workbook
+    except ImportError as exc:
+        raise RuntimeError("openpyxl is nodig om Excel-output te maken.") from exc
+
+    output_path = Path(path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    workbook = load_workbook(template_path, data_only=False, read_only=False)
+    workbook.calculation.fullCalcOnLoad = True
+    workbook.calculation.forceFullCalc = True
+
+    tabs = period.get("workbook_tabs") or []
+    week_tabs = [tab for tab in tabs if tab.get("kind") == "week"][:4]
+    period_tab = next((tab for tab in tabs if tab.get("kind") == "period"), None)
+    payslip_tab = next((tab for tab in tabs if tab.get("kind") == "payslip"), None)
+    week_sheet_map = _rename_template_week_sheets(workbook, week_tabs)
+    _replace_template_week_formula_refs(workbook, week_sheet_map)
+
+    if period_tab:
+        row_map = _fill_template_period_sheet(workbook["Periode"], period_tab.get("rows", []))
+    else:
+        row_map = {}
+    for tab in week_tabs:
+        sheet_name = week_sheet_map.get(tab.get("label")) or tab.get("label")
+        if sheet_name in workbook.sheetnames:
+            _fill_template_week_sheet(workbook[sheet_name], tab.get("rows", []), row_map)
+    if payslip_tab and "Loonstrook" in workbook.sheetnames:
+        _fill_template_payslip_notes(workbook["Loonstrook"], payslip_tab.get("rows", []), row_map)
+
+    workbook.save(output_path)
+    return output_path
+
+
+def _rename_template_week_sheets(workbook, week_tabs: list[dict]) -> dict[str, str]:
+    mapping = {}
+    for old_name, tab in zip(TGN_TEMPLATE_WEEK_SHEETS, week_tabs):
+        new_name = _safe_sheet_title(tab.get("label") or old_name, set(workbook.sheetnames) - {old_name})
+        if old_name in workbook.sheetnames and old_name != new_name:
+            workbook[old_name].title = new_name
+        mapping[old_name] = new_name
+        mapping[tab.get("label") or new_name] = new_name
+    return mapping
+
+
+def _replace_template_week_formula_refs(workbook, sheet_map: dict[str, str]) -> None:
+    replacements = {
+        old_name: new_name
+        for old_name, new_name in sheet_map.items()
+        if old_name in TGN_TEMPLATE_WEEK_SHEETS and old_name != new_name
+    }
+    if not replacements:
+        return
+    for worksheet in workbook.worksheets:
+        for row in worksheet.iter_rows():
+            for cell in row:
+                value = cell.value
+                if not (isinstance(value, str) and value.startswith("=")):
+                    continue
+                for old_name, new_name in replacements.items():
+                    value = value.replace(f"'{old_name}'!", f"'{new_name}'!")
+                    value = value.replace(f"{old_name}!", f"'{new_name}'!")
+                cell.value = value
+
+
+def _template_employee_rows(worksheet) -> list[int]:
+    rows = []
+    for row_index in range(8, worksheet.max_row + 1):
+        value = worksheet.cell(row_index, 2).value
+        if value is None:
+            continue
+        if isinstance(value, str) and (value.startswith("=") or value.strip()):
+            rows.append(row_index)
+    return rows
+
+
+def _fill_template_period_sheet(worksheet, rows: list[dict]) -> dict[str, int]:
+    target_rows = _template_employee_rows(worksheet)
+    _clear_template_period_inputs(worksheet, target_rows)
+    row_map = {}
+    for target_row, source in zip(target_rows, rows):
+        employee_name = source.get("employee_name") or ""
+        row_map[_key(employee_name)] = target_row
+        _set(worksheet, target_row, "B", employee_name)
+        _set(worksheet, target_row, "C", source.get("license_plate"))
+        _set(worksheet, target_row, "D", source.get("choice_budget"))
+        _set(worksheet, target_row, "E", source.get("phase"))
+        _set(worksheet, target_row, "F", source.get("pension_scheme"))
+        _set(worksheet, target_row, "G", source.get("contract_hours"))
+        _set(worksheet, target_row, "H", source.get("cao_name"))
+        _set(worksheet, target_row, "I", source.get("days_right"))
+        _set(worksheet, target_row, "J", source.get("configuration"))
+        _set(worksheet, target_row, "K", source.get("function_name"))
+        _set(worksheet, target_row, "L", source.get("gross_hourly_wage"))
+        _set(worksheet, target_row, "M", source.get("gross_above_cao"))
+        _set(worksheet, target_row, "T", source.get("reserve_vacation_days"))
+        _set(worksheet, target_row, "V", source.get("reserve_adv"))
+        _set(worksheet, target_row, "W", source.get("reserve_holiday"))
+        _set(worksheet, target_row, "Y", source.get("tsf"))
+        _set(worksheet, target_row, "AC", source.get("compensation_uta_days"))
+        _set(worksheet, target_row, "AD", source.get("compensation_adv_days"))
+        _set(worksheet, target_row, "AE", source.get("compensation_t"))
+        _set(worksheet, target_row, "AI", source.get("rv_flex"))
+        _set(worksheet, target_row, "BB", source.get("net_period_basis"))
+        _set(worksheet, target_row, "BG", source.get("notes") or source.get("status"))
+    return row_map
+
+
+def _clear_template_period_inputs(worksheet, rows: list[int]) -> None:
+    columns = ("B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "T", "V", "W", "Y", "AC", "AD", "AE", "AI", "BB", "BC", "BG")
+    for row_index in rows:
+        for column in columns:
+            worksheet[f"{column}{row_index}"].value = None
+
+
+def _fill_template_week_sheet(worksheet, rows: list[dict], row_map: dict[str, int]) -> None:
+    target_rows = _template_employee_rows(worksheet)
+    for target_row in target_rows:
+        for column in ("D", "E", "F", "G", "H", "I", "J", "L", "M", "P", "R", "S"):
+            worksheet[f"{column}{target_row}"].value = None
+    for source in rows:
+        target_row = row_map.get(_key(source.get("employee_name")))
+        if not target_row:
+            continue
+        _set(worksheet, target_row, "D", source.get("worked_days"))
+        _set(worksheet, target_row, "E", source.get("worked_hours"))
+        _set(worksheet, target_row, "F", source.get("vacation_hours"))
+        _set(worksheet, target_row, "G", source.get("sickness_hours"))
+        _set(worksheet, target_row, "H", source.get("rv_hours"))
+        _set(worksheet, target_row, "I", source.get("kv_hours"))
+        _set(worksheet, target_row, "J", source.get("holiday_hours"))
+        _set(worksheet, target_row, "L", source.get("single_trip_km"))
+        _set(worksheet, target_row, "M", source.get("work_km"))
+        _set(worksheet, target_row, "P", source.get("extra_reimbursement"))
+        _set(worksheet, target_row, "R", source.get("remarks"))
+        _set(worksheet, target_row, "S", source.get("project_info"))
+
+
+def _fill_template_payslip_notes(worksheet, rows: list[dict], row_map: dict[str, int]) -> None:
+    for source in rows:
+        target_row = row_map.get(_key(source.get("employee_name")))
+        if not target_row:
+            continue
+        _set(worksheet, target_row, "P", source.get("notes"))
+
+
+def _set(worksheet, row: int, column: str, value) -> None:
+    if value in (None, "-"):
+        return
+    worksheet[f"{column}{row}"].value = _excel_cell_value(value)
+
+
 def _write_sheet(worksheet, columns: list[dict], rows: list[dict]) -> None:
     safe_columns = columns or [{"label": "Melding", "key": "message"}]
     worksheet.append([column.get("label", column.get("key", "")) for column in safe_columns])
@@ -225,4 +386,32 @@ def _excel_cell_value(value):
         return float(value)
     if isinstance(value, (dict, list, tuple, set)):
         return str(value)
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        if text.startswith("="):
+            return text
+        parsed_number = _parse_excel_number(text)
+        if parsed_number is not None:
+            return parsed_number
     return value
+
+
+def _parse_excel_number(value: str):
+    text = value.strip()
+    is_percent = text.endswith("%")
+    text = text.replace(chr(8364), "").replace("â‚¬", "").replace("%", "").replace(" ", "")
+    if not re.fullmatch(r"-?[0-9.,]+", text):
+        return None
+    if "," in text and "." in text:
+        text = text.replace(".", "").replace(",", ".")
+    elif "," in text:
+        text = text.replace(",", ".")
+    try:
+        number = float(text)
+    except ValueError:
+        return None
+    if is_percent:
+        number = number / 100
+    return int(number) if number.is_integer() else number

@@ -1126,7 +1126,7 @@ def export_payroll_period_excel(period_id: int):
         return RedirectResponse("/dashboard/periods#periodes", status_code=303)
     output_path = Path("runtime/exports/payroll") / f"periode-{period_id}-verloning.xlsx"
     try:
-        build_payroll_output_workbook(output_path, period)
+        build_payroll_output_workbook(output_path, period, use_tgn_template=True)
     except Exception as exc:
         fallback_period = {
             **period,
@@ -1145,7 +1145,7 @@ def export_payroll_period_excel(period_id: int):
         "periode",
         period_id,
         period.get("name", f"Periode {period_id}"),
-        "Excel-output gemaakt met tabbladen Periode en Loonstrook.",
+        "Excel-output gemaakt in TGN-templateopzet met weektabs, Periode, Loonstrook en Grondslag.",
         "export",
     )
     return FileResponse(
