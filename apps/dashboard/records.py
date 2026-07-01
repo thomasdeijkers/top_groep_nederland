@@ -2567,9 +2567,6 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                 if not period_row:
                     return []
                 _, start_date, end_date = period_row
-                cursor.execute("SELECT LOWER(COALESCE(status, '')) = 'archief' FROM payroll_periods WHERE id = %s;", (period_id,))
-                is_archived_period = bool((cursor.fetchone() or [False])[0])
-                visible_statuses = list(PAYROLL_LOCKED_STATUSES if is_archived_period else PAYROLL_VALIDATION_STATUSES)
                 cursor.execute(
                     """
                     SELECT week_index, start_date, end_date
@@ -2582,39 +2579,49 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                 weeks = cursor.fetchall()
                 cursor.execute(
                     """
-                    WITH booking_context AS (
-                        SELECT timesheet_inbox_id,
-                               MAX(relation_id) AS relation_id,
-                               MAX(principal_id) AS principal_id,
-                               MAX(project_id) AS project_id,
-                               MAX(payroll_cao_setting_id) AS payroll_cao_setting_id,
-                               SUM(hours) AS booking_hours,
-                               STRING_AGG(DISTINCT status, ', ') AS booking_status
-                        FROM project_time_bookings
-                        WHERE LOWER(REPLACE(COALESCE(status, ''), ' ', '_')) = ANY(%s)
-                        GROUP BY timesheet_inbox_id
+                    WITH day_context AS (
+                        SELECT payroll_week_input_id,
+                               COUNT(*) FILTER (WHERE COALESCE(hours, 0) > 0) AS worked_days,
+                               COALESCE(SUM(hours), 0) AS day_hours,
+                               COALESCE(SUM(km), 0) AS day_km
+                        FROM payroll_week_input_days
+                        GROUP BY payroll_week_input_id
+                    ), project_context AS (
+                        SELECT pip.payroll_week_input_id,
+                               STRING_AGG(DISTINCT COALESCE(v.title, '-'), ', ' ORDER BY COALESCE(v.title, '-')) AS project_name,
+                               STRING_AGG(DISTINCT COALESCE(pr.name, '-'), ', ' ORDER BY COALESCE(pr.name, '-')) AS principal_name,
+                               MAX(COALESCE(b.payroll_cao_setting_id, v.payroll_cao_setting_id)) AS payroll_cao_setting_id,
+                               STRING_AGG(DISTINCT COALESCE(pip.status, b.status, 'concept'), ', ' ORDER BY COALESCE(pip.status, b.status, 'concept')) AS booking_status
+                        FROM payroll_week_input_projects pip
+                        LEFT JOIN project_time_bookings b
+                            ON b.id = pip.project_time_booking_id
+                        LEFT JOIN vacancies v
+                            ON v.id = COALESCE(pip.project_id, b.project_id)
+                        LEFT JOIN relations pr
+                            ON pr.id = COALESCE(pip.principal_id, b.principal_id)
+                        GROUP BY pip.payroll_week_input_id
                     )
-                    SELECT w.id,
-                           COALESCE(w.matched_relation_id, b.relation_id) AS relation_id,
-                           COALESCE(r.name, w.employee_name, w.matched_candidate_name, 'Onbekend') AS employee_name,
+                    SELECT i.timesheet_inbox_id,
+                           i.relation_id,
+                           COALESCE(r.name, i.employee_name, 'Onbekend') AS employee_name,
                            COALESCE(c.name, 'Geen CAO') AS cao_name,
                            COALESCE(c.standard_week_hours, 40) AS standard_week_hours,
                            COALESCE(c.weekday_overtime_percent, 125) AS weekday_overtime_percent,
                            r.hourly_rate,
                            COALESCE(c.default_hourly_wage, 0) AS cao_hourly_wage,
-                           COALESCE(v.title, w.project_name, '-') AS project_name,
-                           COALESCE(p.name, w.principal_name, '-') AS principal_name,
-                           COALESCE(w.work_date, w.received_at::date) AS work_date,
+                           COALESCE(pc.project_name, '-') AS project_name,
+                           COALESCE(pc.principal_name, '-') AS principal_name,
+                           i.work_date,
                            COALESCE(
-                               w.hours,
-                               b.booking_hours,
+                               NULLIF(dc.day_hours, 0),
+                               NULLIF(i.worked_hours, 0),
                                CASE
-                                   WHEN COALESCE(w.parsed_fields->'total_hours'->>'value', '') ~ '^[0-9]+([,.][0-9]+)?$'
-                                   THEN REPLACE(w.parsed_fields->'total_hours'->>'value', ',', '.')::numeric
+                                   WHEN COALESCE(i.raw_fields->'total_hours'->>'value', '') ~ '^[0-9]+([,.][0-9]+)?$'
+                                   THEN REPLACE(i.raw_fields->'total_hours'->>'value', ',', '.')::numeric
                                    ELSE 0
                                END
                            ) AS hours,
-                           COALESCE(b.booking_status, w.status) AS status,
+                           COALESCE(pc.booking_status, i.status) AS status,
                            r.payroll_license_plate,
                            r.payroll_choice_budget,
                            r.payroll_phase,
@@ -2624,25 +2631,29 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                            r.payroll_scale,
                            r.payroll_function,
                            r.payroll_hourly_wage,
-                           COALESCE(w.parsed_fields, '{}'::jsonb) AS parsed_fields
-                    FROM whatsapp_timesheet_inbox w
-                    LEFT JOIN booking_context b
-                        ON b.timesheet_inbox_id = w.id
+                           COALESCE(i.raw_fields, '{}'::jsonb) AS parsed_fields,
+                           COALESCE(pw.week_index, 0) AS week_index,
+                           COALESCE(NULLIF(dc.worked_days, 0), 0) AS worked_days,
+                           COALESCE(NULLIF(dc.day_km, 0), i.total_km, 0) AS total_km
+                    FROM payroll_week_inputs i
+                    JOIN payroll_periods pp
+                        ON pp.id = i.payroll_period_id
+                    LEFT JOIN payroll_period_weeks pw
+                        ON pw.id = i.payroll_period_week_id
+                       AND pw.payroll_period_id = i.payroll_period_id
+                    LEFT JOIN day_context dc
+                        ON dc.payroll_week_input_id = i.id
+                    LEFT JOIN project_context pc
+                        ON pc.payroll_week_input_id = i.id
                     LEFT JOIN relations r
-                        ON r.id = COALESCE(w.matched_relation_id, b.relation_id)
-                    LEFT JOIN relations p
-                        ON p.id = COALESCE(w.selected_principal_id, b.principal_id)
-                    LEFT JOIN vacancies v
-                        ON v.id = COALESCE(w.selected_project_id, b.project_id)
+                        ON r.id = i.relation_id
                     LEFT JOIN payroll_cao_settings c
-                        ON c.id = COALESCE(b.payroll_cao_setting_id, v.payroll_cao_setting_id)
-                    WHERE LOWER(REPLACE(COALESCE(w.status, ''), ' ', '_')) = ANY(%s)
-                      AND w.deleted_at IS NULL
-                      AND w.archived_at IS NULL
-                      AND COALESCE(w.work_date, w.received_at::date) BETWEEN %s AND %s
-                    ORDER BY employee_name, work_date, w.id;
+                        ON c.id = pc.payroll_cao_setting_id
+                    WHERE i.payroll_period_id = %s
+                      AND """ + _active_period_payroll_status_condition("i", "pp") + """
+                    ORDER BY employee_name, i.work_date, i.id;
                     """,
-                    (visible_statuses, visible_statuses, start_date, end_date),
+                    (period_id, *_active_period_payroll_status_params()),
                 )
                 aggregates: dict[tuple, dict] = {}
                 for row in cursor.fetchall():
@@ -2682,24 +2693,36 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                     parsed_fields = row[22] or {}
                     hours = Decimal(str(row[11] or 0))
                     parsed_hours = _parsed_total_hours(parsed_fields)
-                    if parsed_hours is not None:
+                    if not hours and parsed_hours is not None:
                         hours = parsed_hours
-                    worked_days = _parsed_worked_days(parsed_fields, row[10])
-                    total_km = _parsed_total_km(parsed_fields)
+                    worked_days = Decimal(str(row[24] or 0))
+                    if not worked_days:
+                        worked_days = _parsed_worked_days(parsed_fields, row[10])
+                    total_km = Decimal(str(row[25] or 0))
+                    if not total_km:
+                        total_km = _parsed_total_km(parsed_fields)
                     item["booking_count"] += 1
                     item["total_hours_raw"] += hours
                     item["total_km_raw"] += total_km
                     item["projects"].add(row[8] or "-")
                     item["principals"].add(row[9] or "-")
                     item["statuses"].add(row[12] or "concept")
-                    if row[10]:
+                    week_index_from_input = int(row[23] or 0)
+                    if 1 <= week_index_from_input <= 4:
+                        item["week_hours_raw"][week_index_from_input - 1] += hours
+                        item["week_days_raw"][week_index_from_input - 1] += worked_days
+                        item["week_km_raw"][week_index_from_input - 1] += total_km
+                        if row[0]:
+                            item["week_timesheet_ids"][week_index_from_input - 1].append(row[0])
+                    elif row[10]:
                         item["dates"].add(row[10])
                         for week_index, week_start, week_end in weeks:
                             if week_start <= row[10] <= week_end and 1 <= week_index <= 4:
                                 item["week_hours_raw"][week_index - 1] += hours
                                 item["week_days_raw"][week_index - 1] += worked_days
                                 item["week_km_raw"][week_index - 1] += total_km
-                                item["week_timesheet_ids"][week_index - 1].append(row[0])
+                                if row[0]:
+                                    item["week_timesheet_ids"][week_index - 1].append(row[0])
                                 break
                 rows = []
                 for item in aggregates.values():

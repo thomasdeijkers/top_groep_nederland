@@ -1848,8 +1848,6 @@ Metadata:
                                             <th>Netto loon</th>
                                             <th>Reiskosten</th>
                                             <th>Dagvergoeding</th>
-                                            <th>Voorschot wk 1-3</th>
-                                            <th>Week 4 / uitbetaling</th>
                                             <th>Ritme</th>
                                             <th>Totaal 4 weken</th>
                                             <th>Status</th>
@@ -1871,15 +1869,13 @@ Metadata:
                                             <td>{{ result.net_wage_amount }}</td>
                                             <td>{{ result.travel_amount }}</td>
                                             <td>{{ result.day_allowance_amount }}</td>
-                                            <td>{{ result.advance_weeks_1_3 }}</td>
-                                            <td>{{ result.week_4_amount }}</td>
                                             <td>{{ result.payment_schedule or 'wekelijks' }}</td>
                                             <td><strong>{{ result.net_period_total }}</strong></td>
                                             <td><span class="status-tag">{{ result.status_label }}</span></td>
                                         </tr>
                                         {% else %}
                                         <tr>
-                                            <td colspan="12">
+                                            <td colspan="10">
                                                 <div class="empty-state empty-state--compact">
                                                     <strong>{% if week_input.input_count|int == 0 %}Nog geen gevalideerde uren{% else %}Nog geen periode-afrekening per medewerker{% endif %}</strong>
                                                     <span>{% if week_input.input_count|int == 0 %}Valideer eerst urenbriefjes en stuur ze door naar loonberekening. Daarna verschijnen hier de medewerkerregels.{% else %}Deze tabel vult zodra weekresultaten tot een periode-afrekening worden samengevoegd.{% endif %}</span>

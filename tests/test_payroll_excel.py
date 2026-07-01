@@ -1105,6 +1105,27 @@ class CompletePeriodTimesheetImportTests(unittest.TestCase):
         self.assertEqual(row["net_to_receive"], f"{chr(8364)} 1.207,06")
         self.assertEqual(row["net_total"], f"{chr(8364)} 1.207,06")
 
+    def test_period_settlement_table_does_not_show_implicit_advance_split(self):
+        template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
+
+        self.assertNotIn("Voorschot wk 1-3", template)
+        self.assertNotIn("Week 4 / uitbetaling", template)
+        self.assertNotIn("result.advance_weeks_1_3", template)
+        self.assertNotIn("result.week_4_amount", template)
+
+    def test_period_payroll_rows_are_sourced_from_week_inputs(self):
+        records_source = Path("apps/dashboard/records.py").read_text(encoding="utf-8-sig")
+        block = records_source[
+            records_source.index("def list_payroll_period_payroll"):
+            records_source.index("_PAYROLL_DAY_KEYS")
+        ]
+
+        self.assertIn("FROM payroll_week_inputs i", block)
+        self.assertIn("i.payroll_period_id = %s", block)
+        self.assertIn("i.payroll_period_week_id", block)
+        self.assertIn("_active_period_payroll_status_condition(\"i\", \"pp\")", block)
+        self.assertNotIn("FROM whatsapp_timesheet_inbox w", block)
+
 
 class DashboardDatabaseStatusTests(unittest.TestCase):
     def test_non_overview_pages_use_real_database_status(self):
