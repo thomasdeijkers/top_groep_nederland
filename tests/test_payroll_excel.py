@@ -1372,6 +1372,7 @@ class DashboardContextSafetyTests(unittest.TestCase):
         template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
         router_source = Path("apps/dashboard/router.py").read_text(encoding="utf-8-sig")
         script_source = Path("apps/dashboard/static/dashboard.js").read_text(encoding="utf-8-sig")
+        stylesheet = Path("apps/dashboard/static/dashboard.css").read_text(encoding="utf-8-sig")
 
         self.assertNotIn("Alle taken", router_source)
         self.assertIn('workflow_stage: str = "controle"', router_source)
@@ -1382,6 +1383,8 @@ class DashboardContextSafetyTests(unittest.TestCase):
         self.assertIn("Naar valideren", template)
         self.assertIn("data-can-send-to-payroll", template)
         self.assertIn("canSendToPayroll", script_source)
+        self.assertIn("repeat(auto-fit, minmax(min(100%, 240px), 1fr))", stylesheet)
+        self.assertIn("grid-auto-flow: row", stylesheet)
 
     def test_period_approval_finalizes_timesheets_and_archives_period(self):
         template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")

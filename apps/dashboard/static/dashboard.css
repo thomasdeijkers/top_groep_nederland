@@ -7206,3 +7206,11 @@ body[data-theme="light"] .theme-toggle strong {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
+
+/* Tile rows should always use the full available width. Keep this after media rules. */
+.timesheet-status-grid {
+    width: 100%;
+    grid-auto-flow: row;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+    overflow: visible;
+}
