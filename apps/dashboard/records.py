@@ -5434,6 +5434,9 @@ def _format_whatsapp_row(row) -> dict:
     _cap_unverified_timesheet_numbers(fields)
     _ensure_total_check(fields)
     source_channel = (row[25] or "manual_upload").strip() or "manual_upload"
+    work_date = row[15]
+    parsed_week_number = _int_or_none((fields.get("week_number") or {}).get("value"))
+    week_number = parsed_week_number or (work_date.isocalendar().week if work_date else None)
     source_labels = {
         "whatsapp": "WhatsApp",
         "email": "E-mail",
@@ -5457,9 +5460,12 @@ def _format_whatsapp_row(row) -> dict:
         "employee_city": row[12] or "",
         "principal_name": row[13] or "",
         "project_name": row[14] or "",
-        "work_date": row[15],
-        "work_date_display": row[15].strftime("%d-%m-%Y") if row[15] else "-",
-        "work_date_sort": row[15].isoformat() if row[15] else "",
+        "work_date": work_date,
+        "work_date_display": work_date.strftime("%d-%m-%Y") if work_date else "-",
+        "work_date_sort": work_date.isoformat() if work_date else "",
+        "week_number": week_number,
+        "week_number_display": f"WK{week_number}" if week_number else "-",
+        "week_number_sort": f"{week_number:02d}" if week_number else "",
         "hours": row[16],
         "break_minutes": row[17],
         "parsed_fields": _confidence_fields(fields),

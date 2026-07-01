@@ -2438,10 +2438,11 @@ Metadata:
                                         <tr>
                                             <th><button class="sort-header" type="button" data-sort-column="0">Taak</button></th>
                                             <th><button class="sort-header" type="button" data-sort-column="1">Datum</button></th>
-                                            <th><button class="sort-header" type="button" data-sort-column="2">Herkomst</button></th>
-                                            <th><button class="sort-header" type="button" data-sort-column="3">Status</button></th>
-                                            <th><button class="sort-header" type="button" data-sort-column="4">Match</button></th>
-                                            <th><button class="sort-header" type="button" data-sort-column="5">Zekerheid</button></th>
+                                            <th><button class="sort-header" type="button" data-sort-column="2">Week</button></th>
+                                            <th><button class="sort-header" type="button" data-sort-column="3">Herkomst</button></th>
+                                            <th><button class="sort-header" type="button" data-sort-column="4">Status</button></th>
+                                            <th><button class="sort-header" type="button" data-sort-column="5">Match</button></th>
+                                            <th><button class="sort-header" type="button" data-sort-column="6">Zekerheid</button></th>
                                             <th>Acties</th>
                                         </tr>
                                     </thead>
@@ -2458,6 +2459,7 @@ Metadata:
                                                 </a>
                                             </td>
                                             <td data-sort-value="{{ message.received_at_sort }}">{{ message.received_at_display }}</td>
+                                            <td data-sort-value="{{ message.week_number_sort }}">{{ message.week_number_display }}</td>
                                             <td data-sort-value="{{ message.source_channel_label }}">
                                                 {% set source_icon = 'https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/whatsapp.svg' if message.source_channel == 'whatsapp' else 'https://api.iconify.design/lucide:mail.svg' if message.source_channel == 'email' else 'https://api.iconify.design/lucide:folder-sync.svg' if message.source_channel == 'server_folder' else 'https://api.iconify.design/lucide:hand.svg' %}
                                                 <span class="source-pill source-pill--{{ message.source_channel }}" title="{{ message.source_channel_label }}" aria-label="{{ message.source_channel_label }}">
@@ -2488,7 +2490,7 @@ Metadata:
                                         </tr>
                                         {% else %}
                                         <tr>
-                                            <td colspan="7">
+                                            <td colspan="8">
                                                 <div class="empty-state">
                                                     <strong>Geen urenbriefjes in de inbox</strong>
                                                 <span>Nieuwe uploads verschijnen hier automatisch als taak.</span>

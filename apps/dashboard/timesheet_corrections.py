@@ -136,9 +136,16 @@ def validate_timesheet(timesheet_id: int, principal_id: int | None, project_id: 
         with conn.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT matched_relation_id, work_date, hours, parsed_fields
-                FROM whatsapp_timesheet_inbox
-                WHERE id = %s;
+                SELECT w.matched_relation_id,
+                       w.work_date,
+                       w.hours,
+                       w.parsed_fields,
+                       COALESCE(r.name, w.employee_name, w.matched_candidate_name, 'Onbekend') AS employee_name,
+                       COALESCE(w.source_channel, 'dashboard') AS source_channel,
+                       COALESCE(w.parse_source, 'manual') AS parse_source
+                FROM whatsapp_timesheet_inbox w
+                LEFT JOIN relations r ON r.id = w.matched_relation_id
+                WHERE w.id = %s;
                 """,
                 (timesheet_id,),
             )
@@ -146,7 +153,7 @@ def validate_timesheet(timesheet_id: int, principal_id: int | None, project_id: 
             if not row:
                 return
 
-            relation_id, work_date, hours, parsed_fields = row
+            relation_id, work_date, hours, parsed_fields, employee_name, source_channel, parse_source = row
             if not relation_id:
                 raise TimesheetValidationError("Koppel eerst een kandidaat voordat je dit urenbriefje valideert.")
             cursor.execute(
@@ -164,8 +171,15 @@ def validate_timesheet(timesheet_id: int, principal_id: int | None, project_id: 
             parsed_fields = parsed_fields or {}
             _recalculate_total_checks(parsed_fields)
             work_date = _date_from_fields(parsed_fields) or work_date
+            if not work_date:
+                raise TimesheetValidationError("Vul eerst een werkdatum in zodat de juiste loonperiode bepaald kan worden.")
             hours = _decimal_or_none((parsed_fields.get("total_hours") or {}).get("value")) or hours or _hours_from_fields(parsed_fields)
             payroll_cao_setting_id = _project_cao_setting_id(cursor, project_id)
+            payroll_period = _payroll_period_context(cursor, work_date)
+            if not payroll_period:
+                raise TimesheetValidationError("Geen loonperiode gevonden voor de werkdatum van dit urenbriefje.")
+            payroll_period_id, payroll_period_week_id, week_number, period_number, period_year = payroll_period
+            arrangement_id = _arrangement_id_for_period(cursor, relation_id, period_year, period_number)
 
             cursor.execute(
                 """
@@ -193,11 +207,49 @@ def validate_timesheet(timesheet_id: int, principal_id: int | None, project_id: 
                 """
                 INSERT INTO project_time_bookings (
                     timesheet_inbox_id, relation_id, principal_id, project_id,
-                    payroll_cao_setting_id, work_date, hours, status, updated_at
+                    payroll_cao_setting_id, payroll_period_id, work_date, hours, status, updated_at
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, 'loon_te_berekenen', NOW());
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'loon_te_berekenen', NOW())
+                RETURNING id;
                 """,
-                (timesheet_id, relation_id, principal_id, project_id, payroll_cao_setting_id, work_date, hours),
+                (
+                    timesheet_id,
+                    relation_id,
+                    principal_id,
+                    project_id,
+                    payroll_cao_setting_id,
+                    payroll_period_id,
+                    work_date,
+                    hours,
+                ),
+            )
+            booking_id = cursor.fetchone()[0]
+            week_input_id = _upsert_payroll_week_input(
+                cursor,
+                payroll_period_id=payroll_period_id,
+                payroll_period_week_id=payroll_period_week_id,
+                relation_id=relation_id,
+                arrangement_id=arrangement_id,
+                timesheet_id=timesheet_id,
+                week_number=week_number,
+                employee_name=employee_name,
+                work_date=work_date,
+                source_channel=source_channel,
+                parse_source=parse_source,
+                status="loon_te_berekenen",
+                worked_hours=hours,
+                total_km=_total_km_from_fields(parsed_fields),
+                parsed_fields=parsed_fields,
+            )
+            _replace_payroll_week_input_days(cursor, week_input_id, parsed_fields)
+            _replace_payroll_week_input_project(
+                cursor,
+                week_input_id=week_input_id,
+                booking_id=booking_id,
+                principal_id=principal_id,
+                project_id=project_id,
+                work_date=work_date,
+                hours=hours,
             )
         conn.commit()
 
@@ -249,6 +301,189 @@ def _project_cao_setting_id(cursor, project_id: int | None):
     )
     row = cursor.fetchone()
     return row[0] if row else None
+
+
+def _payroll_period_context(cursor, work_date):
+    cursor.execute(
+        """
+        SELECT p.id,
+               w.id,
+               w.week_number,
+               p.period_number,
+               p.year
+        FROM payroll_periods p
+        JOIN payroll_period_weeks w
+            ON w.payroll_period_id = p.id
+           AND %s BETWEEN w.start_date AND w.end_date
+        WHERE %s BETWEEN p.start_date AND p.end_date
+        ORDER BY p.start_date DESC, w.week_index DESC
+        LIMIT 1;
+        """,
+        (work_date, work_date),
+    )
+    return cursor.fetchone()
+
+
+def _arrangement_id_for_period(cursor, relation_id: int, year: int, period_number: int):
+    cursor.execute(
+        """
+        SELECT id
+        FROM payroll_employee_arrangements
+        WHERE relation_id = %s
+          AND COALESCE(status, 'active') <> 'archief'
+          AND (
+              valid_from_year < %s
+              OR (valid_from_year = %s AND valid_from_period_number <= %s)
+          )
+        ORDER BY valid_from_year DESC, valid_from_period_number DESC, id DESC
+        LIMIT 1;
+        """,
+        (relation_id, year, year, period_number),
+    )
+    row = cursor.fetchone()
+    return row[0] if row else None
+
+
+def _upsert_payroll_week_input(
+    cursor,
+    *,
+    payroll_period_id: int,
+    payroll_period_week_id: int,
+    relation_id: int,
+    arrangement_id: int | None,
+    timesheet_id: int,
+    week_number: int,
+    employee_name: str,
+    work_date,
+    source_channel: str,
+    parse_source: str,
+    status: str,
+    worked_hours,
+    total_km,
+    parsed_fields: dict,
+) -> int:
+    cursor.execute(
+        """
+        INSERT INTO payroll_week_inputs (
+            payroll_period_id, payroll_period_week_id, relation_id, arrangement_id,
+            timesheet_inbox_id, week_number, employee_name, work_date, source_channel,
+            parse_source, status, worked_hours, total_km, day_codes, raw_fields,
+            created_at, updated_at
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, COALESCE(%s, 0), COALESCE(%s, 0), %s, %s, NOW(), NOW())
+        ON CONFLICT (timesheet_inbox_id) WHERE timesheet_inbox_id IS NOT NULL
+        DO UPDATE SET
+            payroll_period_id = EXCLUDED.payroll_period_id,
+            payroll_period_week_id = EXCLUDED.payroll_period_week_id,
+            relation_id = EXCLUDED.relation_id,
+            arrangement_id = EXCLUDED.arrangement_id,
+            week_number = EXCLUDED.week_number,
+            employee_name = EXCLUDED.employee_name,
+            work_date = EXCLUDED.work_date,
+            source_channel = EXCLUDED.source_channel,
+            parse_source = EXCLUDED.parse_source,
+            status = EXCLUDED.status,
+            worked_hours = EXCLUDED.worked_hours,
+            total_km = EXCLUDED.total_km,
+            day_codes = EXCLUDED.day_codes,
+            raw_fields = EXCLUDED.raw_fields,
+            updated_at = NOW()
+        RETURNING id;
+        """,
+        (
+            payroll_period_id,
+            payroll_period_week_id,
+            relation_id,
+            arrangement_id,
+            timesheet_id,
+            week_number,
+            employee_name or "Onbekend",
+            work_date,
+            source_channel or "dashboard",
+            parse_source or "manual",
+            status,
+            worked_hours,
+            total_km,
+            Json(_day_codes_from_fields(parsed_fields)),
+            Json(parsed_fields),
+        ),
+    )
+    return cursor.fetchone()[0]
+
+
+def _replace_payroll_week_input_days(cursor, week_input_id: int, parsed_fields: dict) -> None:
+    cursor.execute("DELETE FROM payroll_week_input_days WHERE payroll_week_input_id = %s;", (week_input_id,))
+    for index, day_name, hours_key, km_key, code_key in (
+        (1, "maandag", "monday_hours", "monday_km", "monday_code"),
+        (2, "dinsdag", "tuesday_hours", "tuesday_km", "tuesday_code"),
+        (3, "woensdag", "wednesday_hours", "wednesday_km", "wednesday_code"),
+        (4, "donderdag", "thursday_hours", "thursday_km", "thursday_code"),
+        (5, "vrijdag", "friday_hours", "friday_km", "friday_code"),
+        (6, "zaterdag", "saturday_hours", "saturday_km", "saturday_code"),
+        (7, "zondag", "sunday_hours", "sunday_km", "sunday_code"),
+    ):
+        cursor.execute(
+            """
+            INSERT INTO payroll_week_input_days (
+                payroll_week_input_id, day_index, day_name, hours, km, day_code, source, created_at, updated_at
+            )
+            VALUES (%s, %s, %s, COALESCE(%s, 0), COALESCE(%s, 0), %s, 'parsed_fields', NOW(), NOW());
+            """,
+            (
+                week_input_id,
+                index,
+                day_name,
+                _decimal_or_none((parsed_fields.get(hours_key) or {}).get("value")),
+                _decimal_or_none((parsed_fields.get(km_key) or {}).get("value")),
+                str((parsed_fields.get(code_key) or {}).get("value") or "").strip() or None,
+            ),
+        )
+
+
+def _replace_payroll_week_input_project(
+    cursor,
+    *,
+    week_input_id: int,
+    booking_id: int,
+    principal_id: int | None,
+    project_id: int | None,
+    work_date,
+    hours,
+) -> None:
+    cursor.execute("DELETE FROM payroll_week_input_projects WHERE payroll_week_input_id = %s;", (week_input_id,))
+    cursor.execute(
+        """
+        INSERT INTO payroll_week_input_projects (
+            payroll_week_input_id, project_time_booking_id, principal_id, project_id,
+            work_date, hours, status, source, created_at, updated_at
+        )
+        VALUES (%s, %s, %s, %s, %s, COALESCE(%s, 0), 'loon_te_berekenen', 'project_time_bookings', NOW(), NOW());
+        """,
+        (week_input_id, booking_id, principal_id, project_id, work_date, hours),
+    )
+
+
+def _day_codes_from_fields(parsed_fields: dict) -> dict:
+    return {
+        "monday": str((parsed_fields.get("monday_code") or {}).get("value") or ""),
+        "tuesday": str((parsed_fields.get("tuesday_code") or {}).get("value") or ""),
+        "wednesday": str((parsed_fields.get("wednesday_code") or {}).get("value") or ""),
+        "thursday": str((parsed_fields.get("thursday_code") or {}).get("value") or ""),
+        "friday": str((parsed_fields.get("friday_code") or {}).get("value") or ""),
+        "saturday": str((parsed_fields.get("saturday_code") or {}).get("value") or ""),
+        "sunday": str((parsed_fields.get("sunday_code") or {}).get("value") or ""),
+    }
+
+
+def _total_km_from_fields(parsed_fields: dict):
+    for key in ("total_km", "calculated_total_km"):
+        value = _decimal_or_none((parsed_fields.get(key) or {}).get("value"))
+        if value is not None:
+            return value
+    total = Decimal("0")
+    for key in ("monday_km", "tuesday_km", "wednesday_km", "thursday_km", "friday_km", "saturday_km", "sunday_km"):
+        total += _decimal_or_none((parsed_fields.get(key) or {}).get("value")) or Decimal("0")
+    return total
 
 
 def _apply_absence_code_to_day_codes(parsed_fields: dict) -> None:

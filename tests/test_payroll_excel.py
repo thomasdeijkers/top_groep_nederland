@@ -1193,6 +1193,26 @@ class TimesheetCandidateValidationTests(unittest.TestCase):
         self.assertIn("ROW_NUMBER() OVER", migration)
         self.assertIn("idx_project_time_bookings_unique_timesheet", migration)
 
+    def test_timesheet_overview_shows_week_column(self):
+        template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
+        records_source = Path("apps/dashboard/records.py").read_text(encoding="utf-8-sig")
+
+        self.assertIn('data-sort-column="2">Week', template)
+        self.assertIn("message.week_number_display", template)
+        self.assertIn("week_number_sort", records_source)
+        self.assertIn("parsed_week_number", records_source)
+
+    def test_timesheet_validation_writes_to_matching_payroll_period_week(self):
+        correction_source = Path("apps/dashboard/timesheet_corrections.py").read_text(encoding="utf-8-sig")
+
+        self.assertIn("def _payroll_period_context", correction_source)
+        self.assertIn("JOIN payroll_period_weeks w", correction_source)
+        self.assertIn("payroll_period_id, payroll_period_week_id", correction_source)
+        self.assertIn("INSERT INTO payroll_week_inputs", correction_source)
+        self.assertIn("INSERT INTO payroll_week_input_days", correction_source)
+        self.assertIn("INSERT INTO payroll_week_input_projects", correction_source)
+        self.assertIn("payroll_cao_setting_id, payroll_period_id, work_date", correction_source)
+
 
 class DashboardContextSafetyTests(unittest.TestCase):
     def test_dashboard_context_sections_fall_back_individually(self):
