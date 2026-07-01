@@ -21,6 +21,7 @@ from shared.db.connection import get_connection
 
 PAYROLL_PERIODS_PER_YEAR = 13
 PAYROLL_CALENDAR_START_2026 = date(2026, 1, 5)
+PAYROLL_VALIDATION_STATUSES = ("loon_te_berekenen", "loon_berekenen", "loon", "doorgestuurd_naar_loonadministratie")
 PAYROLL_LOCKED_STATUSES = ("processed", "definitief_loonbetaling", "verwerkt")
 PAYROLL_EDITABLE_AFTER_REOPEN_STATUS = "loon_te_berekenen"
 
@@ -2148,13 +2149,16 @@ def list_payroll_employee_week_results(period_id: int, limit: int = 200) -> list
                            COUNT(*) FILTER (WHERE r.calculation_status = 'mist_netto_basisloon') AS missing_wage_count,
                            STRING_AGG(DISTINCT r.calculation_status, ', ' ORDER BY r.calculation_status) AS statuses
                     FROM payroll_week_results r
+                    JOIN payroll_week_inputs i ON i.id = r.payroll_week_input_id
+                    JOIN payroll_periods p ON p.id = r.payroll_period_id
                     LEFT JOIN payroll_period_weeks w ON w.id = r.payroll_period_week_id
                     WHERE r.payroll_period_id = %s
+                      AND """ + _active_period_payroll_status_condition("i", "p") + """
                     GROUP BY COALESCE(r.relation_id, 0), r.employee_name
                     ORDER BY r.employee_name ASC
                     LIMIT %s;
                     """,
-                    (period_id, limit),
+                    (period_id, *_active_period_payroll_status_params(), limit),
                 )
                 return [
                     {
@@ -2191,6 +2195,19 @@ def _employee_week_result_status(concept_count, missing_arrangement_count, missi
     return "controle"
 
 
+def _active_period_payroll_status_condition(alias: str = "i", period_alias: str = "p") -> str:
+    return (
+        f"((LOWER(COALESCE({period_alias}.status, '')) = 'archief' "
+        f"AND LOWER(REPLACE(COALESCE({alias}.status, ''), ' ', '_')) = ANY(%s)) "
+        f"OR (LOWER(COALESCE({period_alias}.status, '')) <> 'archief' "
+        f"AND LOWER(REPLACE(COALESCE({alias}.status, ''), ' ', '_')) = ANY(%s)))"
+    )
+
+
+def _active_period_payroll_status_params() -> tuple[list[str], list[str]]:
+    return (list(PAYROLL_LOCKED_STATUSES), list(PAYROLL_VALIDATION_STATUSES))
+
+
 def get_payroll_week_result_summary(period_id: int) -> dict:
     zero_money = _format_money(0)
     empty = {
@@ -2220,21 +2237,27 @@ def get_payroll_week_result_summary(period_id: int) -> dict:
                            COUNT(*) FILTER (WHERE calculation_status = 'concept'),
                            COUNT(*) FILTER (WHERE calculation_status = 'mist_inrichting'),
                            COUNT(*) FILTER (WHERE calculation_status = 'mist_netto_basisloon')
-                    FROM payroll_week_results
-                    WHERE payroll_period_id = %s;
+                    FROM payroll_week_results r
+                    JOIN payroll_week_inputs i ON i.id = r.payroll_week_input_id
+                    JOIN payroll_periods p ON p.id = r.payroll_period_id
+                    WHERE r.payroll_period_id = %s
+                      AND """ + _active_period_payroll_status_condition("i", "p") + """;
                     """,
-                    (period_id,),
+                    (period_id, *_active_period_payroll_status_params()),
                 )
                 row = cursor.fetchone() or (0, 0, 0, 0, 0, 0, 0, 0)
                 cursor.execute(
                     """
                     SELECT COALESCE(calculation_status, 'concept'), COUNT(*)
-                    FROM payroll_week_results
-                    WHERE payroll_period_id = %s
-                    GROUP BY COALESCE(calculation_status, 'concept')
-                    ORDER BY COUNT(*) DESC, COALESCE(calculation_status, 'concept');
+                    FROM payroll_week_results r
+                    JOIN payroll_week_inputs i ON i.id = r.payroll_week_input_id
+                    JOIN payroll_periods p ON p.id = r.payroll_period_id
+                    WHERE r.payroll_period_id = %s
+                      AND """ + _active_period_payroll_status_condition("i", "p") + """
+                    GROUP BY COALESCE(r.calculation_status, 'concept')
+                    ORDER BY COUNT(*) DESC, COALESCE(r.calculation_status, 'concept');
                     """,
-                    (period_id,),
+                    (period_id, *_active_period_payroll_status_params()),
                 )
                 status_counts = [
                     {"status": status, "count": count}
@@ -2320,7 +2343,9 @@ def list_payroll_period_exceptions(period_id: int, limit: int = 100) -> list[dic
                                'Koppel deze week-invoer aan de juiste medewerkerkaart voordat de periode betrouwbaar is.' AS detail,
                                'Urenbriefje controleren' AS next_step
                         FROM payroll_week_inputs i
+                        JOIN payroll_periods p ON p.id = i.payroll_period_id
                         WHERE i.payroll_period_id = %s
+                          AND """ + _active_period_payroll_status_condition("i", "p") + """
                           AND i.relation_id IS NULL
                         GROUP BY i.employee_name
 
@@ -2336,7 +2361,9 @@ def list_payroll_period_exceptions(period_id: int, limit: int = 100) -> list[dic
                                'Leg de verloningsinrichting vast op de medewerkerkaart voor deze periode.' AS detail,
                                'Medewerkerkaart openen' AS next_step
                         FROM payroll_week_inputs i
+                        JOIN payroll_periods p ON p.id = i.payroll_period_id
                         WHERE i.payroll_period_id = %s
+                          AND """ + _active_period_payroll_status_condition("i", "p") + """
                           AND i.relation_id IS NOT NULL
                           AND i.arrangement_id IS NULL
                         GROUP BY i.relation_id, i.employee_name
@@ -2353,7 +2380,10 @@ def list_payroll_period_exceptions(period_id: int, limit: int = 100) -> list[dic
                                'Vul netto basis 40 uur in zodat de netto indicatie per week en periode kan worden berekend.' AS detail,
                                'Medewerkerkaart openen' AS next_step
                         FROM payroll_week_results r
+                        JOIN payroll_week_inputs i ON i.id = r.payroll_week_input_id
+                        JOIN payroll_periods p ON p.id = r.payroll_period_id
                         WHERE r.payroll_period_id = %s
+                          AND """ + _active_period_payroll_status_condition("i", "p") + """
                           AND r.calculation_status = 'mist_netto_basisloon'
                         GROUP BY r.relation_id, r.employee_name
 
@@ -2369,8 +2399,10 @@ def list_payroll_period_exceptions(period_id: int, limit: int = 100) -> list[dic
                                'Er zijn uren verwerkt zonder gekoppelde projectregel; controleer opdrachtgever/project voor facturatie en CAO-context.' AS detail,
                                'Urenbriefje controleren' AS next_step
                         FROM payroll_week_inputs i
+                        JOIN payroll_periods p ON p.id = i.payroll_period_id
                         LEFT JOIN input_project_counts pc ON pc.payroll_week_input_id = i.id
                         WHERE i.payroll_period_id = %s
+                          AND """ + _active_period_payroll_status_condition("i", "p") + """
                           AND COALESCE(i.worked_hours, 0) > 0
                           AND COALESCE(pc.project_count, 0) = 0
                         GROUP BY i.relation_id, i.employee_name
@@ -2383,7 +2415,13 @@ def list_payroll_period_exceptions(period_id: int, limit: int = 100) -> list[dic
                              employee_name ASC, title ASC
                     LIMIT %s;
                     """,
-                    (period_id, period_id, period_id, period_id, limit),
+                    (
+                        period_id, *_active_period_payroll_status_params(),
+                        period_id, *_active_period_payroll_status_params(),
+                        period_id, *_active_period_payroll_status_params(),
+                        period_id, *_active_period_payroll_status_params(),
+                        limit,
+                    ),
                 )
                 rows = cursor.fetchall()
         return [
@@ -2450,10 +2488,12 @@ def get_payroll_week_input_summary(period_id: int) -> dict:
                            COALESCE(SUM(total_km), 0),
                            COUNT(*) FILTER (WHERE arrangement_id IS NOT NULL),
                            COUNT(*) FILTER (WHERE arrangement_id IS NULL)
-                    FROM payroll_week_inputs
-                    WHERE payroll_period_id = %s;
+                    FROM payroll_week_inputs i
+                    JOIN payroll_periods p ON p.id = i.payroll_period_id
+                    WHERE i.payroll_period_id = %s
+                      AND """ + _active_period_payroll_status_condition("i", "p") + """;
                     """,
-                    (period_id,),
+                    (period_id, *_active_period_payroll_status_params()),
                 )
                 summary_row = cursor.fetchone() or (0, 0, 0, 0, 0)
                 cursor.execute(
@@ -2461,9 +2501,11 @@ def get_payroll_week_input_summary(period_id: int) -> dict:
                     SELECT COUNT(d.id)
                     FROM payroll_week_input_days d
                     JOIN payroll_week_inputs i ON i.id = d.payroll_week_input_id
-                    WHERE i.payroll_period_id = %s;
+                    JOIN payroll_periods p ON p.id = i.payroll_period_id
+                    WHERE i.payroll_period_id = %s
+                      AND """ + _active_period_payroll_status_condition("i", "p") + """;
                     """,
-                    (period_id,),
+                    (period_id, *_active_period_payroll_status_params()),
                 )
                 day_count = cursor.fetchone()[0]
                 cursor.execute(
@@ -2471,20 +2513,24 @@ def get_payroll_week_input_summary(period_id: int) -> dict:
                     SELECT COUNT(p.id)
                     FROM payroll_week_input_projects p
                     JOIN payroll_week_inputs i ON i.id = p.payroll_week_input_id
-                    WHERE i.payroll_period_id = %s;
+                    JOIN payroll_periods pp ON pp.id = i.payroll_period_id
+                    WHERE i.payroll_period_id = %s
+                      AND """ + _active_period_payroll_status_condition("i", "pp") + """;
                     """,
-                    (period_id,),
+                    (period_id, *_active_period_payroll_status_params()),
                 )
                 project_count = cursor.fetchone()[0]
                 cursor.execute(
                     """
                     SELECT COALESCE(status, 'concept'), COUNT(*)
-                    FROM payroll_week_inputs
-                    WHERE payroll_period_id = %s
-                    GROUP BY COALESCE(status, 'concept')
-                    ORDER BY COUNT(*) DESC, COALESCE(status, 'concept');
+                    FROM payroll_week_inputs i
+                    JOIN payroll_periods p ON p.id = i.payroll_period_id
+                    WHERE i.payroll_period_id = %s
+                      AND """ + _active_period_payroll_status_condition("i", "p") + """
+                    GROUP BY COALESCE(i.status, 'concept')
+                    ORDER BY COUNT(*) DESC, COALESCE(i.status, 'concept');
                     """,
-                    (period_id,),
+                    (period_id, *_active_period_payroll_status_params()),
                 )
                 status_counts = [
                     {"status": row[0], "count": row[1]}
@@ -2521,6 +2567,9 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                 if not period_row:
                     return []
                 _, start_date, end_date = period_row
+                cursor.execute("SELECT LOWER(COALESCE(status, '')) = 'archief' FROM payroll_periods WHERE id = %s;", (period_id,))
+                is_archived_period = bool((cursor.fetchone() or [False])[0])
+                visible_statuses = list(PAYROLL_LOCKED_STATUSES if is_archived_period else PAYROLL_VALIDATION_STATUSES)
                 cursor.execute(
                     """
                     SELECT week_index, start_date, end_date
@@ -2542,7 +2591,7 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                                SUM(hours) AS booking_hours,
                                STRING_AGG(DISTINCT status, ', ') AS booking_status
                         FROM project_time_bookings
-                        WHERE LOWER(REPLACE(COALESCE(status, ''), ' ', '_')) IN ('loon_te_berekenen', 'loon_berekenen', 'loon', 'doorgestuurd_naar_loonadministratie', 'verwerkt', 'processed')
+                        WHERE LOWER(REPLACE(COALESCE(status, ''), ' ', '_')) = ANY(%s)
                         GROUP BY timesheet_inbox_id
                     )
                     SELECT w.id,
@@ -2587,13 +2636,13 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                         ON v.id = COALESCE(w.selected_project_id, b.project_id)
                     LEFT JOIN payroll_cao_settings c
                         ON c.id = COALESCE(b.payroll_cao_setting_id, v.payroll_cao_setting_id)
-                    WHERE LOWER(REPLACE(COALESCE(w.status, ''), ' ', '_')) IN ('loon_te_berekenen', 'loon_berekenen', 'loon', 'doorgestuurd_naar_loonadministratie', 'verwerkt', 'processed')
+                    WHERE LOWER(REPLACE(COALESCE(w.status, ''), ' ', '_')) = ANY(%s)
                       AND w.deleted_at IS NULL
                       AND w.archived_at IS NULL
                       AND COALESCE(w.work_date, w.received_at::date) BETWEEN %s AND %s
                     ORDER BY employee_name, work_date, w.id;
                     """,
-                    (start_date, end_date),
+                    (visible_statuses, visible_statuses, start_date, end_date),
                 )
                 aggregates: dict[tuple, dict] = {}
                 for row in cursor.fetchall():

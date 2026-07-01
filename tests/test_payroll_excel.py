@@ -1309,6 +1309,17 @@ class DashboardContextSafetyTests(unittest.TestCase):
         self.assertIn("UPDATE payroll_week_inputs", records_source)
         self.assertIn("SET status = 'Archief'", records_source)
 
+    def test_payroll_period_controls_only_use_active_validation_rows(self):
+        records_source = Path("apps/dashboard/records.py").read_text(encoding="utf-8-sig")
+
+        self.assertIn("PAYROLL_VALIDATION_STATUSES", records_source)
+        self.assertIn("def _active_period_payroll_status_condition", records_source)
+        self.assertIn("get_payroll_week_result_summary", records_source)
+        self.assertIn("list_payroll_period_exceptions", records_source)
+        self.assertIn("get_payroll_week_input_summary", records_source)
+        self.assertIn("LOWER(COALESCE(p.status, '')) <> 'archief'", records_source)
+        self.assertIn("LOWER(REPLACE(COALESCE({alias}.status, ''), ' ', '_')) = ANY(%s)", records_source)
+
     def test_payroll_payment_approval_locks_timesheet_edits_until_period_restore(self):
         template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
         router_source = Path("apps/dashboard/router.py").read_text(encoding="utf-8-sig")
