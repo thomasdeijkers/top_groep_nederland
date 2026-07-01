@@ -1442,6 +1442,69 @@ h2 {
     font-size: 0.78rem;
 }
 
+.settings-edit-row td {
+    padding: 0 12px 14px;
+    background: rgba(127, 209, 160, 0.035);
+}
+
+.settings-edit-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.7fr);
+    gap: 12px;
+}
+
+.settings-inline-form {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(130px, 1fr));
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid rgba(204, 216, 226, 0.14);
+    border-radius: 8px;
+    background: rgba(18, 37, 48, 0.92);
+}
+
+.settings-inline-form--mutation {
+    grid-template-columns: repeat(2, minmax(130px, 1fr));
+    align-content: start;
+}
+
+.settings-inline-form label {
+    display: grid;
+    gap: 4px;
+    color: #b9c8d1;
+    font-size: 0.74rem;
+    font-weight: 650;
+}
+
+.settings-inline-form input,
+.settings-inline-form select {
+    min-height: 34px;
+    border-color: rgba(204, 216, 226, 0.16);
+    background: #22333f;
+    color: #f8fbfd;
+}
+
+.settings-inline-form__wide {
+    grid-column: 1 / -1;
+}
+
+.settings-inline-form__check {
+    display: flex !important;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 8px;
+}
+
+.settings-inline-form__check input {
+    min-height: auto;
+}
+
+.settings-inline-form__actions {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: flex-end;
+}
+
 .project-search {
     margin-top: 8px;
 }

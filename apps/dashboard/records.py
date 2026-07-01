@@ -3755,12 +3755,15 @@ def _payroll_running_balance_row(row) -> dict:
         "balance_type": row[3],
         "balance_label": row[4],
         "balance_year": row[5] or "doorlopend",
+        "raw_balance_year": row[5] or 0,
+        "raw_annual_limit": _format_number(row[6]) if row[6] is not None else "",
         "annual_limit": _format_money(row[6]) if row[6] is not None else "-",
         "current_balance": _format_money(row[7]),
         "raw_current_balance": Decimal(str(row[7] or 0)),
         "mutation_count": row[8] or 0,
         "last_mutation_date": row[9].strftime("%d-%m-%Y") if row[9] else "-",
         "status": _running_balance_status(row[3], row[6], row[7]),
+        "raw_status": row[10] or "active",
         "source": row[11] or "dashboard",
     }
 
@@ -3923,13 +3926,29 @@ def list_payroll_employee_arrangements(limit: int = 100) -> list[dict]:
                         "employee_name": row[2] or "Onbekend",
                         "valid_from": f"{row[3]} / P{row[4]}",
                         "valid_until": f"{row[5]} / P{row[6]}" if row[5] and row[6] else "Doorlopend",
+                        "valid_from_year": row[3],
+                        "valid_from_period_number": row[4],
+                        "valid_until_year": row[5] or "",
+                        "valid_until_period_number": row[6] or "",
                         "cao_branch": row[7] or "bouwplaats",
                         "phase": row[8] or "-",
                         "pension_scheme": row[9] or "-",
+                        "raw_phase": row[8] or "",
+                        "raw_pension_scheme": row[9] or "",
+                        "raw_contract_hours_4w": _format_number(row[10]) if row[10] is not None else "",
                         "contract_hours_4w": _format_number(row[10]) if row[10] is not None else "-",
                         "days_right_code": row[11] or "-",
                         "scale_code": row[12] or "-",
                         "function_name": row[13] or "-",
+                        "raw_days_right_code": row[11] or "",
+                        "raw_scale_code": row[12] or "",
+                        "raw_function_name": row[13] or "",
+                        "raw_gross_hourly_wage": _format_number(row[14]) if row[14] is not None else "",
+                        "raw_net_base_40h": _format_number(row[15]) if row[15] is not None else "",
+                        "raw_vacation_rate_40h": _format_number(row[16]) if row[16] is not None else "",
+                        "raw_sickness_rate_40h": _format_number(row[17]) if row[17] is not None else "",
+                        "raw_holiday_rate_40h": _format_number(row[18]) if row[18] is not None else "",
+                        "raw_payment_schedule": row[19] or "weekly",
                         "gross_hourly_wage": _format_money(row[14]) if row[14] is not None else "-",
                         "net_base_40h": _format_money(row[15]) if row[15] is not None else "-",
                         "vacation_rate_40h": _format_money(row[16]) if row[16] is not None else "-",
@@ -3949,6 +3968,142 @@ def list_payroll_employee_arrangements(limit: int = 100) -> list[dict]:
                 ]
     except Exception:
         return []
+
+
+def update_payroll_employee_arrangement(arrangement_id: int, data: dict) -> str:
+    ensure_dashboard_tables()
+    payment_schedule = data.get("payment_schedule") if data.get("payment_schedule") in {"weekly", "four_weekly"} else "weekly"
+    status = data.get("status") if data.get("status") in {"concept", "active", "archief"} else "concept"
+    values = {
+        "valid_from_year": _int_or_none(data.get("valid_from_year")) or 2026,
+        "valid_from_period_number": _int_or_none(data.get("valid_from_period_number")) or 1,
+        "valid_until_year": _int_or_none(data.get("valid_until_year")),
+        "valid_until_period_number": _int_or_none(data.get("valid_until_period_number")),
+        "cao_branch": _clean_text(data.get("cao_branch")) or "bouwplaats",
+        "phase": _clean_text(data.get("phase")),
+        "pension_scheme": _clean_text(data.get("pension_scheme")),
+        "contract_hours_4w": _decimal_or_none(data.get("contract_hours_4w")),
+        "days_right_code": _clean_text(data.get("days_right_code")),
+        "scale_code": _clean_text(data.get("scale_code")),
+        "function_name": _clean_text(data.get("function_name")),
+        "gross_hourly_wage": _decimal_or_none(data.get("gross_hourly_wage")),
+        "net_base_40h": _decimal_or_none(data.get("net_base_40h")),
+        "vacation_rate_40h": _decimal_or_none(data.get("vacation_rate_40h")),
+        "sickness_rate_40h": _decimal_or_none(data.get("sickness_rate_40h")),
+        "holiday_rate_40h": _decimal_or_none(data.get("holiday_rate_40h")),
+        "payment_schedule": payment_schedule,
+        "company_car": bool(data.get("company_car")),
+        "license_plate": _clean_text(data.get("license_plate")),
+        "health_insurance_eligible": bool(data.get("health_insurance_eligible")),
+        "status": status,
+        "source": _clean_text(data.get("source")) or "dashboard",
+        "notes": _clean_text(data.get("notes")),
+    }
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE payroll_employee_arrangements
+                SET valid_from_year = %s,
+                    valid_from_period_number = %s,
+                    valid_until_year = %s,
+                    valid_until_period_number = %s,
+                    cao_branch = %s,
+                    phase = %s,
+                    pension_scheme = %s,
+                    contract_hours_4w = %s,
+                    days_right_code = %s,
+                    scale_code = %s,
+                    function_name = %s,
+                    gross_hourly_wage = %s,
+                    net_base_40h = %s,
+                    vacation_rate_40h = %s,
+                    sickness_rate_40h = %s,
+                    holiday_rate_40h = %s,
+                    payment_schedule = %s,
+                    company_car = %s,
+                    license_plate = %s,
+                    health_insurance_eligible = %s,
+                    status = %s,
+                    source = %s,
+                    notes = %s,
+                    updated_at = NOW()
+                WHERE id = %s
+                RETURNING relation_id;
+                """,
+                (*values.values(), arrangement_id),
+            )
+            row = cursor.fetchone()
+        conn.commit()
+    return f"Medewerker-inrichting #{arrangement_id} bijgewerkt voor relatie #{row[0]}." if row else f"Medewerker-inrichting #{arrangement_id} niet gevonden."
+
+
+def update_payroll_running_balance_account(account_id: int, data: dict) -> str:
+    ensure_dashboard_tables()
+    balance_type = data.get("balance_type") if data.get("balance_type") in {"wkr", "loan_advance", "choice_budget"} else "wkr"
+    status = data.get("status") if data.get("status") in {"active", "paused", "archived"} else "active"
+    values = {
+        "balance_type": balance_type,
+        "balance_label": _clean_text(data.get("balance_label")) or balance_type,
+        "balance_year": _int_or_none(data.get("balance_year")) or 0,
+        "annual_limit": _decimal_or_none(data.get("annual_limit")),
+        "status": status,
+        "source": _clean_text(data.get("source")) or "dashboard",
+        "notes": _clean_text(data.get("notes")),
+    }
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE payroll_running_balance_accounts
+                SET balance_type = %s,
+                    balance_label = %s,
+                    balance_year = %s,
+                    annual_limit = %s,
+                    status = %s,
+                    source = %s,
+                    notes = %s,
+                    updated_at = NOW()
+                WHERE id = %s
+                RETURNING relation_id;
+                """,
+                (*values.values(), account_id),
+            )
+            row = cursor.fetchone()
+        conn.commit()
+    return f"Saldo-account #{account_id} bijgewerkt voor relatie #{row[0]}." if row else f"Saldo-account #{account_id} niet gevonden."
+
+
+def create_payroll_running_balance_mutation(account_id: int, data: dict) -> str:
+    ensure_dashboard_tables()
+    amount = _decimal_or_none(data.get("amount"))
+    if amount is None:
+        return "Geen saldo-mutatie geboekt: bedrag ontbreekt."
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO payroll_running_balance_mutations (
+                    account_id, mutation_date, amount, description, source, updated_at
+                )
+                VALUES (%s, COALESCE(NULLIF(%s, '')::date, CURRENT_DATE), %s, %s, %s, NOW())
+                RETURNING id;
+                """,
+                (
+                    account_id,
+                    _clean_text(data.get("mutation_date")) or "",
+                    amount,
+                    _clean_text(data.get("description")),
+                    _clean_text(data.get("source")) or "dashboard",
+                ),
+            )
+            mutation_id = cursor.fetchone()[0]
+        conn.commit()
+    return f"Saldo-mutatie #{mutation_id} geboekt op account #{account_id}."
+
+
+def _clean_text(value) -> str:
+    return str(value or "").strip()
 
 
 def get_payroll_parameter_values(year: int, period_number: int, branch: str = "build") -> dict[str, Decimal | str | None]:

@@ -440,6 +440,7 @@
                                                 <th>Betaling</th>
                                                 <th>Rechten</th>
                                                 <th>Status</th>
+                                                <th>Actie</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -458,10 +459,53 @@
                                                 <td>{{ arrangement.payment_schedule }}{% if arrangement.company_car %} - auto {{ arrangement.license_plate }}{% endif %}</td>
                                                 <td>{{ arrangement.days_right_code }} - {{ arrangement.right_count }} regels - {{ arrangement.allowance_count }} vergoedingen</td>
                                                 <td><span class="status-tag">{{ arrangement.status }}</span></td>
+                                                <td><button class="icon-text-button" type="button" data-settings-edit-toggle="arrangement-{{ arrangement.id }}">Aanpassen</button></td>
+                                            </tr>
+                                            <tr class="settings-edit-row" id="arrangement-{{ arrangement.id }}" hidden>
+                                                <td colspan="11">
+                                                    <form class="settings-inline-form" action="/api/payroll/employee-arrangements/{{ arrangement.id }}" method="post">
+                                                        <label>Vanaf jaar <input name="valid_from_year" value="{{ arrangement.valid_from_year }}"></label>
+                                                        <label>Vanaf periode <input name="valid_from_period_number" value="{{ arrangement.valid_from_period_number }}"></label>
+                                                        <label>Tot jaar <input name="valid_until_year" value="{{ arrangement.valid_until_year }}"></label>
+                                                        <label>Tot periode <input name="valid_until_period_number" value="{{ arrangement.valid_until_period_number }}"></label>
+                                                        <label>CAO tak <select name="cao_branch">
+                                                            <option value="bouwplaats" {% if arrangement.cao_branch == 'bouwplaats' %}selected{% endif %}>bouwplaats</option>
+                                                            <option value="uta" {% if arrangement.cao_branch == 'uta' %}selected{% endif %}>uta</option>
+                                                        </select></label>
+                                                        <label>Fase <input name="phase" value="{{ arrangement.raw_phase }}"></label>
+                                                        <label>Pensioen <input name="pension_scheme" value="{{ arrangement.raw_pension_scheme }}"></label>
+                                                        <label>Contracturen 4w <input name="contract_hours_4w" value="{{ arrangement.raw_contract_hours_4w }}"></label>
+                                                        <label>Rechtcode <input name="days_right_code" value="{{ arrangement.raw_days_right_code }}"></label>
+                                                        <label>Schaal <input name="scale_code" value="{{ arrangement.raw_scale_code }}"></label>
+                                                        <label>Functie <input name="function_name" value="{{ arrangement.raw_function_name }}"></label>
+                                                        <label>Bruto uurloon <input name="gross_hourly_wage" value="{{ arrangement.raw_gross_hourly_wage }}"></label>
+                                                        <label>Netto 40u <input name="net_base_40h" value="{{ arrangement.raw_net_base_40h }}"></label>
+                                                        <label>Vakantie 40u <input name="vacation_rate_40h" value="{{ arrangement.raw_vacation_rate_40h }}"></label>
+                                                        <label>Ziekte 40u <input name="sickness_rate_40h" value="{{ arrangement.raw_sickness_rate_40h }}"></label>
+                                                        <label>Feestdag 40u <input name="holiday_rate_40h" value="{{ arrangement.raw_holiday_rate_40h }}"></label>
+                                                        <label>Betaling <select name="payment_schedule">
+                                                            <option value="weekly" {% if arrangement.raw_payment_schedule == 'weekly' %}selected{% endif %}>wekelijks</option>
+                                                            <option value="four_weekly" {% if arrangement.raw_payment_schedule == 'four_weekly' %}selected{% endif %}>4-wekelijks</option>
+                                                        </select></label>
+                                                        <label>Kenteken <input name="license_plate" value="{{ arrangement.license_plate if arrangement.license_plate != '-' else '' }}"></label>
+                                                        <label>Status <select name="status">
+                                                            <option value="concept" {% if arrangement.status == 'concept' %}selected{% endif %}>concept</option>
+                                                            <option value="active" {% if arrangement.status == 'active' %}selected{% endif %}>actief</option>
+                                                            <option value="archief" {% if arrangement.status == 'archief' %}selected{% endif %}>archief</option>
+                                                        </select></label>
+                                                        <label>Bron <input name="source" value="{{ arrangement.source }}"></label>
+                                                        <label class="settings-inline-form__check"><input type="checkbox" name="company_car" value="1" {% if arrangement.company_car %}checked{% endif %}> Auto van de zaak</label>
+                                                        <label class="settings-inline-form__check"><input type="checkbox" name="health_insurance_eligible" value="1" {% if arrangement.health_insurance_eligible %}checked{% endif %}> Zorgverzekering toepassen</label>
+                                                        <label class="settings-inline-form__wide">Toelichting <input name="notes" placeholder="Waarom deze wijziging geldt"></label>
+                                                        <div class="settings-inline-form__actions">
+                                                            <button class="ghost-button" type="submit">Opslaan in auditspoor</button>
+                                                        </div>
+                                                    </form>
+                                                </td>
                                             </tr>
                                             {% else %}
                                             <tr>
-                                                <td colspan="10">
+                                                <td colspan="11">
                                                     <div class="empty-state">
                                                         <strong>Nog geen medewerker-inrichting</strong>
                                                         <span>De migratie neemt bestaande payrollvelden op relaties als concept over zodra die gevuld zijn.</span>
@@ -495,6 +539,7 @@
                                                 <th>Mutaties</th>
                                                 <th>Laatste mutatie</th>
                                                 <th>Status</th>
+                                                <th>Actie</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -511,10 +556,46 @@
                                                 <td>{{ balance.mutation_count }}</td>
                                                 <td>{{ balance.last_mutation_date }}</td>
                                                 <td><span class="status-tag">{{ balance.status }}</span></td>
+                                                <td><button class="icon-text-button" type="button" data-settings-edit-toggle="balance-{{ balance.id }}">Aanpassen</button></td>
+                                            </tr>
+                                            <tr class="settings-edit-row" id="balance-{{ balance.id }}" hidden>
+                                                <td colspan="9">
+                                                    <div class="settings-edit-split">
+                                                        <form class="settings-inline-form" action="/api/payroll/running-balances/{{ balance.id }}" method="post">
+                                                            <label>Soort <select name="balance_type">
+                                                                <option value="wkr" {% if balance.balance_type == 'wkr' %}selected{% endif %}>WKR-teller</option>
+                                                                <option value="loan_advance" {% if balance.balance_type == 'loan_advance' %}selected{% endif %}>Loonvoorschot / geldlening</option>
+                                                                <option value="choice_budget" {% if balance.balance_type == 'choice_budget' %}selected{% endif %}>Keuzebudget</option>
+                                                            </select></label>
+                                                            <label>Label <input name="balance_label" value="{{ balance.balance_label }}"></label>
+                                                            <label>Jaar <input name="balance_year" value="{{ balance.raw_balance_year }}"></label>
+                                                            <label>Maximum <input name="annual_limit" value="{{ balance.raw_annual_limit }}"></label>
+                                                            <label>Status <select name="status">
+                                                                <option value="active" {% if balance.raw_status == 'active' %}selected{% endif %}>actief</option>
+                                                                <option value="paused" {% if balance.raw_status == 'paused' %}selected{% endif %}>pauze</option>
+                                                                <option value="archived" {% if balance.raw_status == 'archived' %}selected{% endif %}>archief</option>
+                                                            </select></label>
+                                                            <label>Bron <input name="source" value="{{ balance.source }}"></label>
+                                                            <label class="settings-inline-form__wide">Toelichting <input name="notes" placeholder="Waarom deze wijziging geldt"></label>
+                                                            <div class="settings-inline-form__actions">
+                                                                <button class="ghost-button" type="submit">Saldo-instelling opslaan</button>
+                                                            </div>
+                                                        </form>
+                                                        <form class="settings-inline-form settings-inline-form--mutation" action="/api/payroll/running-balances/{{ balance.id }}/mutations" method="post">
+                                                            <label>Mutatiedatum <input type="date" name="mutation_date"></label>
+                                                            <label>Bedrag <input name="amount" placeholder="-100,00 of 100,00"></label>
+                                                            <label>Bron <input name="source" value="dashboard"></label>
+                                                            <label class="settings-inline-form__wide">Omschrijving <input name="description" placeholder="Bijvoorbeeld voorschot, terugbetaling of correctie"></label>
+                                                            <div class="settings-inline-form__actions">
+                                                                <button class="ghost-button" type="submit">Mutatie boeken</button>
+                                                            </div>
+                                                        </form>
+                                                    </div>
+                                                </td>
                                             </tr>
                                             {% else %}
                                             <tr>
-                                                <td colspan="8">
+                                                <td colspan="9">
                                                     <div class="empty-state">
                                                         <strong>Nog geen lopende saldi</strong>
                                                         <span>De migratie maakt saldo-rekeningen aan zodra medewerkers inrichting, afrekening of keuzebudget hebben.</span>

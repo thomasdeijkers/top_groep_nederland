@@ -25,6 +25,7 @@ from apps.dashboard.records import (
     create_payroll_period,
     create_payroll_period_batch,
     create_payroll_parameter_version,
+    create_payroll_running_balance_mutation,
     clear_payroll_test_workspace,
     delete_payroll_period,
     get_cao_setting,
@@ -62,7 +63,9 @@ from apps.dashboard.records import (
     save_payroll_workbook_cell,
     search_candidate_matches,
     update_cao_setting,
+    update_payroll_employee_arrangement,
     update_payroll_period_status,
+    update_payroll_running_balance_account,
 )
 from apps.dashboard.relations import (
     create_candidate,
@@ -935,6 +938,51 @@ def delete_whatsapp_message(timesheet_id: int):
     delete_whatsapp_timesheet(timesheet_id)
     _audit("Urenbriefje verwijderd", "urenbriefje", timesheet_id, f"Urenbriefje {timesheet_id}", "Urenbriefje is verwijderd uit de actieve verwerking.", "Verwijderd")
     return RedirectResponse("/dashboard/timesheets", status_code=303)
+
+
+@router.post("/api/payroll/employee-arrangements/{arrangement_id}")
+async def save_payroll_employee_arrangement(arrangement_id: int, request: Request):
+    form = await request.form()
+    description = update_payroll_employee_arrangement(arrangement_id, dict(form))
+    _audit(
+        "Medewerker-inrichting aangepast",
+        "payroll_employee_arrangement",
+        arrangement_id,
+        f"Medewerker-inrichting {arrangement_id}",
+        description,
+        "Verloning",
+    )
+    return RedirectResponse("/dashboard/settings#medewerker-inrichting", status_code=303)
+
+
+@router.post("/api/payroll/running-balances/{account_id}")
+async def save_payroll_running_balance(account_id: int, request: Request):
+    form = await request.form()
+    description = update_payroll_running_balance_account(account_id, dict(form))
+    _audit(
+        "Lopend saldo aangepast",
+        "payroll_running_balance",
+        account_id,
+        f"Lopend saldo {account_id}",
+        description,
+        "Verloning",
+    )
+    return RedirectResponse("/dashboard/settings#lopende-saldi", status_code=303)
+
+
+@router.post("/api/payroll/running-balances/{account_id}/mutations")
+async def add_payroll_running_balance_mutation(account_id: int, request: Request):
+    form = await request.form()
+    description = create_payroll_running_balance_mutation(account_id, dict(form))
+    _audit(
+        "Saldo-mutatie geboekt",
+        "payroll_running_balance",
+        account_id,
+        f"Lopend saldo {account_id}",
+        description,
+        "Verloning",
+    )
+    return RedirectResponse("/dashboard/settings#lopende-saldi", status_code=303)
 
 
 @router.post("/api/timesheets/manual")

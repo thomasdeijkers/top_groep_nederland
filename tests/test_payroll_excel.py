@@ -1062,6 +1062,30 @@ class TimesheetCandidateValidationTests(unittest.TestCase):
         self.assertIn("totalField.value = calculatedField.value", script)
         self.assertIn("syncEditableSummary", script)
 
+    def test_payroll_employee_settings_and_balances_are_editable_with_audit(self):
+        template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
+        router_source = Path("apps/dashboard/router.py").read_text(encoding="utf-8-sig")
+        records_source = Path("apps/dashboard/records.py").read_text(encoding="utf-8-sig")
+        script = Path("apps/dashboard/static/dashboard.js").read_text(encoding="utf-8-sig")
+        stylesheet = Path("apps/dashboard/static/dashboard.css").read_text(encoding="utf-8-sig")
+
+        self.assertIn("/api/payroll/employee-arrangements/{{ arrangement.id }}", template)
+        self.assertIn("/api/payroll/running-balances/{{ balance.id }}", template)
+        self.assertIn("/api/payroll/running-balances/{{ balance.id }}/mutations", template)
+        self.assertIn("data-settings-edit-toggle", template)
+        self.assertIn("settings-inline-form", template)
+        self.assertIn("update_payroll_employee_arrangement", router_source)
+        self.assertIn("update_payroll_running_balance_account", router_source)
+        self.assertIn("create_payroll_running_balance_mutation", router_source)
+        self.assertIn("Medewerker-inrichting aangepast", router_source)
+        self.assertIn("Saldo-mutatie geboekt", router_source)
+        self.assertIn("UPDATE payroll_employee_arrangements", records_source)
+        self.assertIn("UPDATE payroll_running_balance_accounts", records_source)
+        self.assertIn("INSERT INTO payroll_running_balance_mutations", records_source)
+        self.assertIn("raw_status", records_source)
+        self.assertIn("data-settings-edit-toggle", script)
+        self.assertIn(".settings-inline-form", stylesheet)
+
     def test_timesheet_validation_replaces_existing_project_booking(self):
         correction_source = Path("apps/dashboard/timesheet_corrections.py").read_text(encoding="utf-8-sig")
         data_store = Path("apps/dashboard/data_store.py").read_text(encoding="utf-8-sig")

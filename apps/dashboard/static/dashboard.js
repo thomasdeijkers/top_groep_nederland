@@ -48,6 +48,17 @@
         });
     });
 
+    document.querySelectorAll("[data-settings-edit-toggle]").forEach((button) => {
+        button.addEventListener("click", () => {
+            const target = document.getElementById(button.dataset.settingsEditToggle || "");
+            if (!target) {
+                return;
+            }
+            target.hidden = !target.hidden;
+            button.textContent = target.hidden ? "Aanpassen" : "Sluiten";
+        });
+    });
+
     
     document.querySelectorAll("[data-period-tabs]").forEach((tabGroup) => {
         const container = tabGroup.closest(".periods-only") || document;
