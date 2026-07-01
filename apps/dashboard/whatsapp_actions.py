@@ -16,6 +16,13 @@ def archive_whatsapp_timesheet(timesheet_id: int) -> None:
                 """,
                 (timesheet_id,),
             )
+            cursor.execute(
+                """
+                DELETE FROM payroll_week_inputs
+                WHERE timesheet_inbox_id = %s;
+                """,
+                (timesheet_id,),
+            )
         conn.commit()
 
 
@@ -30,6 +37,13 @@ def delete_whatsapp_timesheet(timesheet_id: int) -> None:
                     status = 'verwijderd',
                     updated_at = NOW()
                 WHERE id = %s;
+                """,
+                (timesheet_id,),
+            )
+            cursor.execute(
+                """
+                DELETE FROM payroll_week_inputs
+                WHERE timesheet_inbox_id = %s;
                 """,
                 (timesheet_id,),
             )

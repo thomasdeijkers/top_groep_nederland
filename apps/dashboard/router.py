@@ -1349,7 +1349,9 @@ async def save_payroll_period_workbook_cell(period_id: int, request: Request):
 async def save_payroll_period_payment_status(period_id: int, request: Request):
     form = await request.form()
     result = update_payroll_payment_status(period_id, dict(form))
+    target_tab = "Uitbetaald" if result.get("status") == "uitbetaald" else "Uit te betalen"
     if not result.get("ok"):
+        target_tab = str(form.get("tab") or "")
         _audit(
             "Loon betaalstatus geblokkeerd",
             "periode",
@@ -1359,7 +1361,8 @@ async def save_payroll_period_payment_status(period_id: int, request: Request):
             "Controle vereist",
             metadata={"status": form.get("status"), "timesheet_ids": form.get("timesheet_ids")},
         )
-    return RedirectResponse(f"/dashboard/periods?period={period_id}#periode-verloning", status_code=303)
+    query = urlencode({"period": period_id, "tab": target_tab}) if target_tab else urlencode({"period": period_id})
+    return RedirectResponse(f"/dashboard/periods?{query}#periode-verloning", status_code=303)
 
 
 @router.post("/api/periods/{period_id}/archive")

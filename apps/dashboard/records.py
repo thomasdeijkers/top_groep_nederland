@@ -30,6 +30,7 @@ PAYROLL_VALIDATION_STATUSES = (
     "uitbetaald",
 )
 PAYROLL_LOCKED_STATUSES = ("processed", "definitief_loonbetaling", "verwerkt", "uitbetaald")
+PAYROLL_PREPAYMENT_STATUSES = ("loon_te_berekenen", "loon_berekenen", "loon", "doorgestuurd_naar_loonadministratie")
 PAYROLL_EDITABLE_AFTER_REOPEN_STATUS = "loon_te_berekenen"
 
 
@@ -2159,8 +2160,10 @@ def list_payroll_employee_week_results(period_id: int, limit: int = 200) -> list
                     JOIN payroll_week_inputs i ON i.id = r.payroll_week_input_id
                     JOIN payroll_periods p ON p.id = r.payroll_period_id
                     LEFT JOIN payroll_period_weeks w ON w.id = r.payroll_period_week_id
+                    LEFT JOIN whatsapp_timesheet_inbox wi ON wi.id = i.timesheet_inbox_id
                     WHERE r.payroll_period_id = %s
                       AND """ + _active_period_payroll_status_condition("i", "p") + """
+                      AND """ + _active_timesheet_condition("i", "wi") + """
                     GROUP BY COALESCE(r.relation_id, 0), r.employee_name
                     ORDER BY r.employee_name ASC
                     LIMIT %s;
@@ -2213,6 +2216,15 @@ def _active_period_payroll_status_condition(alias: str = "i", period_alias: str 
 
 def _active_period_payroll_status_params() -> tuple[list[str], list[str]]:
     return (list(PAYROLL_LOCKED_STATUSES), list(PAYROLL_VALIDATION_STATUSES))
+
+
+def _active_timesheet_condition(input_alias: str = "i", timesheet_alias: str = "wi") -> str:
+    return (
+        f"({input_alias}.timesheet_inbox_id IS NULL OR "
+        f"({timesheet_alias}.id IS NOT NULL "
+        f"AND {timesheet_alias}.deleted_at IS NULL "
+        f"AND {timesheet_alias}.archived_at IS NULL))"
+    )
 
 
 def get_payroll_week_result_summary(period_id: int) -> dict:
@@ -2351,8 +2363,10 @@ def list_payroll_period_exceptions(period_id: int, limit: int = 100) -> list[dic
                                'Urenbriefje controleren' AS next_step
                         FROM payroll_week_inputs i
                         JOIN payroll_periods p ON p.id = i.payroll_period_id
+                        LEFT JOIN whatsapp_timesheet_inbox wi ON wi.id = i.timesheet_inbox_id
                         WHERE i.payroll_period_id = %s
-                          AND """ + _active_period_payroll_status_condition("i", "p") + """
+                          AND LOWER(REPLACE(COALESCE(i.status, ''), ' ', '_')) = ANY(%s)
+                          AND """ + _active_timesheet_condition("i", "wi") + """
                           AND i.relation_id IS NULL
                         GROUP BY i.employee_name
 
@@ -2369,8 +2383,10 @@ def list_payroll_period_exceptions(period_id: int, limit: int = 100) -> list[dic
                                'Medewerkerkaart openen' AS next_step
                         FROM payroll_week_inputs i
                         JOIN payroll_periods p ON p.id = i.payroll_period_id
+                        LEFT JOIN whatsapp_timesheet_inbox wi ON wi.id = i.timesheet_inbox_id
                         WHERE i.payroll_period_id = %s
-                          AND """ + _active_period_payroll_status_condition("i", "p") + """
+                          AND LOWER(REPLACE(COALESCE(i.status, ''), ' ', '_')) = ANY(%s)
+                          AND """ + _active_timesheet_condition("i", "wi") + """
                           AND i.relation_id IS NOT NULL
                           AND i.arrangement_id IS NULL
                         GROUP BY i.relation_id, i.employee_name
@@ -2389,8 +2405,10 @@ def list_payroll_period_exceptions(period_id: int, limit: int = 100) -> list[dic
                         FROM payroll_week_results r
                         JOIN payroll_week_inputs i ON i.id = r.payroll_week_input_id
                         JOIN payroll_periods p ON p.id = r.payroll_period_id
+                        LEFT JOIN whatsapp_timesheet_inbox wi ON wi.id = i.timesheet_inbox_id
                         WHERE r.payroll_period_id = %s
-                          AND """ + _active_period_payroll_status_condition("i", "p") + """
+                          AND LOWER(REPLACE(COALESCE(i.status, ''), ' ', '_')) = ANY(%s)
+                          AND """ + _active_timesheet_condition("i", "wi") + """
                           AND r.calculation_status = 'mist_netto_basisloon'
                         GROUP BY r.relation_id, r.employee_name
 
@@ -2407,9 +2425,11 @@ def list_payroll_period_exceptions(period_id: int, limit: int = 100) -> list[dic
                                'Urenbriefje controleren' AS next_step
                         FROM payroll_week_inputs i
                         JOIN payroll_periods p ON p.id = i.payroll_period_id
+                        LEFT JOIN whatsapp_timesheet_inbox wi ON wi.id = i.timesheet_inbox_id
                         LEFT JOIN input_project_counts pc ON pc.payroll_week_input_id = i.id
                         WHERE i.payroll_period_id = %s
-                          AND """ + _active_period_payroll_status_condition("i", "p") + """
+                          AND LOWER(REPLACE(COALESCE(i.status, ''), ' ', '_')) = ANY(%s)
+                          AND """ + _active_timesheet_condition("i", "wi") + """
                           AND COALESCE(i.worked_hours, 0) > 0
                           AND COALESCE(pc.project_count, 0) = 0
                         GROUP BY i.relation_id, i.employee_name
@@ -2423,10 +2443,10 @@ def list_payroll_period_exceptions(period_id: int, limit: int = 100) -> list[dic
                     LIMIT %s;
                     """,
                     (
-                        period_id, *_active_period_payroll_status_params(),
-                        period_id, *_active_period_payroll_status_params(),
-                        period_id, *_active_period_payroll_status_params(),
-                        period_id, *_active_period_payroll_status_params(),
+                        period_id, list(PAYROLL_PREPAYMENT_STATUSES),
+                        period_id, list(PAYROLL_PREPAYMENT_STATUSES),
+                        period_id, list(PAYROLL_PREPAYMENT_STATUSES),
+                        period_id, list(PAYROLL_PREPAYMENT_STATUSES),
                         limit,
                     ),
                 )
@@ -2652,12 +2672,15 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                         ON dc.payroll_week_input_id = i.id
                     LEFT JOIN project_context pc
                         ON pc.payroll_week_input_id = i.id
+                    LEFT JOIN whatsapp_timesheet_inbox wi
+                        ON wi.id = i.timesheet_inbox_id
                     LEFT JOIN relations r
                         ON r.id = i.relation_id
                     LEFT JOIN payroll_cao_settings c
                         ON c.id = pc.payroll_cao_setting_id
                     WHERE i.payroll_period_id = %s
                       AND """ + _active_period_payroll_status_condition("i", "pp") + """
+                      AND """ + _active_timesheet_condition("i", "wi") + """
                     ORDER BY employee_name, i.work_date, i.id;
                     """,
                     (period_id, *_active_period_payroll_status_params()),

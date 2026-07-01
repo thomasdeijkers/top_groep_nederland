@@ -146,9 +146,15 @@ def default_calculation_rules() -> list[dict]:
 def build_workbook_tabs(period_weeks: list[dict], candidates: list[dict], payroll_rows: list[dict], total_rows: list[dict]) -> list[dict]:
     workbook_candidates = candidates[:15] if payroll_rows else []
     week_tabs = []
+    payment_source_tabs = []
     for week in period_weeks:
         label = f"WK{week.get('week_number') or week.get('week_index')}"
-        week_rows = build_week_sheet_rows(label, workbook_candidates, payroll_rows, week)
+        all_week_rows = build_week_sheet_rows(label, workbook_candidates, payroll_rows, week)
+        week_rows = [
+            row for row in all_week_rows
+            if row.get("payroll_status") == "loon_berekenen"
+        ]
+        payment_source_tabs.append({"label": label, "rows": all_week_rows})
         week_tabs.append(
             {
                 "label": label,
@@ -161,8 +167,8 @@ def build_workbook_tabs(period_weeks: list[dict], candidates: list[dict], payrol
     aggregated_totals = aggregate_week_sheet_totals(week_tabs)
     period_rows = build_period_sheet_rows(workbook_candidates, payroll_rows)
     payslip_rows = build_payslip_sheet_rows(period_rows, aggregated_totals)
-    payable_rows = build_payment_sheet_rows(week_tabs, "uit_te_betalen")
-    paid_rows = build_payment_sheet_rows(week_tabs, "uitbetaald")
+    payable_rows = build_payment_sheet_rows(payment_source_tabs, "uit_te_betalen")
+    paid_rows = build_payment_sheet_rows(payment_source_tabs, "uitbetaald")
     return [
         *week_tabs,
         {"label": "Periode", "kind": "period", "columns": PERIOD_SHEET_COLUMNS, "rows": period_rows},
