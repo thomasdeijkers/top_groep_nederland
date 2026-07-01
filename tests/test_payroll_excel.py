@@ -306,16 +306,30 @@ class PayrollParameterTests(unittest.TestCase):
         router_source = Path("apps/dashboard/router.py").read_text(encoding="utf-8")
 
         self.assertIn('/api/settings/payroll-parameters', template)
+        self.assertIn('name="parameter_version_id"', template)
         self.assertIn('name="effective_from"', template)
         self.assertIn('name="version_source_reference"', template)
         self.assertIn('name="notes"', template)
+        self.assertIn('parameter_version={{ version.id }}', template)
         self.assertIn('@router.post("/api/settings/payroll-parameters")', router_source)
+        self.assertIn('"payroll_parameter_version"', router_source)
+        self.assertIn('"parameter_key"', router_source)
 
     def test_parameter_versions_keep_period_uniqueness(self):
         migration = Path("migrations/031_payroll_parameters.sql").read_text(encoding="utf-8")
 
         self.assertIn("UNIQUE (parameter_id, year, period_number)", migration)
         self.assertIn("period_number BETWEEN 1 AND 13", migration)
+
+    def test_settings_cards_are_collapsible_by_default(self):
+        script = Path("apps/dashboard/static/dashboard.js").read_text(encoding="utf-8")
+        styles = Path("apps/dashboard/static/dashboard.css").read_text(encoding="utf-8")
+
+        self.assertIn(".settings-only .settings-card", script)
+        self.assertIn("settingsCollapsed", script)
+        self.assertIn("activeSettingsTarget", script)
+        self.assertIn('textContent = "Openen"', script)
+        self.assertIn('[data-settings-collapsed="true"]', styles)
 
     def test_formats_parameter_percentages_for_display(self):
         self.assertEqual(records._format_parameter_value("0.0833", "percentage"), "8.33%")

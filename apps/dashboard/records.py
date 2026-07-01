@@ -4010,8 +4010,11 @@ def list_payroll_parameters(limit: int = 200) -> list[dict]:
                            p.source_reference,
                            p.description,
                            p.status,
+                           v.id,
                            v.year,
                            v.period_number,
+                           v.effective_from,
+                           v.effective_until,
                            v.build_value,
                            v.uta_value,
                            v.text_value,
@@ -4054,14 +4057,21 @@ def list_payroll_parameters(limit: int = 200) -> list[dict]:
             if row[10] is not None or row[11] is not None:
                 item["versions"].append(
                     {
-                        "year": row[10] or "-",
-                        "period_number": row[11] or "-",
-                        "build_value": _format_parameter_value(row[12], row[4]),
-                        "uta_value": _format_parameter_value(row[13], row[4]),
-                        "text_value": row[14] or "",
-                        "source_reference": row[15] or "",
-                        "notes": row[16] or "",
-                        "status": row[17] or "active",
+                        "id": row[10],
+                        "year": row[11] or "-",
+                        "period_number": row[12] or "-",
+                        "effective_from": row[13].strftime("%d-%m-%Y") if row[13] else "-",
+                        "effective_from_input": row[13].strftime("%Y-%m-%d") if row[13] else "",
+                        "effective_until": row[14].strftime("%d-%m-%Y") if row[14] else "-",
+                        "effective_until_input": row[14].strftime("%Y-%m-%d") if row[14] else "",
+                        "build_value": _format_parameter_value(row[15], row[4]),
+                        "uta_value": _format_parameter_value(row[16], row[4]),
+                        "build_value_input": _format_parameter_input(row[15]),
+                        "uta_value_input": _format_parameter_input(row[16]),
+                        "text_value": row[17] or "",
+                        "source_reference": row[18] or "",
+                        "notes": row[19] or "",
+                        "status": row[20] or "active",
                     }
                 )
         return list(parameters.values())
@@ -4069,9 +4079,30 @@ def list_payroll_parameters(limit: int = 200) -> list[dict]:
         return []
 
 
+def get_payroll_parameter_version(version_id: int | None) -> dict | None:
+    if not version_id:
+        return None
+    for parameter in list_payroll_parameters(limit=500):
+        for version in parameter.get("versions", []):
+            if version.get("id") == version_id:
+                return {
+                    **version,
+                    "parameter_id": parameter["id"],
+                    "parameter_key": parameter["parameter_key"],
+                    "name": parameter["name"],
+                    "category": parameter["category"],
+                    "unit": parameter["unit"],
+                    "value_type": parameter["value_type"],
+                    "applies_to": parameter["applies_to"],
+                    "description": parameter["description"],
+                }
+    return None
+
+
 def create_payroll_parameter_version(data: dict) -> int:
     _ensure_dashboard_tables_for_read()
     parameter_id = _int_or_none(data.get("parameter_id"))
+    parameter_version_id = _int_or_none(data.get("parameter_version_id"))
     with get_connection() as conn:
         with conn.cursor() as cursor:
             if not parameter_id:
@@ -4119,54 +4150,83 @@ def create_payroll_parameter_version(data: dict) -> int:
                 )
                 parameter_id = cursor.fetchone()[0]
 
-            cursor.execute(
-                """
-                INSERT INTO payroll_parameter_versions (
-                    parameter_id,
-                    year,
-                    period_number,
-                    effective_from,
-                    effective_until,
-                    build_value,
-                    uta_value,
-                    text_value,
-                    source_reference,
-                    notes,
-                    status,
-                    created_at,
-                    updated_at
-                )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
-                ON CONFLICT (parameter_id, year, period_number)
-                DO UPDATE SET
-                    effective_from = EXCLUDED.effective_from,
-                    effective_until = EXCLUDED.effective_until,
-                    build_value = EXCLUDED.build_value,
-                    uta_value = EXCLUDED.uta_value,
-                    text_value = EXCLUDED.text_value,
-                    source_reference = EXCLUDED.source_reference,
-                    notes = EXCLUDED.notes,
-                    status = EXCLUDED.status,
-                    updated_at = NOW()
-                RETURNING id;
-                """,
-                (
-                    parameter_id,
-                    _int_or_none(data.get("year")),
-                    _int_or_none(data.get("period_number")),
-                    _date_or_none(data.get("effective_from")),
-                    _date_or_none(data.get("effective_until")),
-                    _number_or_none(data.get("build_value")),
-                    _number_or_none(data.get("uta_value")),
-                    _empty_to_none(data.get("text_value")),
-                    _empty_to_none(data.get("version_source_reference")) or _empty_to_none(data.get("source_reference")),
-                    _empty_to_none(data.get("notes")),
-                    _empty_to_none(data.get("version_status")) or "active",
-                ),
+            payload = (
+                parameter_id,
+                _int_or_none(data.get("year")),
+                _int_or_none(data.get("period_number")),
+                _date_or_none(data.get("effective_from")),
+                _date_or_none(data.get("effective_until")),
+                _number_or_none(data.get("build_value")),
+                _number_or_none(data.get("uta_value")),
+                _empty_to_none(data.get("text_value")),
+                _empty_to_none(data.get("version_source_reference")) or _empty_to_none(data.get("source_reference")),
+                _empty_to_none(data.get("notes")),
+                _empty_to_none(data.get("version_status")) or "active",
             )
+            if parameter_version_id:
+                cursor.execute(
+                    """
+                    UPDATE payroll_parameter_versions
+                    SET parameter_id = %s,
+                        year = %s,
+                        period_number = %s,
+                        effective_from = %s,
+                        effective_until = %s,
+                        build_value = %s,
+                        uta_value = %s,
+                        text_value = %s,
+                        source_reference = %s,
+                        notes = %s,
+                        status = %s,
+                        updated_at = NOW()
+                    WHERE id = %s
+                    RETURNING id;
+                    """,
+                    (*payload, parameter_version_id),
+                )
+            else:
+                cursor.execute(
+                    """
+                    INSERT INTO payroll_parameter_versions (
+                        parameter_id,
+                        year,
+                        period_number,
+                        effective_from,
+                        effective_until,
+                        build_value,
+                        uta_value,
+                        text_value,
+                        source_reference,
+                        notes,
+                        status,
+                        created_at,
+                        updated_at
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+                    ON CONFLICT (parameter_id, year, period_number)
+                    DO UPDATE SET
+                        effective_from = EXCLUDED.effective_from,
+                        effective_until = EXCLUDED.effective_until,
+                        build_value = EXCLUDED.build_value,
+                        uta_value = EXCLUDED.uta_value,
+                        text_value = EXCLUDED.text_value,
+                        source_reference = EXCLUDED.source_reference,
+                        notes = EXCLUDED.notes,
+                        status = EXCLUDED.status,
+                        updated_at = NOW()
+                    RETURNING id;
+                    """,
+                    payload,
+                )
             version_id = cursor.fetchone()[0]
         conn.commit()
     return version_id
+
+
+def _format_parameter_input(value) -> str:
+    if value is None:
+        return ""
+    return format(Decimal(str(value)).normalize(), "f")
 
 
 def _format_parameter_value(value, unit: str = "") -> str:

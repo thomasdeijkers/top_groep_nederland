@@ -20,6 +20,34 @@
         setTheme(themeToggle.checked ? "light" : "dark");
     });
 
+    const settingsCards = Array.from(document.querySelectorAll(".settings-only .settings-card"));
+    const activeSettingsTarget = window.location.hash ? document.querySelector(window.location.hash) : null;
+    settingsCards.forEach((card) => {
+        const header = card.querySelector(":scope > .settings-card-heading") || card.firstElementChild;
+        if (!header) {
+            return;
+        }
+        header.classList.add("settings-collapse-header");
+        const title = header.querySelector("h2")?.textContent?.trim() || "Instelling";
+        const toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.className = "settings-collapse-toggle";
+        toggle.setAttribute("aria-expanded", "false");
+        toggle.textContent = "Openen";
+        header.appendChild(toggle);
+        const setCollapsed = (collapsed) => {
+            card.dataset.settingsCollapsed = collapsed ? "true" : "false";
+            toggle.setAttribute("aria-expanded", String(!collapsed));
+            toggle.textContent = collapsed ? "Openen" : "Sluiten";
+            toggle.setAttribute("aria-label", `${collapsed ? "Open" : "Sluit"} ${title}`);
+        };
+        setCollapsed(!(activeSettingsTarget && card === activeSettingsTarget));
+        toggle.addEventListener("click", () => {
+            const nextCollapsed = card.dataset.settingsCollapsed !== "true";
+            setCollapsed(nextCollapsed);
+        });
+    });
+
     
     document.querySelectorAll("[data-period-tabs]").forEach((tabGroup) => {
         const container = tabGroup.closest(".periods-only") || document;

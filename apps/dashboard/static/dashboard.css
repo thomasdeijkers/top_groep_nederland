@@ -3800,6 +3800,14 @@ select option:checked {
     background: rgba(12, 31, 50, 0.5);
 }
 
+.settings-card[data-settings-collapsed="true"] {
+    min-height: 0;
+}
+
+.settings-card[data-settings-collapsed="true"] > :not(:first-child) {
+    display: none !important;
+}
+
 .settings-card--wide {
     grid-column: 1 / -1;
 }
@@ -3809,6 +3817,38 @@ select option:checked {
     color: #9ca7b1;
     font-size: 0.88rem;
     line-height: 1.45;
+}
+
+.settings-collapse-header {
+    min-width: 0;
+}
+
+.settings-card > .settings-collapse-header:first-child {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.settings-card > .settings-collapse-header:first-child > div {
+    min-width: 0;
+}
+
+.settings-collapse-toggle {
+    flex: 0 0 auto;
+    min-height: 34px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.07);
+    color: #e9f3f6;
+    padding: 0 12px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.settings-collapse-toggle:hover {
+    border-color: rgba(127, 209, 160, 0.42);
+    background: rgba(127, 209, 160, 0.12);
 }
 
 .theme-toggle {
@@ -4228,6 +4268,7 @@ body[data-theme="light"] .table-action-danger:hover {
 }
 
 body[data-theme="light"] .ghost-button,
+body[data-theme="light"] .settings-collapse-toggle,
 body[data-theme="light"] .status-pill {
     border-color: rgba(28, 42, 50, 0.16);
     background: rgba(255, 255, 255, 0.72);
@@ -4244,7 +4285,8 @@ body[data-theme="light"] .currency-input > span {
     color: #116b3d;
 }
 
-body[data-theme="light"] .ghost-button:hover {
+body[data-theme="light"] .ghost-button:hover,
+body[data-theme="light"] .settings-collapse-toggle:hover {
     border-color: rgba(66, 138, 87, 0.34);
     color: #0f3f25;
 }

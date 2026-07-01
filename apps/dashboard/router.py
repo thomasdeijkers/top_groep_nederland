@@ -28,6 +28,7 @@ from apps.dashboard.records import (
     clear_payroll_test_workspace,
     delete_payroll_period,
     get_cao_setting,
+    get_payroll_parameter_version,
     get_payroll_period,
     get_project,
     get_overview_data,
@@ -275,6 +276,7 @@ def _dashboard_context(
     project_id: int | None = None,
     period_id: int | None = None,
     cao_id: int | None = None,
+    parameter_version_id: int | None = None,
     show_cao_form: bool = False,
 ):
     data_page = "timesheets" if active_page in {"timesheets", "whatsapp"} else "relations" if active_page in {"relations", "candidates", "principals"} else active_page
@@ -342,6 +344,7 @@ def _dashboard_context(
             "payroll_data_diagnostics": [],
             "payroll_period_defaults": {},
             "payroll_parameters": [],
+            "selected_payroll_parameter_version": None,
             "payroll_employee_arrangements": [],
             "payroll_running_balances": [],
             "cao_settings": [],
@@ -432,6 +435,7 @@ def _dashboard_context(
     payroll_period_defaults = _context_value(data_page, "payroll_period_defaults", {}, get_payroll_period_defaults) if data_page == "periods" else {}
     selected_payroll_period = _context_value(data_page, "selected_payroll_period", None, lambda: get_payroll_period(period_id)) if data_page == "periods" and period_id else None
     payroll_parameters = _context_value(data_page, "payroll_parameters", [], list_payroll_parameters) if data_page == "settings" else []
+    selected_payroll_parameter_version = _context_value(data_page, "selected_payroll_parameter_version", None, lambda: get_payroll_parameter_version(parameter_version_id)) if data_page == "settings" and parameter_version_id else None
     payroll_employee_arrangements = _context_value(data_page, "payroll_employee_arrangements", [], list_payroll_employee_arrangements) if data_page == "settings" else []
     payroll_running_balances = _context_value(data_page, "payroll_running_balances", [], list_payroll_running_balances) if data_page == "settings" else []
     cao_settings = _context_value(data_page, "cao_settings", [], list_cao_settings) if data_page in {"settings", "periods"} else []
@@ -541,6 +545,7 @@ def _dashboard_context(
         "payroll_data_diagnostics": payroll_data_diagnostics,
         "payroll_period_defaults": payroll_period_defaults,
         "payroll_parameters": payroll_parameters,
+        "selected_payroll_parameter_version": selected_payroll_parameter_version,
         "payroll_employee_arrangements": payroll_employee_arrangements,
         "payroll_running_balances": payroll_running_balances,
         "cao_settings": cao_settings,
@@ -609,10 +614,11 @@ def _render_dashboard(
     project_id: int | None = None,
     period_id: int | None = None,
     cao_id: int | None = None,
+    parameter_version_id: int | None = None,
     show_cao_form: bool = False,
 ):
     try:
-        context = _dashboard_context(active_page, edit_id, query, timesheet_id, workflow_stage, timesheet_tab, relation_tab, status_filter, show_relation_form, project_id, period_id, cao_id, show_cao_form)
+        context = _dashboard_context(active_page, edit_id, query, timesheet_id, workflow_stage, timesheet_tab, relation_tab, status_filter, show_relation_form, project_id, period_id, cao_id, parameter_version_id, show_cao_form)
     except Exception as exc:
         print(f"DASHBOARD_CONTEXT_ERROR {active_page}: {type(exc).__name__}: {exc}")
         return HTMLResponse(
@@ -946,9 +952,10 @@ def server_page(request: Request):
 
 
 @router.get("/dashboard/settings", response_class=HTMLResponse)
-def settings_page(request: Request, cao: str = ""):
+def settings_page(request: Request, cao: str = "", parameter_version: str = ""):
     cao_id = int(cao) if cao.isdigit() else None
-    return _render_dashboard(request, "settings", cao_id=cao_id, show_cao_form=cao == "new")
+    parameter_version_id = int(parameter_version) if parameter_version.isdigit() else None
+    return _render_dashboard(request, "settings", cao_id=cao_id, parameter_version_id=parameter_version_id, show_cao_form=cao == "new")
 
 
 @router.post("/api/settings/cao")
@@ -998,6 +1005,7 @@ def edit_cao_setting(
 
 @router.post("/api/settings/payroll-parameters")
 def save_payroll_parameter_version(
+    parameter_version_id: str = Form(""),
     parameter_id: str = Form(""),
     parameter_key: str = Form(""),
     name: str = Form(""),
@@ -1019,9 +1027,29 @@ def save_payroll_parameter_version(
     version_status: str = Form("active"),
 ):
     version_id = create_payroll_parameter_version(locals())
-    label = name or parameter_key or f"parameter {parameter_id}"
-    _audit("Grondslag parameter opgeslagen", "payroll_parameter", version_id, label, "Periodegebonden parameter-versie opgeslagen.", "Instellingen")
-    return RedirectResponse("/dashboard/settings#grondslag-parameters", status_code=303)
+    version = get_payroll_parameter_version(version_id) or {}
+    label = version.get("name") or name or parameter_key or f"parameter {parameter_id}"
+    period_label = f"{version.get('year') or year} / P{version.get('period_number') or period_number}"
+    action = "Grondslag parameter bijgewerkt" if parameter_version_id else "Grondslag parameter opgeslagen"
+    _audit(
+        action,
+        "payroll_parameter_version",
+        version_id,
+        label,
+        f"Parameter-versie voor {period_label} opgeslagen met bron en toelichting.",
+        "Instellingen",
+        metadata={
+            "parameter_id": version.get("parameter_id") or parameter_id,
+            "parameter_key": version.get("parameter_key") or parameter_key,
+            "year": version.get("year") or year,
+            "period_number": version.get("period_number") or period_number,
+            "effective_from": version.get("effective_from_input") or effective_from,
+            "build_value": version.get("build_value_input") or build_value,
+            "uta_value": version.get("uta_value_input") or uta_value,
+            "source_reference": version.get("source_reference") or version_source_reference,
+        },
+    )
+    return RedirectResponse(f"/dashboard/settings?parameter_version={version_id}#grondslag-parameters", status_code=303)
 
 
 @router.get("/api/health")
