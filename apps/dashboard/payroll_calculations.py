@@ -168,13 +168,15 @@ def build_week_sheet_rows(sheet_label: str, candidates: list[dict], payroll_rows
         worked_hours = _decimal(weekly_hours[week_index - 1] if len(weekly_hours) >= week_index else "")
         if not worked_hours:
             continue
+        weekly_days = payroll_row.get("week_worked_days", [])
+        weekly_km = payroll_row.get("week_total_km", [])
         week_timesheet_ids = payroll_row.get("week_timesheet_ids", [])
         timesheet_ids = week_timesheet_ids[week_index - 1] if len(week_timesheet_ids) >= week_index else []
         timesheet_label = "Open" if len(timesheet_ids) <= 1 else f"Open ({len(timesheet_ids)})"
-        worked_days = _decimal(payroll_row.get("worked_days") or payroll_row.get("days_worked"))
+        worked_days = _decimal(weekly_days[week_index - 1] if len(weekly_days) >= week_index else "") or _decimal(payroll_row.get("worked_days") or payroll_row.get("days_worked"))
         single_trip_km = _decimal(payroll_row.get("single_trip_km"))
         work_km = _decimal(payroll_row.get("work_km"))
-        total_km = _decimal(payroll_row.get("total_km")) or ((single_trip_km * worked_days * 2) + work_km if single_trip_km and worked_days else Decimal("0"))
+        total_km = _decimal(weekly_km[week_index - 1] if len(weekly_km) >= week_index else "") or _decimal(payroll_row.get("total_km")) or ((single_trip_km * worked_days * 2) + work_km if single_trip_km and worked_days else Decimal("0"))
         net_advance = _decimal(payroll_row.get("net_advance"))
         rows.append(
             {

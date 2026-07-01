@@ -2568,7 +2568,8 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                            r.payroll_days_right,
                            r.payroll_scale,
                            r.payroll_function,
-                           r.payroll_hourly_wage
+                           r.payroll_hourly_wage,
+                           COALESCE(w.parsed_fields, '{}'::jsonb) AS parsed_fields
                     FROM whatsapp_timesheet_inbox w
                     LEFT JOIN booking_context b
                         ON b.timesheet_inbox_id = w.id
@@ -2607,7 +2608,10 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                             "booking_count": 0,
                             "total_hours_raw": Decimal("0"),
                             "week_hours_raw": [Decimal("0"), Decimal("0"), Decimal("0"), Decimal("0")],
+                            "week_days_raw": [Decimal("0"), Decimal("0"), Decimal("0"), Decimal("0")],
+                            "week_km_raw": [Decimal("0"), Decimal("0"), Decimal("0"), Decimal("0")],
                             "week_timesheet_ids": [[], [], [], []],
+                            "total_km_raw": Decimal("0"),
                             "relation_id": row[1],
                             "payroll_license_plate": row[13] or "",
                             "payroll_choice_budget": row[14] or "",
@@ -2620,9 +2624,16 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                             "payroll_hourly_wage": row[21] or "",
                         },
                     )
+                    parsed_fields = row[22] or {}
                     hours = Decimal(str(row[11] or 0))
+                    parsed_hours = _parsed_total_hours(parsed_fields)
+                    if parsed_hours is not None:
+                        hours = parsed_hours
+                    worked_days = _parsed_worked_days(parsed_fields, row[10])
+                    total_km = _parsed_total_km(parsed_fields)
                     item["booking_count"] += 1
                     item["total_hours_raw"] += hours
+                    item["total_km_raw"] += total_km
                     item["projects"].add(row[8] or "-")
                     item["principals"].add(row[9] or "-")
                     item["statuses"].add(row[12] or "concept")
@@ -2631,6 +2642,8 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                         for week_index, week_start, week_end in weeks:
                             if week_start <= row[10] <= week_end and 1 <= week_index <= 4:
                                 item["week_hours_raw"][week_index - 1] += hours
+                                item["week_days_raw"][week_index - 1] += worked_days
+                                item["week_km_raw"][week_index - 1] += total_km
                                 item["week_timesheet_ids"][week_index - 1].append(row[0])
                                 break
                 rows = []
@@ -2650,10 +2663,13 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                             "projects": ", ".join(sorted(item["projects"])),
                             "principals": ", ".join(sorted(item["principals"])),
                             "booking_count": item["booking_count"],
-                            "worked_days": len(item["dates"]),
+                            "worked_days": _format_number(sum(item["week_days_raw"], Decimal("0"))),
                             "total_hours": _format_number(item["total_hours_raw"]),
                             "week_hours": [_format_number(value) for value in item["week_hours_raw"]],
+                            "week_worked_days": [_format_number(value) for value in item["week_days_raw"]],
+                            "week_total_km": [_format_number(value) for value in item["week_km_raw"]],
                             "week_timesheet_ids": item["week_timesheet_ids"],
+                            "total_km": _format_number(item["total_km_raw"]),
                             "normal_hours": _format_number(normal_hours),
                             "overtime_hours": _format_number(overtime_hours),
                             "hourly_wage": _format_money(wage),
@@ -2674,6 +2690,60 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                 return sorted(rows, key=lambda item: item["employee_name"])
     except Exception:
         return []
+
+
+_PAYROLL_DAY_KEYS = (
+    ("monday_hours", "monday_km"),
+    ("tuesday_hours", "tuesday_km"),
+    ("wednesday_hours", "wednesday_km"),
+    ("thursday_hours", "thursday_km"),
+    ("friday_hours", "friday_km"),
+    ("saturday_hours", "saturday_km"),
+    ("sunday_hours", "sunday_km"),
+)
+
+
+def _parsed_field_decimal(parsed_fields: dict, key: str) -> Decimal | None:
+    value = (parsed_fields.get(key) or {}).get("value") if isinstance(parsed_fields, dict) else None
+    return _decimal_or_none(value)
+
+
+def _parsed_total_hours(parsed_fields: dict) -> Decimal | None:
+    total = _parsed_field_decimal(parsed_fields, "total_hours")
+    if total is not None:
+        return total
+    values = [
+        _parsed_field_decimal(parsed_fields, hours_key)
+        for hours_key, _km_key in _PAYROLL_DAY_KEYS
+    ]
+    known_values = [value for value in values if value is not None]
+    return sum(known_values, Decimal("0")) if known_values else None
+
+
+def _parsed_worked_days(parsed_fields: dict, fallback_date=None) -> Decimal:
+    count = sum(
+        Decimal("1")
+        for hours_key, _km_key in _PAYROLL_DAY_KEYS
+        if (_parsed_field_decimal(parsed_fields, hours_key) or Decimal("0")) > 0
+    )
+    if count:
+        return count
+    return Decimal("1") if fallback_date else Decimal("0")
+
+
+def _parsed_total_km(parsed_fields: dict) -> Decimal:
+    total = _parsed_field_decimal(parsed_fields, "total_km")
+    if total is not None:
+        return total
+    calculated = _parsed_field_decimal(parsed_fields, "calculated_total_km")
+    if calculated is not None:
+        return calculated
+    values = [
+        _parsed_field_decimal(parsed_fields, km_key)
+        for _hours_key, km_key in _PAYROLL_DAY_KEYS
+    ]
+    known_values = [value for value in values if value is not None]
+    return sum(known_values, Decimal("0")) if known_values else Decimal("0")
 
 
 def create_manual_timesheet(data: dict) -> int:

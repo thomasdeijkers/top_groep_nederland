@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from apps.dashboard import openai_usage, records, router as dashboard_router, timesheet_corrections, timesheet_parser, timesheet_uploads
-from apps.dashboard.payroll_calculations import derived_period_total_rows
+from apps.dashboard.payroll_calculations import build_week_sheet_rows, derived_period_total_rows
 from apps.dashboard.payroll_excel import analyze_payroll_workbook, build_payroll_output_workbook, build_tgn_template_output_workbook
 
 
@@ -106,6 +106,28 @@ class PayrollCalculationTests(unittest.TestCase):
             workbook = load_workbook(path)
 
         self.assertEqual(workbook.sheetnames, ["WK17", "Periode", "Loonstrook"])
+
+    def test_week_rows_use_week_level_days_and_km_from_timesheet_parse(self):
+        rows = build_week_sheet_rows(
+            "WK21",
+            [],
+            [
+                {
+                    "employee_name": "Leo Doorn",
+                    "week_hours": ["0", "0", "0", "40"],
+                    "week_worked_days": ["0", "0", "0", "5"],
+                    "week_total_km": ["0", "0", "0", "105"],
+                    "week_timesheet_ids": [[], [], [], [123]],
+                    "total_km": "105",
+                }
+            ],
+            {"week_index": 4, "week_number": 21},
+        )
+
+        self.assertEqual(rows[0]["worked_days"], "5")
+        self.assertEqual(rows[0]["worked_hours"], "40")
+        self.assertEqual(rows[0]["total_km"], "105")
+        self.assertEqual(rows[0]["commute_km"], "105")
 
     @unittest.skipIf(Workbook is None, "openpyxl is niet beschikbaar")
     def test_exports_tgn_template_layout_with_formulas(self):
@@ -382,6 +404,28 @@ class PayrollWeekInputTests(unittest.TestCase):
         self.assertEqual(fields["calculated_total_km"]["value"], "34")
         self.assertEqual(fields["total_km"]["value"], "34")
         self.assertEqual(fields["total_km_check"]["value"], "klopt")
+
+    def test_payroll_rows_derive_days_and_km_from_parsed_day_fields(self):
+        fields = {
+            "monday_hours": {"value": "8"},
+            "tuesday_hours": {"value": "8"},
+            "wednesday_hours": {"value": "8"},
+            "thursday_hours": {"value": "8"},
+            "friday_hours": {"value": "8"},
+            "saturday_hours": {"value": ""},
+            "sunday_hours": {"value": ""},
+            "monday_km": {"value": "21"},
+            "tuesday_km": {"value": "21"},
+            "wednesday_km": {"value": "21"},
+            "thursday_km": {"value": "21"},
+            "friday_km": {"value": "21"},
+            "total_km": {"value": "105"},
+            "total_hours": {"value": "40"},
+        }
+
+        self.assertEqual(records._parsed_worked_days(fields), records.Decimal("5"))
+        self.assertEqual(records._parsed_total_hours(fields), records.Decimal("40"))
+        self.assertEqual(records._parsed_total_km(fields), records.Decimal("105"))
 
 
 
