@@ -6049,6 +6049,26 @@ body[data-theme="light"] .theme-toggle strong {
     font-weight: 600;
 }
 
+.manual-parse-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.manual-parse-actions .ghost-button {
+    min-height: 34px;
+    padding: 0 12px;
+    white-space: nowrap;
+}
+
+.manual-parse-actions .ghost-button--primary {
+    border-color: rgba(127, 209, 160, 0.42);
+    background: rgba(47, 126, 87, 0.42);
+    color: #f4fff8;
+}
+
 .autosave-status {
     display: inline-flex;
     align-items: center;

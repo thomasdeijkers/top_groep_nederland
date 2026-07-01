@@ -1148,17 +1148,21 @@
             syncSumCheck(kmInputs, totalKmInput, calculatedKmInput, checkKmInput, "km", "totaal km ontbreekt");
         };
 
-        const saveCorrections = async () => {
+        const saveCorrections = async (submitter = null) => {
             if (!form.action) {
                 return;
             }
             autosaveController?.abort();
             autosaveController = new AbortController();
             setAutosaveStatus("Opslaan...", "saving");
+            const formData = new FormData(form);
+            if (submitter?.name) {
+                formData.set(submitter.name, submitter.value || "1");
+            }
             try {
                 const response = await fetch(form.action, {
                     method: "POST",
-                    body: new FormData(form),
+                    body: formData,
                     headers: {
                         "X-Requested-With": "fetch",
                         Accept: "application/json",
@@ -1223,7 +1227,15 @@
             event.preventDefault();
             syncWorkflowIds();
             syncTotalCheck();
-            saveCorrections();
+            saveCorrections(event.submitter);
+        });
+        form.querySelector("[data-manual-parse-open]")?.addEventListener("click", () => {
+            form.querySelectorAll(".timesheet-accordion").forEach((section) => {
+                section.open = true;
+            });
+            const firstManualField = form.querySelector("[data-parsed-employee-name]") || form.querySelector("input:not([readonly]), select, textarea");
+            firstManualField?.focus();
+            setAutosaveStatus("Handmatig invullen actief - sla op als de velden zijn overgenomen", "pending");
         });
         absenceInput?.addEventListener("change", () => {
             applyAbsenceCode();

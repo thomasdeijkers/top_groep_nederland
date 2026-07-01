@@ -1034,6 +1034,21 @@ class TimesheetCandidateValidationTests(unittest.TestCase):
         self.assertIn("validateButton.disabled = false", script)
         self.assertIn("workflowCandidateTarget.value = option.value", script)
 
+    def test_failed_parse_can_be_completed_manually_with_audit_marker(self):
+        template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
+        script = Path("apps/dashboard/static/dashboard.js").read_text(encoding="utf-8-sig")
+        router_source = Path("apps/dashboard/router.py").read_text(encoding="utf-8-sig")
+        stylesheet = Path("apps/dashboard/static/dashboard.css").read_text(encoding="utf-8-sig")
+
+        self.assertIn("data-manual-parse-open", template)
+        self.assertIn('name="manual_parse"', template)
+        self.assertIn("Handmatige parse opslaan", template)
+        self.assertIn("form.querySelectorAll(\".timesheet-accordion\")", script)
+        self.assertIn("formData.set(submitter.name", script)
+        self.assertIn("manual_parse = str(form.get(\"manual_parse\")", router_source)
+        self.assertIn("Urenbriefje handmatig geparsed", router_source)
+        self.assertIn(".manual-parse-actions", stylesheet)
+
     def test_timesheet_validation_replaces_existing_project_booking(self):
         correction_source = Path("apps/dashboard/timesheet_corrections.py").read_text(encoding="utf-8-sig")
         data_store = Path("apps/dashboard/data_store.py").read_text(encoding="utf-8-sig")

@@ -819,6 +819,7 @@ async def correct_whatsapp_timesheet(timesheet_id: int, request: Request):
         for key, value in form.items()
         if key.startswith("field_")
     }
+    manual_parse = str(form.get("manual_parse") or "").strip() == "1"
     matched_relation_raw = str(form.get("matched_relation_id") or "").strip()
     matched_relation_id = ensure_relation_for_candidate_match(matched_relation_raw)
     clear_candidate_match = "matched_relation_id" in form and not matched_relation_raw
@@ -831,7 +832,16 @@ async def correct_whatsapp_timesheet(timesheet_id: int, request: Request):
     description = _audit_changed_fields(corrections)
     if matched_relation_id:
         description += f" Kandidaatkaart #{matched_relation_id} gekoppeld."
-    _audit("Urenbriefje gecorrigeerd", "urenbriefje", timesheet_id, f"Urenbriefje {timesheet_id}", description, "Controle")
+    if manual_parse:
+        description = f"Handmatig uit het urenbriefje overgenomen. {description}".strip()
+    _audit(
+        "Urenbriefje handmatig geparsed" if manual_parse else "Urenbriefje gecorrigeerd",
+        "urenbriefje",
+        timesheet_id,
+        f"Urenbriefje {timesheet_id}",
+        description,
+        "Controle",
+    )
     if request.headers.get("X-Requested-With") == "fetch":
         return JSONResponse({"ok": True, "timesheet_id": timesheet_id})
     return RedirectResponse(f"/dashboard/timesheets?stage=valideren&timesheet={timesheet_id}", status_code=303)
