@@ -202,7 +202,8 @@ def build_week_sheet_rows(sheet_label: str, candidates: list[dict], payroll_rows
         payroll_status = _payment_status(payroll_statuses)
         weekly_blockers = payroll_row.get("week_blockers", [])
         payroll_blockers = weekly_blockers[week_index - 1] if len(weekly_blockers) >= week_index else []
-        payroll_blocker_message = " ".join(str(blocker) for blocker in payroll_blockers if blocker)
+        payroll_blocker_items = [str(blocker).strip() for blocker in payroll_blockers if str(blocker).strip()]
+        payroll_blocker_message = " ".join(payroll_blocker_items)
         worked_days = _decimal(weekly_days[week_index - 1] if len(weekly_days) >= week_index else "") or _decimal(payroll_row.get("worked_days") or payroll_row.get("days_worked"))
         single_trip_km = _decimal(payroll_row.get("single_trip_km"))
         work_km = _decimal(payroll_row.get("work_km"))
@@ -239,6 +240,7 @@ def build_week_sheet_rows(sheet_label: str, candidates: list[dict], payroll_rows
                 "payroll_status": payroll_status,
                 "payroll_status_label": _payment_status_label(payroll_status),
                 "payment_action": _payment_action_label(payroll_status),
+                "payroll_blocker_items": payroll_blocker_items,
                 "payroll_blocker_message": payroll_blocker_message,
             }
         )
@@ -293,6 +295,7 @@ def build_payment_sheet_rows(week_tabs: list[dict], target_status: str) -> list[
                 "payroll_status": row.get("payroll_status") or "",
                 "payroll_status_label": row.get("payroll_status_label") or "",
                 "payment_action": row.get("payment_action") or "",
+                "payroll_blocker_items": row.get("payroll_blocker_items") or [],
                 "payroll_blocker_message": row.get("payroll_blocker_message") or "",
             }
             rows.append(payment_row)

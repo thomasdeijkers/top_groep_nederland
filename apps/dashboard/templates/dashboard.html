@@ -1950,7 +1950,7 @@ Metadata:
                                                             <button class="payroll-workbook-link" type="submit" {% if selected_payroll_period.is_locked_for_payment %}disabled title="Deze loonperiode staat op slot"{% endif %}>Terug naar uit te betalen</button>
                                                         </form>
                                                         {% elif row.payroll_blocker_message %}
-                                                        <button class="payroll-workbook-link" type="button" data-payroll-blocked-payment data-block-reason="{{ row.payroll_blocker_message }}">Uitbetalen</button>
+                                                        <button class="payroll-workbook-link" type="button" data-payroll-blocked-payment data-block-reason="{{ row.payroll_blocker_message|e }}" data-block-fields="{{ row.payroll_blocker_items|join('||')|e }}">Uitbetalen</button>
                                                         {% elif row.timesheet_ids %}
                                                         <form class="payroll-workbook-action-form" action="/api/periods/{{ selected_payroll_period.id }}/payment-status" method="post">
                                                             <input type="hidden" name="timesheet_ids" value="{{ row.timesheet_ids }}">
@@ -2096,6 +2096,26 @@ Metadata:
                             </div>
                         </details>
                     </article>
+
+                    <div class="modal-backdrop payroll-block-modal" data-payroll-block-modal hidden>
+                        <article class="payroll-block-dialog" role="dialog" aria-modal="true" aria-labelledby="payroll-block-title">
+                            <header class="payroll-block-dialog__header">
+                                <div>
+                                    <p class="section-label">Loonbetaling</p>
+                                    <h2 id="payroll-block-title">Uitbetalen kan nog niet</h2>
+                                    <small data-payroll-block-summary>Vul eerst de ontbrekende gegevens aan.</small>
+                                </div>
+                                <button class="modal-close" type="button" data-payroll-block-close aria-label="Sluiten">x</button>
+                            </header>
+                            <div class="payroll-block-dialog__body">
+                                <p>Deze loonregel blijft geblokkeerd tot de volgende punten zijn aangevuld:</p>
+                                <ul class="payroll-block-list" data-payroll-block-list></ul>
+                            </div>
+                            <div class="modal-actions">
+                                <button class="ghost-button ghost-button--primary" type="button" data-payroll-block-close>Begrepen</button>
+                            </div>
+                        </article>
+                    </div>
                     {% endif %}
 
                     {% if not selected_project %}

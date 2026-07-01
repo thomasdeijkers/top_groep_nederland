@@ -3597,6 +3597,76 @@ select option:checked {
     margin: 0;
 }
 
+.payroll-block-dialog {
+    width: min(560px, 100%);
+    padding: 18px;
+    border: 1px solid rgba(127, 209, 160, 0.28);
+    border-radius: 8px;
+    background: #182028;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+}
+
+.payroll-block-dialog__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.payroll-block-dialog__header h2 {
+    margin: 0 0 5px;
+    color: #ffffff;
+    font-size: 1.22rem;
+}
+
+.payroll-block-dialog__header small,
+.payroll-block-dialog__body p {
+    color: #b9c8d2;
+}
+
+.payroll-block-dialog__body {
+    display: grid;
+    gap: 12px;
+    padding: 14px 0;
+}
+
+.payroll-block-dialog__body p {
+    margin: 0;
+}
+
+.payroll-block-list {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.payroll-block-list li {
+    position: relative;
+    min-height: 36px;
+    padding: 9px 12px 9px 34px;
+    border: 1px solid rgba(230, 117, 103, 0.28);
+    border-radius: 8px;
+    background: rgba(89, 44, 52, 0.26);
+    color: #ffe1dd;
+    font-weight: 700;
+}
+
+.payroll-block-list li::before {
+    content: "";
+    position: absolute;
+    left: 13px;
+    top: 15px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ff6f61;
+    box-shadow: 0 0 0 3px rgba(255, 111, 97, 0.16);
+}
+
 .relation-editor-backdrop {
     position: fixed;
     inset: 0;

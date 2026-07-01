@@ -345,10 +345,83 @@
             });
         };
 
+        const payrollBlockModal = document.querySelector("[data-payroll-block-modal]");
+        const payrollBlockList = document.querySelector("[data-payroll-block-list]");
+        const payrollBlockSummary = document.querySelector("[data-payroll-block-summary]");
+        const closePayrollBlockModal = () => {
+            if (payrollBlockModal) {
+                payrollBlockModal.hidden = true;
+            }
+        };
+        const cleanBlockerText = (text) => String(text || "")
+            .replace(/\s+/g, " ")
+            .replace(/[.;]\s*$/, "")
+            .trim();
+        const splitBlockerFields = (blocker) => {
+            const text = cleanBlockerText(blocker);
+            if (!text) {
+                return [];
+            }
+            const colonIndex = text.indexOf(":");
+            if (colonIndex === -1) {
+                return [text];
+            }
+            const prefix = text.slice(0, colonIndex).trim();
+            const fieldText = text.slice(colonIndex + 1);
+            const fields = fieldText
+                .split(",")
+                .map((field) => cleanBlockerText(field))
+                .filter(Boolean);
+            if (!fields.length) {
+                return [text];
+            }
+            return fields.map((field) => `${prefix}: ${field}`);
+        };
+        const blockerItemsFromButton = (button) => {
+            const rawItems = (button.dataset.blockFields || "")
+                .split("||")
+                .map((item) => cleanBlockerText(item))
+                .filter(Boolean);
+            const items = (rawItems.length ? rawItems : [button.dataset.blockReason || "Deze loonregel mist nog gegevens."])
+                .flatMap(splitBlockerFields);
+            return [...new Set(items)].filter(Boolean);
+        };
+        const openPayrollBlockModal = (button) => {
+            const items = blockerItemsFromButton(button);
+            if (!payrollBlockModal || !payrollBlockList) {
+                window.alert(`Uitbetalen kan nog niet.\n\n${items.join("\n")}`);
+                return;
+            }
+            payrollBlockList.innerHTML = "";
+            items.forEach((item) => {
+                const listItem = document.createElement("li");
+                listItem.textContent = item;
+                payrollBlockList.appendChild(listItem);
+            });
+            if (payrollBlockSummary) {
+                payrollBlockSummary.textContent = `${items.length} punt${items.length === 1 ? "" : "en"} ontbre${items.length === 1 ? "ekt" : "ken"} voor verloning.`;
+            }
+            payrollBlockModal.hidden = false;
+            payrollBlockModal.querySelector("[data-payroll-block-close]")?.focus();
+        };
+
+        document.querySelectorAll("[data-payroll-block-close]").forEach((button) => {
+            button.addEventListener("click", closePayrollBlockModal);
+        });
+        payrollBlockModal?.addEventListener("click", (event) => {
+            if (event.target === payrollBlockModal) {
+                closePayrollBlockModal();
+            }
+        });
+        document.addEventListener("keydown", (event) => {
+            if (event.key === "Escape" && payrollBlockModal && !payrollBlockModal.hidden) {
+                closePayrollBlockModal();
+            }
+        });
+
         workbook.querySelectorAll("[data-payroll-blocked-payment]").forEach((button) => {
             button.addEventListener("click", () => {
-                const reason = button.dataset.blockReason || "Deze loonregel mist nog gegevens.";
-                window.alert(`Uitbetalen kan nog niet.\n\n${reason}`);
+                openPayrollBlockModal(button);
             });
         });
 
