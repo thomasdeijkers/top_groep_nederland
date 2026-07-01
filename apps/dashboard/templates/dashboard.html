@@ -1755,42 +1755,41 @@ Metadata:
                             </div>
                         </section>
                         {% endif %}
+                        {% set payment_summary = selected_payroll_period.payroll_payment_summary %}
+                        {% set exception_summary = selected_payroll_period.payroll_exception_summary %}
                         <div class="project-detail-summary">
                             <div>
-                                <span>Week-invoer</span>
-                                <strong>{{ week_input.input_count }}</strong>
+                                <span>Uit te betalen loon</span>
+                                <strong>{{ payment_summary.payable_total }}</strong>
+                                <small>{{ payment_summary.payable_count }} declaraties</small>
                             </div>
                             <div>
-                                <span>Dagregels</span>
-                                <strong>{{ week_input.day_count }}</strong>
+                                <span>Uitbetaald loon</span>
+                                <strong>{{ payment_summary.paid_total }}</strong>
+                                <small>{{ payment_summary.paid_count }} declaraties</small>
                             </div>
                             <div>
-                                <span>Projectregels</span>
-                                <strong>{{ week_input.project_count }}</strong>
+                                <span>Open loonregels</span>
+                                <strong>{{ payment_summary.open_count }}</strong>
+                                <small>nog te verwerken</small>
                             </div>
                             <div>
                                 <span>Uren / km</span>
                                 <strong>{{ week_input.total_hours }} / {{ week_input.total_km }}</strong>
+                                <small>uit urenbriefjes</small>
                             </div>
                             <div>
-                                <span>Weekresultaten</span>
-                                <strong>{{ week_result.result_count }}</strong>
+                                <span>Blokkades</span>
+                                <strong>{{ exception_summary.blocking }}</strong>
+                                <small>{{ exception_summary.warning }} nalopen</small>
                             </div>
                             <div>
-                                <span>Netto indicatie</span>
-                                <strong>{{ week_result.total_net_week }}</strong>
-                            </div>
-                            <div>
-                                <span>Concept</span>
-                                <strong>{{ week_result.concept_count }}</strong>
-                            </div>
-                            <div>
-                                <span>Nog te berekenen</span>
-                                <strong>{{ week_result.missing_arrangement_count + week_result.missing_wage_count }}</strong>
+                                <span>Medewerkers</span>
+                                <strong>{{ payment_summary.employee_count }}</strong>
+                                <small>{{ payment_summary.declaration_count }} declaraties totaal</small>
                             </div>
                         </div>
 
-                        {% set exception_summary = selected_payroll_period.payroll_exception_summary %}
                         <details class="period-import-log payroll-exception-panel" open>
                             <summary>{% if week_input.input_count|int == 0 %}Nog geen gevalideerde uren{% else %}Payroll-uitzonderingen{% if exception_summary.total %} &middot; {{ exception_summary.blocking }} blokkerend &middot; {{ exception_summary.warning }} nalopen{% endif %}{% endif %}</summary>
                             <div class="payroll-exception-summary">

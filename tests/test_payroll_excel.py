@@ -1151,6 +1151,12 @@ class CompletePeriodTimesheetImportTests(unittest.TestCase):
         self.assertIn("def _active_timesheet_condition", records_source)
         self.assertIn("payroll-week-tab-summary", template)
         self.assertIn("uur - {{ tab.summary.booking_count }} regels", template)
+        self.assertIn("def summarize_payroll_payment_flow", records_source)
+        self.assertIn('period["payroll_payment_summary"] = summarize_payroll_payment_flow(period["workbook_tabs"])', records_source)
+        self.assertIn("Uit te betalen loon", template)
+        self.assertIn("Uitbetaald loon", template)
+        self.assertIn("Open loonregels", template)
+        self.assertIn("Blokkades", template)
 
     def test_deleted_timesheets_are_removed_from_payroll_periods(self):
         actions_source = Path("apps/dashboard/whatsapp_actions.py").read_text(encoding="utf-8-sig")

@@ -2043,6 +2043,7 @@ def get_payroll_period(period_id: int | None) -> dict | None:
                 if tab.get("kind") == "week":
                     tab["summary"] = summarize_week_rows(tab.get("rows", []))
             period["payroll_totals"] = summarize_workbook_tabs(period["workbook_tabs"])
+            period["payroll_payment_summary"] = summarize_payroll_payment_flow(period["workbook_tabs"])
             period["payroll_import_logs"] = list_payroll_import_logs(period_id)
             period["payroll_calculation_rules"] = list_payroll_calculation_rules()
             period["payroll_validation_results"] = list_payroll_validation_results(period_id)
@@ -2085,6 +2086,7 @@ def _empty_payroll_period_detail_defaults() -> dict:
         "employee_week_results": [],
         "payroll_rows": [],
         "payroll_totals": _payroll_period_totals([]),
+        "payroll_payment_summary": summarize_payroll_payment_flow([]),
         "period_calculation_rows": [],
         "period_sheet_rows": [],
         "payslip_sheet_rows": [],
@@ -3004,6 +3006,33 @@ def _payroll_period_totals(rows: list[dict]) -> dict:
         "bookings": total_bookings,
         "days": total_days,
         "hours": _format_number(total_hours),
+    }
+
+
+def summarize_payroll_payment_flow(workbook_tabs: list[dict]) -> dict:
+    def tab_rows(kind: str) -> list[dict]:
+        return [
+            row
+            for tab in workbook_tabs
+            if tab.get("kind") == kind
+            for row in tab.get("rows", [])
+        ]
+
+    open_rows = tab_rows("week")
+    payable_rows = tab_rows("payment")
+    paid_rows = tab_rows("paid")
+    all_rows = [*open_rows, *payable_rows, *paid_rows]
+    payable_total = sum((_payroll_money_decimal(row.get("net_amount")) for row in payable_rows), Decimal("0"))
+    paid_total = sum((_payroll_money_decimal(row.get("net_amount")) for row in paid_rows), Decimal("0"))
+    employee_names = {row.get("employee_name") for row in all_rows if row.get("employee_name")}
+    return {
+        "payable_total": _format_money(payable_total),
+        "paid_total": _format_money(paid_total),
+        "open_count": len(open_rows),
+        "payable_count": len(payable_rows),
+        "paid_count": len(paid_rows),
+        "declaration_count": len(all_rows),
+        "employee_count": len(employee_names),
     }
 
 
