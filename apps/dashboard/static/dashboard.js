@@ -409,10 +409,28 @@
                 if (input.dataset.tabLabel !== "Loonstrook") {
                     return;
                 }
-                const periodTotal = parseNumber(field("period-total")?.value);
+                const totalHours = parseNumber(field("total-worked-hours")?.value);
+                const hourlyWage = parseNumber(field("hourly-wage")?.value);
+                const totalKm = parseNumber(field("total-km")?.value);
+                const declarations = parseNumber(field("extra-reimbursements")?.value);
+                const grossWage = totalHours && hourlyWage ? totalHours * hourlyWage : parseNumber(field("gross-wage")?.value);
+                let periodTotal = parseNumber(field("period-total")?.value);
+                if (grossWage) {
+                    const pension = grossWage * 0.035;
+                    const tax = grossWage * 0.29;
+                    const travel = totalKm * 0.23;
+                    periodTotal = (grossWage * 0.62) + travel + declarations;
+                    setFieldValue("gross-wage", formatMoney(grossWage));
+                    setFieldValue("weekly-wage", formatMoney(grossWage / 4));
+                    setFieldValue("pension-deduction", formatMoney(pension));
+                    setFieldValue("payroll-tax", formatMoney(tax));
+                    setFieldValue("net-after-deductions", formatMoney(Math.max(grossWage - pension - tax, 0)));
+                    setFieldValue("wkr-reimbursements", formatMoney(travel));
+                    setFieldValue("period-total", formatMoney(periodTotal));
+                }
                 const alreadyReceived = parseNumber(field("already-received-net")?.value);
                 const payslipAdvance = parseNumber(field("payslip-advance")?.value);
-                const netToReceive = formatMoney(periodTotal - alreadyReceived - payslipAdvance);
+                const netToReceive = formatMoney(Math.max(periodTotal - alreadyReceived - payslipAdvance, 0));
                 ["net-to-receive", "net-total"].forEach((key) => {
                     const target = field(key);
                     if (target) {

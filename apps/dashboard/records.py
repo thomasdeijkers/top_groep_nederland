@@ -3217,7 +3217,23 @@ def _recalculate_payroll_derived_cells(tab: dict, row: dict) -> None:
         return
     if kind != "payslip":
         return
-    period_total = _payroll_money_decimal(row.get("period_total"))
+    worked_hours = _payroll_number_decimal(row.get("total_worked_hours"))
+    hourly_wage = _payroll_money_decimal(row.get("hourly_wage") or row.get("gross_hourly_wage"))
+    gross_wage = worked_hours * hourly_wage if worked_hours and hourly_wage else _payroll_money_decimal(row.get("gross_wage"))
+    if gross_wage:
+        row["gross_wage"] = _format_money(gross_wage)
+        row["weekly_wage"] = _format_money(gross_wage / Decimal("4"))
+        row["pension_deduction"] = _format_money(gross_wage * Decimal("0.035"))
+        row["payroll_tax"] = _format_money(gross_wage * Decimal("0.29"))
+        row["net_after_deductions"] = _format_money(max(gross_wage - (gross_wage * Decimal("0.035")) - (gross_wage * Decimal("0.29")), Decimal("0")))
+    travel_allowance = _payroll_number_decimal(row.get("total_km")) * Decimal("0.23")
+    declarations = _payroll_money_decimal(row.get("extra_reimbursements"))
+    if gross_wage:
+        period_total = (gross_wage * Decimal("0.62")) + travel_allowance + declarations
+        row["period_total"] = _format_money(period_total)
+        row["wkr_reimbursements"] = _format_money(travel_allowance)
+    else:
+        period_total = _payroll_money_decimal(row.get("period_total"))
     already_received = _payroll_money_decimal(row.get("already_received_net"))
     payslip_advance = _payroll_money_decimal(row.get("payslip_advance"))
     net_to_receive = max(period_total - already_received - payslip_advance, Decimal("0"))

@@ -74,6 +74,8 @@ PAYSLIP_SHEET_COLUMNS = [
     {"label": "Totaal FD", "key": "total_holiday_hours"},
     {"label": "Totaal kilometers", "key": "total_km"},
     {"label": "Extra declaraties/vergoeding", "key": "extra_reimbursements"},
+    {"label": "Uurtarief", "key": "hourly_wage"},
+    {"label": "Tarief bron", "key": "hourly_wage_source"},
     {"label": "Reeds ontvangen netto", "key": "already_received_net"},
     {"label": "Nog te ontvangen netto loon", "key": "net_to_receive"},
     {"label": "Totaal 4 weken", "key": "period_total"},
@@ -386,7 +388,13 @@ def build_period_sheet_rows(candidates: list[dict], payroll_rows: list[dict]) ->
     for index, payroll_row in enumerate(payroll_rows, start=1):
         employee_name = payroll_row.get("employee_name") or "-"
         candidate = candidates_by_name.get(_key(employee_name), {})
-        hourly_wage = _decimal(payroll_row.get("payroll_hourly_wage")) or _decimal(candidate.get("hourly_rate")) or _decimal(payroll_row.get("hourly_wage"))
+        payroll_hourly_wage = _decimal(payroll_row.get("payroll_hourly_wage"))
+        if payroll_hourly_wage:
+            hourly_wage = payroll_hourly_wage
+            hourly_wage_source = "Medewerkerkaart"
+        else:
+            hourly_wage = _decimal(payroll_row.get("hourly_wage"))
+            hourly_wage_source = payroll_row.get("hourly_wage_source") or ("CAO" if hourly_wage else "")
         contract_hours = _decimal(payroll_row.get("payroll_cao_hours")) or _decimal(payroll_row.get("standard_week_hours"))
         cao_name = payroll_row.get("cao_name") or payroll_row.get("payroll_cao_name") or ""
         phase = payroll_row.get("payroll_phase") or ""
@@ -405,6 +413,7 @@ def build_period_sheet_rows(candidates: list[dict], payroll_rows: list[dict]) ->
                 "configuration": payroll_row.get("payroll_scale") or "",
                 "function_name": payroll_row.get("payroll_function") or "",
                 "gross_hourly_wage": _format_money(hourly_wage) if hourly_wage else "",
+                "hourly_wage_source": hourly_wage_source,
                 "gross_total": _format_money(bruto_total) if bruto_total else "",
                 "reservations": payroll_row.get("reservations") or "",
                 "bik": payroll_row.get("bik") or "",
@@ -467,6 +476,8 @@ def build_payslip_sheet_rows(period_rows: list[dict], total_rows: list[dict]) ->
                 "total_holiday_hours": totals.get("total_holiday_hours", "0"),
                 "total_km": _format_number(km_total),
                 "extra_reimbursements": _format_money(declarations),
+                "hourly_wage": _format_money(hourly_wage) if hourly_wage else "",
+                "hourly_wage_source": period_row.get("hourly_wage_source") or "",
                 "already_received_net": _format_money(net_advance),
                 "net_to_receive": _format_money(net_to_receive),
                 "period_total": _format_money(net_reference),

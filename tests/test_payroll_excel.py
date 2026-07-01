@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from apps.dashboard import openai_usage, records, router as dashboard_router, timesheet_corrections, timesheet_parser, timesheet_uploads
-from apps.dashboard.payroll_calculations import build_week_sheet_rows, derived_period_total_rows
+from apps.dashboard.payroll_calculations import build_payslip_sheet_rows, build_period_sheet_rows, build_week_sheet_rows, derived_period_total_rows
 from apps.dashboard.payroll_excel import analyze_payroll_workbook, build_payroll_output_workbook, build_tgn_template_output_workbook
 
 
@@ -296,8 +296,6 @@ class PayrollCalculationTests(unittest.TestCase):
         self.assertIn("/dashboard/relations?tab=candidates&edit={{ row.relation_id }}", template)
 
     def test_workbook_rows_do_not_invent_missing_payroll_values(self):
-        from apps.dashboard.payroll_calculations import build_period_sheet_rows, build_week_sheet_rows
-
         period_rows = build_period_sheet_rows([], [{"employee_name": "Thomas"}])
         week_rows = build_week_sheet_rows("WK18", [], [{"employee_name": "Thomas", "week_hours": ["8"]}], {"week_index": 1, "week_number": 18})
 
@@ -307,6 +305,27 @@ class PayrollCalculationTests(unittest.TestCase):
         self.assertEqual(period_rows[0]["reserve_vacation_days"], "")
         self.assertEqual(week_rows[0]["single_trip_km"], "")
         self.assertEqual(week_rows[0]["project_info"], "")
+
+    def test_period_rows_fallback_to_cao_wage_when_candidate_wage_missing(self):
+        rows = build_period_sheet_rows(
+            [],
+            [
+                {
+                    "employee_name": "Thomas",
+                    "hourly_wage": f"{chr(8364)} 18,95",
+                    "hourly_wage_source": "CAO default",
+                    "total_hours": "40",
+                    "standard_week_hours": "40",
+                }
+            ],
+        )
+        payslip_rows = build_payslip_sheet_rows(rows, [{"employee_name": "Thomas", "total_worked_hours": "40", "total_worked_days": "5"}])
+
+        self.assertEqual(rows[0]["gross_hourly_wage"], f"{chr(8364)} 18,95")
+        self.assertEqual(rows[0]["hourly_wage_source"], "CAO default")
+        self.assertEqual(payslip_rows[0]["hourly_wage"], f"{chr(8364)} 18,95")
+        self.assertEqual(payslip_rows[0]["hourly_wage_source"], "CAO default")
+        self.assertEqual(payslip_rows[0]["gross_wage"], f"{chr(8364)} 758,00")
 
     def test_workbook_editable_fields_recalculate_like_excel(self):
         week_row = {
@@ -326,9 +345,25 @@ class PayrollCalculationTests(unittest.TestCase):
         self.assertEqual(period_row["gross_total"], f"{chr(8364)} 860,00")
         self.assertEqual(period_row["labor_cost_margin"], f"{chr(8364)} 154,80")
 
+        payslip_row = {
+            "total_worked_hours": "40",
+            "hourly_wage": f"{chr(8364)} 18,95",
+            "total_km": "105",
+            "extra_reimbursements": f"{chr(8364)} 0,00",
+            "already_received_net": f"{chr(8364)} 0,00",
+            "payslip_advance": f"{chr(8364)} 0,00",
+        }
+        records._recalculate_payroll_derived_cells({"kind": "payslip"}, payslip_row)
+        self.assertEqual(payslip_row["gross_wage"], f"{chr(8364)} 758,00")
+        self.assertEqual(payslip_row["wkr_reimbursements"], f"{chr(8364)} 24,15")
+        self.assertEqual(payslip_row["period_total"], f"{chr(8364)} 494,11")
+        self.assertEqual(payslip_row["net_to_receive"], f"{chr(8364)} 494,11")
+
         script = Path("apps/dashboard/static/dashboard.js").read_text(encoding="utf-8-sig")
         self.assertIn("input.dataset.tabLabel.startsWith(\"WK\")", script)
         self.assertIn("gross-total", script)
+        self.assertIn("hourly-wage", script)
+        self.assertIn("gross-wage", script)
         self.assertIn("normalized.includes(\",\") && normalized.includes(\".\")", script)
 
 
