@@ -426,7 +426,7 @@ def _check_total_km(fields: dict) -> None:
 
 def _date_or_none(value: str):
     text = (value or "").strip()
-    for fmt in ("%d-%m-%Y", "%d/%m/%Y", "%Y-%m-%d"):
+    for fmt in ("%d-%m-%Y", "%d/%m/%Y", "%d-%m-%y", "%d/%m/%y", "%Y-%m-%d"):
         try:
             return datetime.strptime(text, fmt).date().isoformat()
         except ValueError:

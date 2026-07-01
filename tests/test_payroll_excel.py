@@ -1164,10 +1164,15 @@ class TimesheetCandidateValidationTests(unittest.TestCase):
     def test_manual_timesheet_fields_recalculate_totals_and_badges(self):
         template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
         script = Path("apps/dashboard/static/dashboard.js").read_text(encoding="utf-8-sig")
+        parser_source = Path("apps/dashboard/timesheet_parser.py").read_text(encoding="utf-8-sig")
+        records_source = Path("apps/dashboard/records.py").read_text(encoding="utf-8-sig")
 
         self.assertIn('data-manual-parse-save="true"', template)
         self.assertIn("'week_number')", template)
-        self.assertIn("'date')", template)
+        self.assertIn('type="date" name="field_date"', template)
+        self.assertIn("selected_message.date_input_value", template)
+        self.assertIn("_timesheet_date_input_value", records_source)
+        self.assertIn('"%d-%m-%y"', parser_source)
         self.assertIn("'principal_name')", template)
         self.assertIn("forceTotals || source === \"hours\"", script)
         self.assertIn("forceTotals || source === \"km\"", script)

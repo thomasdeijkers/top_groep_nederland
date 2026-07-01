@@ -5435,6 +5435,7 @@ def _format_whatsapp_row(row) -> dict:
     _ensure_total_check(fields)
     source_channel = (row[25] or "manual_upload").strip() or "manual_upload"
     work_date = row[15]
+    date_input_value = _timesheet_date_input_value((fields.get("date") or {}).get("value"), work_date)
     parsed_week_number = _int_or_none((fields.get("week_number") or {}).get("value"))
     week_number = parsed_week_number or (work_date.isocalendar().week if work_date else None)
     source_labels = {
@@ -5463,6 +5464,7 @@ def _format_whatsapp_row(row) -> dict:
         "work_date": work_date,
         "work_date_display": work_date.strftime("%d-%m-%Y") if work_date else "-",
         "work_date_sort": work_date.isoformat() if work_date else "",
+        "date_input_value": date_input_value,
         "week_number": week_number,
         "week_number_display": f"WK{week_number}" if week_number else "-",
         "week_number_sort": f"{week_number:02d}" if week_number else "",
@@ -5482,6 +5484,20 @@ def _format_whatsapp_row(row) -> dict:
         "source_channel_label": source_labels.get(source_channel, "Handmatige verwerking"),
         "matched_relation_id": row[26],
     }
+
+
+def _timesheet_date_input_value(parsed_value, work_date) -> str:
+    if work_date:
+        return work_date.isoformat()
+    text = str(parsed_value or "").strip()
+    if not text:
+        return ""
+    for pattern in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%d-%m-%y", "%d/%m/%y"):
+        try:
+            return datetime.strptime(text, pattern).date().isoformat()
+        except ValueError:
+            continue
+    return ""
 
 
 def _decimal_or_none(value):

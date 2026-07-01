@@ -2671,7 +2671,7 @@ Metadata:
                                                 </summary>
                                                 <div class="digital-timesheet-grid digital-timesheet-grid--primary">
                                                 <label><span class="field-title">Week {{ confidence_light(selected_message.parsed_map.week_number) }}</span><input name="field_week_number" value="{{ selected_message.parsed_map.week_number.value if selected_message.parsed_map.week_number is defined else '' }}"></label>
-                                                <label><span class="field-title">Datum {{ confidence_light(selected_message.parsed_map.date) }}</span><input name="field_date" value="{{ selected_message.parsed_map.date.value if selected_message.parsed_map.date is defined else selected_message.work_date or '' }}"></label>
+                                                <label><span class="field-title">Datum {{ confidence_light(selected_message.parsed_map.date) }}</span><input type="date" name="field_date" value="{{ selected_message.date_input_value }}"></label>
                                                 {% set parsed_employee_name = selected_message.parsed_map.employee_name.value if selected_message.parsed_map.employee_name is defined else selected_message.employee_name %}
                                                 {% set parsed_employee_phone = selected_message.parsed_map.employee_phone.value if selected_message.parsed_map.employee_phone is defined else selected_message.sender_phone %}
                                                 <label>
