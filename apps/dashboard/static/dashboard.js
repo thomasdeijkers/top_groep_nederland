@@ -1105,7 +1105,7 @@
             metric.innerHTML = `<i></i>${label}: ${cleanValue ? `${cleanValue}${unit}` : "Leeg"}`;
         };
 
-        const syncSumCheck = (inputs, totalField, calculatedField, checkField, unit, missingMessage) => {
+        const syncSumCheck = (inputs, totalField, calculatedField, checkField, unit, missingMessage, forceTotal = false) => {
             if (!calculatedField || !checkField) {
                 return;
             }
@@ -1120,6 +1120,9 @@
             }
             const calculated = values.reduce((sum, value) => sum + value, 0);
             calculatedField.value = formatHours(calculated);
+            if (forceTotal && totalField) {
+                totalField.value = calculatedField.value;
+            }
             const stated = parseHours(totalField?.value);
             if (stated === null) {
                 if (totalField) {
@@ -1143,9 +1146,20 @@
             setSummaryMetric(calculatedField.name.replace("field_", ""), calculatedField.value, "green");
         };
 
-        const syncTotalCheck = (source = "") => {
-            syncSumCheck(dayInputs, totalInput, calculatedInput, checkInput, "uur", "totaal ontbreekt");
-            syncSumCheck(kmInputs, totalKmInput, calculatedKmInput, checkKmInput, "km", "totaal km ontbreekt");
+        const syncTotalCheck = (source = "", forceTotals = false) => {
+            syncSumCheck(dayInputs, totalInput, calculatedInput, checkInput, "uur", "totaal ontbreekt", forceTotals || source === "hours");
+            syncSumCheck(kmInputs, totalKmInput, calculatedKmInput, checkKmInput, "km", "totaal km ontbreekt", forceTotals || source === "km");
+        };
+
+        const syncEditableSummary = (input) => {
+            if (!input?.name || !input.name.startsWith("field_")) {
+                return;
+            }
+            const key = input.name.replace("field_", "");
+            const value = input.tagName === "SELECT"
+                ? (input.selectedOptions[0]?.textContent || input.value || "").trim()
+                : input.value;
+            setSummaryMetric(key, value, "green");
         };
 
         const saveCorrections = async (submitter = null) => {
@@ -1204,19 +1218,27 @@
 
         dayInputs.forEach((input) => input.addEventListener("input", () => {
             syncTotalCheck("hours");
+            syncEditableSummary(input);
             scheduleAutosave();
         }));
         totalInput?.addEventListener("input", () => {
             syncTotalCheck("total");
+            syncEditableSummary(totalInput);
             scheduleAutosave();
         });
         kmInputs.forEach((input) => input.addEventListener("input", () => {
             syncTotalCheck("km");
+            syncEditableSummary(input);
             scheduleAutosave();
         }));
         totalKmInput?.addEventListener("input", () => {
             syncTotalCheck("total_km");
+            syncEditableSummary(totalKmInput);
             scheduleAutosave();
+        });
+        form.querySelectorAll("input[name^='field_'], select[name^='field_'], textarea[name^='field_']").forEach((input) => {
+            input.addEventListener("input", () => syncEditableSummary(input));
+            input.addEventListener("change", () => syncEditableSummary(input));
         });
         form.addEventListener("change", () => {
             syncWorkflowIds();
@@ -1226,7 +1248,7 @@
         form.addEventListener("submit", (event) => {
             event.preventDefault();
             syncWorkflowIds();
-            syncTotalCheck();
+            syncTotalCheck("submit", event.submitter?.dataset.manualParseSave === "true");
             saveCorrections(event.submitter);
         });
         form.querySelector("[data-manual-parse-open]")?.addEventListener("click", () => {

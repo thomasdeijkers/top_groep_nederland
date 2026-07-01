@@ -2556,7 +2556,7 @@ Metadata:
                                                 </div>
                                                 <div class="manual-parse-actions">
                                                     <button class="ghost-button" type="button" data-manual-parse-open>Handmatig parsen</button>
-                                                    <button class="ghost-button ghost-button--primary" type="submit" name="manual_parse" value="1" data-manual-parse-save>Handmatige parse opslaan</button>
+                                                    <button class="ghost-button ghost-button--primary" type="submit" name="manual_parse" value="1" data-manual-parse-save="true">Handmatige parse opslaan</button>
                                                 </div>
                                             </div>
 
@@ -2564,14 +2564,14 @@ Metadata:
                                                 <summary>
                                                     <strong>Basisgegevens</strong>
                                                     <span class="accordion-metrics">
-                                                        {{ summary_status(selected_message.parsed_map.week_number, 'Week') }}
-                                                        {{ summary_status(selected_message.parsed_map.date, 'Datum', selected_message.parsed_map.date.value if selected_message.parsed_map.date is defined else selected_message.work_date) }}
+                                                        {{ summary_status(selected_message.parsed_map.week_number, 'Week', none, '', 'week_number') }}
+                                                        {{ summary_status(selected_message.parsed_map.date, 'Datum', selected_message.parsed_map.date.value if selected_message.parsed_map.date is defined else selected_message.work_date, '', 'date') }}
                                                         <span class="accordion-metric accordion-metric--{{ 'green' if selected_message.matched_relation_id else 'red' }}" data-candidate-match-summary>
                                                             <i></i>Kandidaat: {{ selected_message.matched_name if selected_message.matched_relation_id else 'Niet gekoppeld' }}
                                                         </span>
-                                                        {{ summary_status(selected_message.parsed_map.principal_name, 'Opdrachtgever') }}
-                                                        {{ summary_status(selected_message.parsed_map.work_name, 'Project', selected_message.project_name) }}
-                                                        {{ summary_status(selected_message.parsed_map.project_number, 'Projectnr') }}
+                                                        {{ summary_status(selected_message.parsed_map.principal_name, 'Opdrachtgever', none, '', 'principal_name') }}
+                                                        {{ summary_status(selected_message.parsed_map.work_name, 'Project', selected_message.project_name, '', 'work_name') }}
+                                                        {{ summary_status(selected_message.parsed_map.project_number, 'Projectnr', none, '', 'project_number') }}
                                                     </span>
                                                 </summary>
                                                 <div class="digital-timesheet-grid digital-timesheet-grid--primary">

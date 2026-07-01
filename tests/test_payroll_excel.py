@@ -1049,6 +1049,19 @@ class TimesheetCandidateValidationTests(unittest.TestCase):
         self.assertIn("Urenbriefje handmatig geparsed", router_source)
         self.assertIn(".manual-parse-actions", stylesheet)
 
+    def test_manual_timesheet_fields_recalculate_totals_and_badges(self):
+        template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
+        script = Path("apps/dashboard/static/dashboard.js").read_text(encoding="utf-8-sig")
+
+        self.assertIn('data-manual-parse-save="true"', template)
+        self.assertIn("'week_number')", template)
+        self.assertIn("'date')", template)
+        self.assertIn("'principal_name')", template)
+        self.assertIn("forceTotals || source === \"hours\"", script)
+        self.assertIn("forceTotals || source === \"km\"", script)
+        self.assertIn("totalField.value = calculatedField.value", script)
+        self.assertIn("syncEditableSummary", script)
+
     def test_timesheet_validation_replaces_existing_project_booking(self):
         correction_source = Path("apps/dashboard/timesheet_corrections.py").read_text(encoding="utf-8-sig")
         data_store = Path("apps/dashboard/data_store.py").read_text(encoding="utf-8-sig")
