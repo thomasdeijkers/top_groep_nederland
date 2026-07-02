@@ -84,6 +84,11 @@
                     <a class="side-nav__item {% if active_page == 'tickets' %}side-nav__item--active{% endif %}" href="/dashboard/tickets"><span class="side-nav__label">Tickets</span><span class="module-status module-status--red" title="Open"></span></a>
                     <a class="side-nav__item {% if active_page == 'server' %}side-nav__item--active{% endif %}" href="/dashboard/server"><span class="side-nav__label">Server info</span><span class="module-status module-status--green" title="Compleet"></span></a>
                     <a class="side-nav__item {% if active_page == 'settings' %}side-nav__item--active{% endif %}" href="/dashboard/settings"><span class="side-nav__label">Instellingen</span><span class="module-status module-status--orange" title="Basis"></span></a>
+                    {% if auth_enabled %}
+                    <form class="dashboard-logout dashboard-logout--nav" method="post" action="/logout">
+                        <button class="side-nav__item" type="submit"><span class="side-nav__label">Afmelden</span></button>
+                    </form>
+                    {% endif %}
                 </nav>
 
                 <div class="sidebar-footer">
@@ -141,11 +146,6 @@
                             {% else %}Werkmodule voor Top Groep Nederland.{% endif %}
                         </p>
                     </div>
-                    {% if auth_enabled %}
-                        <form class="dashboard-logout" method="post" action="/logout">
-                            <button type="submit">Afmelden</button>
-                        </form>
-                    {% endif %}
                 </header>
 
                 <section class="stats-grid overview-only" aria-label="Dashboard statistieken">
@@ -823,6 +823,9 @@
 
                     {% set show_relation_editor = show_relation_form|default(false) or selected_relation or (request is defined and request.query_params.get('new')) %}
                     {% if show_relation_editor %}
+                    {% if relation_return_url %}
+                    {% set relation_editor_close_url = relation_return_url %}
+                    {% else %}
                     {% set relation_editor_close_url = '/dashboard/relations?tab=' ~ active_relation_tab %}
                     {% if query %}
                     {% set relation_editor_close_url = relation_editor_close_url ~ '&q=' ~ (query|urlencode) %}
@@ -831,6 +834,7 @@
                     {% set relation_editor_close_url = relation_editor_close_url ~ '&status=' ~ (status_filter|urlencode) %}
                     {% endif %}
                     {% set relation_editor_close_url = relation_editor_close_url ~ '#relaties' %}
+                    {% endif %}
                     <div class="relation-editor-backdrop relations-only" data-relation-editor-modal data-close-url="{{ relation_editor_close_url }}">
                         <article class="relation-editor-modal" id="relatie-formulier" role="dialog" aria-modal="true" aria-labelledby="relation-editor-title">
                             <div class="panel-header relation-editor-modal__header">
@@ -851,6 +855,7 @@
                             </div>
 
                             <form class="create-form relation-form" data-relation-form action="{% if selected_relation %}/api/relations/{{ selected_relation.id }}{% else %}/api/relations{% endif %}" method="post" enctype="multipart/form-data">
+                                <input type="hidden" name="return_to" value="{{ relation_return_url or '' }}">
                                 <div class="relation-photo-panel">
                                     <div class="relation-photo-preview">
                                         {% if selected_relation and selected_relation.photo_path %}
@@ -927,7 +932,7 @@
                                         <label>Fase
                                             {% set relation_payroll_phase = selected_relation.payroll_phase|default('', true) if selected_relation else '' %}
                                             <select name="payroll_phase">
-                                                <option value="" {% if not relation_payroll_phase %}selected{% endif %}>Geen fase</option>
+                                                <option value="" {% if not relation_payroll_phase %}selected{% endif %}></option>
                                                 {% for option in ['Fase A', 'Fase B', 'Fase C', 'Fase 1-2', 'Fase 3'] %}
                                                 <option value="{{ option }}" {% if relation_payroll_phase == option %}selected{% endif %}>{{ option }}</option>
                                                 {% endfor %}
@@ -936,7 +941,7 @@
                                         <label>Pensioen
                                             {% set relation_payroll_pension = selected_relation.payroll_pension|default('', true) if selected_relation else '' %}
                                             <select name="payroll_pension">
-                                                <option value="" {% if not relation_payroll_pension %}selected{% endif %}>Geen pensioen</option>
+                                                <option value="" {% if not relation_payroll_pension %}selected{% endif %}></option>
                                                 {% for option in ['BPF UTA', 'BPF Bouw', 'StiPP Basis', 'StiPP Plus', 'Geen'] %}
                                                 <option value="{{ option }}" {% if relation_payroll_pension == option %}selected{% endif %}>{{ option }}</option>
                                                 {% endfor %}
@@ -947,7 +952,7 @@
                                         <label>Inregeling
                                             {% set relation_payroll_scale = selected_relation.payroll_scale|default('', true) if selected_relation else '' %}
                                             <select name="payroll_scale">
-                                                <option value="" {% if not relation_payroll_scale %}selected{% endif %}>Geen inregeling</option>
+                                                <option value="" {% if not relation_payroll_scale %}selected{% endif %}></option>
                                                 {% for option in ['T4.2 F/G A', 'B.02.1 Aannemingsschaal 2', '4.58 Particulier halfjaar', 'Concept'] %}
                                                 <option value="{{ option }}" {% if relation_payroll_scale == option %}selected{% endif %}>{{ option }}</option>
                                                 {% endfor %}
@@ -1819,7 +1824,7 @@ Metadata:
                                     </div>
                                     <div>
                                         {% if exception.relation_id %}
-                                        <a class="ghost-button" href="/dashboard/relations?tab=candidates&edit={{ exception.relation_id }}#relatie-formulier">{{ exception.next_step }}</a>
+                                        <a class="ghost-button" href="/dashboard/relations?tab=candidates&edit={{ exception.relation_id }}&return_to={{ ('/dashboard/periods?period=' ~ selected_payroll_period.id ~ '#periode-verloning')|urlencode }}#relatie-formulier">{{ exception.next_step }}</a>
                                         {% else %}
                                         <a class="ghost-button" href="/dashboard/timesheets?q={{ exception.employee_name|urlencode }}#timesheet-inbox">{{ exception.next_step }}</a>
                                         {% endif %}
@@ -1857,7 +1862,7 @@ Metadata:
                                         <tr>
                                             <td>
                                                 {% if result.relation_id %}
-                                                <a class="payroll-relation-link" href="/dashboard/relations?tab=candidates&edit={{ result.relation_id }}#relatie-formulier">{{ result.employee_name }}</a>
+                                                <a class="payroll-relation-link" href="/dashboard/relations?tab=candidates&edit={{ result.relation_id }}&return_to={{ ('/dashboard/periods?period=' ~ selected_payroll_period.id ~ '#periode-verloning')|urlencode }}#relatie-formulier">{{ result.employee_name }}</a>
                                                 {% else %}
                                                 <strong>{{ result.employee_name }}</strong>
                                                 {% endif %}
@@ -1935,7 +1940,7 @@ Metadata:
                                                 {% set cell_value = row[column.key] %}
                                                 <td class="payroll-col-{{ column.key|replace('_', '-') }} {% if column.hidden_in_excel %}excel-hidden-column{% endif %}" data-sort-value="{{ cell_value }}">
                                                     {% if column.key == 'employee_name' and row.relation_id %}
-                                                        <a class="payroll-relation-link" href="/dashboard/relations?tab=candidates&edit={{ row.relation_id }}#relatie-formulier">{{ cell_value }}</a>
+                                                        <a class="payroll-relation-link" href="/dashboard/relations?tab=candidates&edit={{ row.relation_id }}&return_to={{ ('/dashboard/periods?period=' ~ selected_payroll_period.id ~ '#periode-verloning')|urlencode }}#relatie-formulier">{{ cell_value }}</a>
                                                     {% elif column.key == 'timesheet_link' %}
                                                         {% if row.timesheet_id %}
                                                         <a class="payroll-workbook-link" href="/dashboard/timesheets?tab=task&stage=loon&timesheet={{ row.timesheet_id }}#timesheet-tabs">{{ cell_value }}</a>

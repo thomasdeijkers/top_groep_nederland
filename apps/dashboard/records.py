@@ -2349,7 +2349,7 @@ def _payroll_arrangement_missing_fields_text(
     pension_scheme=None,
 ) -> str:
     if not arrangement_id:
-        return "Geen geldige medewerker-inrichting voor deze loonperiode."
+        return "Medewerker-inrichting mist: geldige periode-inrichting, contracturen, netto basisloon 40 uur, bruto uurloon, fase, pensioenregeling."
     missing = []
     if contract_hours is None:
         missing.append("contracturen")

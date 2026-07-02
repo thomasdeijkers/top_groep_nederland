@@ -110,6 +110,15 @@ def _relations_url(tab: str = "candidates", edit: int | None = None, q: str = ""
     return f"/dashboard/relations?{urlencode(params)}{anchor}"
 
 
+def _safe_dashboard_return_url(value: str = "") -> str:
+    value = str(value or "").strip()
+    if not value:
+        return ""
+    if value.startswith("/dashboard/") or value == "/dashboard":
+        return value
+    return ""
+
+
 def _audit(
     action: str,
     entity_type: str,
@@ -354,8 +363,10 @@ def _dashboard_context(
     cao_id: int | None = None,
     parameter_version_id: int | None = None,
     show_cao_form: bool = False,
+    return_to: str = "",
 ):
     data_page = "timesheets" if active_page in {"timesheets", "whatsapp"} else "relations" if active_page in {"relations", "candidates", "principals"} else active_page
+    relation_return_url = _safe_dashboard_return_url(return_to)
     if active_page == "server":
         stats = get_empty_dashboard_stats()
         server_overview = get_server_overview()
@@ -611,6 +622,7 @@ def _dashboard_context(
         "selected_relation": selected_relation,
         "selected_relation_payroll": selected_relation_payroll,
         "selected_relation_audit_events": selected_relation_audit_events,
+        "relation_return_url": relation_return_url,
         "selected_vacancy": selected_vacancy,
         "query": query,
         "overview_data": overview_data,
@@ -698,9 +710,10 @@ def _render_dashboard(
     cao_id: int | None = None,
     parameter_version_id: int | None = None,
     show_cao_form: bool = False,
+    return_to: str = "",
 ):
     try:
-        context = _dashboard_context(active_page, edit_id, query, timesheet_id, workflow_stage, timesheet_tab, relation_tab, status_filter, show_relation_form, project_id, period_id, cao_id, parameter_version_id, show_cao_form)
+        context = _dashboard_context(active_page, edit_id, query, timesheet_id, workflow_stage, timesheet_tab, relation_tab, status_filter, show_relation_form, project_id, period_id, cao_id, parameter_version_id, show_cao_form, return_to)
     except Exception as exc:
         print(f"DASHBOARD_CONTEXT_ERROR {active_page}: {type(exc).__name__}: {exc}")
         return HTMLResponse(
@@ -753,8 +766,8 @@ def principals_page(request: Request, edit: int | None = None, q: str = "", stat
 
 
 @router.get("/dashboard/relations", response_class=HTMLResponse)
-def relations_page(request: Request, edit: int | None = None, q: str = "", tab: str = "candidates", status: str = "", new: bool = Query(False)):
-    return _render_dashboard(request, "relations", edit, q, relation_tab=tab, status_filter=status, show_relation_form=new)
+def relations_page(request: Request, edit: int | None = None, q: str = "", tab: str = "candidates", status: str = "", new: bool = Query(False), return_to: str = ""):
+    return _render_dashboard(request, "relations", edit, q, relation_tab=tab, status_filter=status, show_relation_form=new, return_to=return_to)
 
 
 @router.get("/dashboard/relations/photo/{relation_id}")
@@ -1482,6 +1495,7 @@ async def save_relation(
     kvk_number: str = Form(""),
     vat_number: str = Form(""),
     notes: str = Form(""),
+    return_to: str = Form(""),
     photo: UploadFile | None = File(None),
 ):
     photo_data = await _relation_photo_from_upload(photo)
@@ -1489,7 +1503,8 @@ async def save_relation(
     tab = "principals" if relation_type == "principal" else "candidates"
     label = name if relation_type == "principal" else " ".join(part for part in (first_name, last_name) if part).strip()
     _audit("Relatie aangemaakt", relation_type, record_id, label or "Relatie", "Nieuwe relatie aangemaakt in het dashboard.", "Relaties")
-    return RedirectResponse(_relations_url(tab, edit=record_id, anchor="#relatie-formulier"), status_code=303)
+    redirect_url = _safe_dashboard_return_url(return_to) or _relations_url(tab, edit=record_id, anchor="#relatie-formulier")
+    return RedirectResponse(redirect_url, status_code=303)
 
 
 @router.post("/api/relations/{relation_id}")
@@ -1526,6 +1541,7 @@ async def edit_relation(
     kvk_number: str = Form(""),
     vat_number: str = Form(""),
     notes: str = Form(""),
+    return_to: str = Form(""),
     photo: UploadFile | None = File(None),
 ):
     photo_data = await _relation_photo_from_upload(photo)
@@ -1533,7 +1549,8 @@ async def edit_relation(
     tab = "principals" if relation_type == "principal" else "candidates"
     label = name if relation_type == "principal" else " ".join(part for part in (first_name, last_name) if part).strip()
     _audit("Relatie bijgewerkt", relation_type, relation_id, label or f"Relatie {relation_id}", _audit_relation_fields(locals()), "Relaties")
-    return RedirectResponse(_relations_url(tab, edit=relation_id, anchor="#relatie-formulier"), status_code=303)
+    redirect_url = _safe_dashboard_return_url(return_to) or _relations_url(tab, edit=relation_id, anchor="#relatie-formulier")
+    return RedirectResponse(redirect_url, status_code=303)
 
 
 @router.post("/api/relations/{relation_id}/delete")

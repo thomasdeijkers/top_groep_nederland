@@ -196,6 +196,21 @@ a {
     color: #f7fff9;
 }
 
+.dashboard-logout--nav {
+    margin: 12px 0 0;
+}
+
+.dashboard-logout--nav button.side-nav__item {
+    width: 100%;
+    color: #eef5f4;
+    font: inherit;
+    cursor: pointer;
+}
+
+.dashboard-logout--nav button.side-nav__item .side-nav__label {
+    text-align: left;
+}
+
 .sidebar-footer {
     display: grid;
     gap: 8px;
