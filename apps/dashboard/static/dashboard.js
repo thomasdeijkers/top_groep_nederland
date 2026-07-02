@@ -481,6 +481,18 @@
                     target.classList.add("payroll-cell-input--dirty");
                 }
             };
+            const setSourceMeta = (target, updatedAt = "") => {
+                const meta = target?.parentElement?.querySelector("[data-cell-meta]");
+                if (!meta) {
+                    return;
+                }
+                const sourceValue = target.dataset.sourceValue || "leeg";
+                const isOverride = (target.value || "") !== (target.dataset.sourceValue || "");
+                meta.textContent = isOverride
+                    ? `Override actief (origineel urenbriefje: ${sourceValue || "leeg"})${updatedAt ? ` · ${updatedAt}` : ""}`
+                    : `Origineel urenbriefje: ${sourceValue || "leeg"}`;
+                target.classList.toggle("payroll-cell-input--overridden", isOverride);
+            };
             const recalculateWorkbookRow = () => {
                 if (!row) {
                     return;
@@ -544,6 +556,7 @@
             const save = async () => {
                 const value = input.value;
                 const originalValue = input.dataset.originalValue || "";
+                const sourceValue = input.dataset.sourceValue ?? originalValue;
                 if (value === originalValue && !input.dataset.dirtyOnce) {
                     return;
                 }
@@ -560,7 +573,7 @@
                             relation_id: input.dataset.relationId,
                             column_key: input.dataset.columnKey,
                             column_label: input.dataset.columnLabel,
-                            original_value: originalValue,
+                            original_value: sourceValue,
                             previous_value: input.dataset.previousValue || originalValue,
                             value,
                         }),
@@ -573,10 +586,7 @@
                     input.dataset.originalValue = result.value || value;
                     input.classList.remove("payroll-cell-input--error");
                     recalculateWorkbookRow();
-                    const meta = input.parentElement?.querySelector("[data-cell-meta]");
-                    if (meta) {
-                        meta.textContent = `Vorig: ${result.previous_value || "-"} · Mutatie: ${result.updated_at || "-"}`;
-                    }
+                    setSourceMeta(input, result.updated_at || "");
                     recalculatePaymentSummary();
                 } catch (error) {
                     input.classList.add("payroll-cell-input--error");
@@ -587,6 +597,7 @@
             input.addEventListener("input", () => {
                 input.classList.add("payroll-cell-input--dirty");
                 recalculateWorkbookRow();
+                setSourceMeta(input);
                 recalculatePaymentSummary();
                 window.clearTimeout(saveTimer);
                 saveTimer = window.setTimeout(save, 650);
@@ -594,6 +605,7 @@
             input.addEventListener("change", () => {
                 input.classList.add("payroll-cell-input--dirty");
                 recalculateWorkbookRow();
+                setSourceMeta(input);
                 recalculatePaymentSummary();
                 window.clearTimeout(saveTimer);
                 save();

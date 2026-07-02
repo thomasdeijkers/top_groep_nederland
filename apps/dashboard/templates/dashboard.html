@@ -1612,9 +1612,15 @@ Metadata:
                                         <td><span class="status-tag">{{ period.status }}</span></td>
                                         <td>
                                             <div class="period-actions">
-                                                <a class="table-link" href="/dashboard/periods?period={{ period.id }}#periode-verloning">Open verloning</a>
+                                                <a class="period-action-tile period-action-tile--primary" href="/dashboard/periods?period={{ period.id }}#periode-verloning">
+                                                    <strong>Open verloning</strong>
+                                                    <small>{{ period.total_hours }} uur &middot; {{ period.booking_count }} regels</small>
+                                                </a>
                                                 <form action="/api/periods/{{ period.id }}/archive" method="post">
-                                                    <button class="table-link table-link--button" type="submit">Archiveer</button>
+                                                    <button class="period-action-tile" type="submit">
+                                                        <strong>Archiveer</strong>
+                                                        <small>Periode bewaren</small>
+                                                    </button>
                                                 </form>
                                             </div>
                                         </td>
@@ -1678,9 +1684,15 @@ Metadata:
                                         <td><span class="status-tag">{{ period.status }}</span></td>
                                         <td>
                                             <div class="period-actions">
-                                                <a class="table-link" href="/dashboard/periods?period={{ period.id }}#periode-verloning">Open verloning</a>
+                                                <a class="period-action-tile period-action-tile--primary" href="/dashboard/periods?period={{ period.id }}#periode-verloning">
+                                                    <strong>Open verloning</strong>
+                                                    <small>{{ period.total_hours }} uur &middot; {{ period.booking_count }} regels</small>
+                                                </a>
                                                 <form action="/api/periods/{{ period.id }}/restore" method="post">
-                                                    <button class="table-link table-link--button" type="submit">Terugzetten</button>
+                                                    <button class="period-action-tile" type="submit">
+                                                        <strong>Terugzetten</strong>
+                                                        <small>Weer actief maken</small>
+                                                    </button>
                                                 </form>
                                             </div>
                                         </td>
@@ -1938,6 +1950,7 @@ Metadata:
                                                 {% for column in tab.columns if not column.hidden_in_excel %}
                                                 {% set cell_mutation = row._mutations[column.key] if row._mutations is defined and column.key in row._mutations else none %}
                                                 {% set cell_value = row[column.key] %}
+                                                {% set cell_source_value = cell_mutation.original_value if cell_mutation and cell_mutation.original_value is defined else cell_value %}
                                                 <td class="payroll-col-{{ column.key|replace('_', '-') }} {% if column.hidden_in_excel %}excel-hidden-column{% endif %}" data-sort-value="{{ cell_value }}">
                                                     {% if column.key == 'employee_name' and row.relation_id %}
                                                         <a class="payroll-relation-link" href="/dashboard/relations?tab=candidates&edit={{ row.relation_id }}&return_to={{ ('/dashboard/periods?period=' ~ selected_payroll_period.id ~ '#periode-verloning')|urlencode }}#relatie-formulier">{{ cell_value }}</a>
@@ -1975,15 +1988,22 @@ Metadata:
                                                     {% elif column.key == 'hourly_wage_source' %}
                                                         <span class="payroll-muted">{{ cell_value or '-' }}</span>
                                                     {% elif column.options is defined %}
-                                                        <select class="payroll-cell-input" data-payroll-cell data-save-url="/api/periods/{{ selected_payroll_period.id }}/workbook-cell" data-tab-label="{{ tab.label }}" data-row-key="{{ row._row_key }}" data-employee-name="{{ row.employee_name }}" data-relation-id="{{ row.relation_id or '' }}" data-column-key="{{ column.key }}" data-column-label="{{ column.label }}" data-original-value="{{ cell_value }}" data-previous-value="{{ cell_mutation.previous_value if cell_mutation else cell_value }}" aria-label="{{ column.label }} {{ row.employee_name }}" {% if selected_payroll_period.is_locked_for_payment %}disabled{% endif %}>
+                                                        <select class="payroll-cell-input {% if cell_mutation %}payroll-cell-input--overridden{% endif %}" data-payroll-cell data-save-url="/api/periods/{{ selected_payroll_period.id }}/workbook-cell" data-tab-label="{{ tab.label }}" data-row-key="{{ row._row_key }}" data-employee-name="{{ row.employee_name }}" data-relation-id="{{ row.relation_id or '' }}" data-column-key="{{ column.key }}" data-column-label="{{ column.label }}" data-original-value="{{ cell_value }}" data-source-value="{{ cell_source_value }}" data-previous-value="{{ cell_mutation.previous_value if cell_mutation else cell_value }}" aria-label="{{ column.label }} {{ row.employee_name }}" {% if selected_payroll_period.is_locked_for_payment %}disabled{% endif %}>
                                                             {% for option in column.options %}
                                                             <option value="{{ option }}" {% if option == cell_value %}selected{% endif %}>{{ option }}</option>
                                                             {% endfor %}
                                                         </select>
                                                     {% else %}
-                                                        <input class="payroll-cell-input" value="{{ cell_value }}" data-payroll-cell data-save-url="/api/periods/{{ selected_payroll_period.id }}/workbook-cell" data-tab-label="{{ tab.label }}" data-row-key="{{ row._row_key }}" data-employee-name="{{ row.employee_name }}" data-relation-id="{{ row.relation_id or '' }}" data-column-key="{{ column.key }}" data-column-label="{{ column.label }}" data-original-value="{{ cell_value }}" data-previous-value="{{ cell_mutation.previous_value if cell_mutation else cell_value }}" aria-label="{{ column.label }} {{ row.employee_name }}" {% if selected_payroll_period.is_locked_for_payment %}disabled{% endif %}>
+                                                        <input class="payroll-cell-input {% if cell_mutation %}payroll-cell-input--overridden{% endif %}" value="{{ cell_value }}" data-payroll-cell data-save-url="/api/periods/{{ selected_payroll_period.id }}/workbook-cell" data-tab-label="{{ tab.label }}" data-row-key="{{ row._row_key }}" data-employee-name="{{ row.employee_name }}" data-relation-id="{{ row.relation_id or '' }}" data-column-key="{{ column.key }}" data-column-label="{{ column.label }}" data-original-value="{{ cell_value }}" data-source-value="{{ cell_source_value }}" data-previous-value="{{ cell_mutation.previous_value if cell_mutation else cell_value }}" aria-label="{{ column.label }} {{ row.employee_name }}" {% if selected_payroll_period.is_locked_for_payment %}disabled{% endif %}>
                                                     {% endif %}
                                                     <small class="payroll-cell-meta" data-cell-meta>
+                                                        {% if cell_mutation %}
+                                                            Override actief (origineel urenbriefje: {{ cell_source_value or 'leeg' }})
+                                                        {% else %}
+                                                            Origineel urenbriefje: {{ cell_source_value or 'leeg' }}
+                                                        {% endif %}
+                                                    </small>
+                                                    <small class="payroll-cell-meta payroll-cell-meta--legacy" hidden>
                                                         {% if cell_mutation %}
                                                             Vorig: {{ cell_mutation.previous_value or '-' }} · Mutatie: {{ cell_mutation.updated_at }}
                                                         {% else %}

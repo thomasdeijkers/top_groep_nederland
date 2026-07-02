@@ -645,17 +645,6 @@ h2 {
     background: rgba(127, 209, 160, 0.08);
 }
 
-.period-actions {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px 12px;
-}
-
-.period-actions form {
-    margin: 0;
-}
-
 .table-link--button {
     padding: 0;
     border: 0;
@@ -899,6 +888,54 @@ h2 {
 
 .period-week-open small {
     color: #afbfca;
+    font-size: 0.72rem;
+    font-weight: 800;
+}
+
+.period-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(132px, 1fr));
+    gap: 8px;
+}
+
+.period-actions form {
+    margin: 0;
+}
+
+.period-action-tile {
+    display: grid;
+    width: 100%;
+    min-height: 52px;
+    align-content: center;
+    gap: 2px;
+    padding: 7px 10px;
+    border: 1px solid rgba(110, 231, 183, 0.24);
+    border-radius: 7px;
+    background: rgba(9, 24, 30, 0.76);
+    color: #dff8ea;
+    font: inherit;
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.period-action-tile--primary {
+    border-color: rgba(127, 209, 160, 0.56);
+    background: rgba(127, 209, 160, 0.16);
+}
+
+.period-action-tile:hover {
+    border-color: rgba(157, 240, 190, 0.78);
+    background: rgba(127, 209, 160, 0.24);
+}
+
+.period-action-tile strong {
+    color: #ffffff;
+    font-size: 0.85rem;
+}
+
+.period-action-tile small {
+    color: #d7f8e4;
     font-size: 0.72rem;
     font-weight: 800;
 }
@@ -1231,6 +1268,11 @@ h2 {
 
 .payroll-cell-input--error {
     border-color: rgba(248, 113, 113, 0.95);
+}
+
+.payroll-cell-input--overridden {
+    border-color: rgba(251, 191, 36, 0.72);
+    background: rgba(74, 59, 30, 0.62);
 }
 
 .payroll-cell-meta {
