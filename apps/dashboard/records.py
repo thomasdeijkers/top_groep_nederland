@@ -1592,9 +1592,98 @@ def list_payroll_periods(limit: int = 25, archived: bool = False) -> list[dict]:
                 ]
                 _apply_period_display_numbers(periods)
                 _attach_period_weeks(cursor, periods)
+                _attach_period_list_notes(cursor, periods)
                 return periods
     except Exception:
         return []
+
+
+def _attach_period_list_notes(cursor, periods: list[dict]) -> None:
+    for period in periods:
+        period_id = period.get("id")
+        period["status_label"] = _payroll_period_status_label(period.get("status"))
+        period["status_tone"] = _payroll_period_status_tone(period.get("status"))
+        period["completion_note"] = "Geen periodegegevens beschikbaar."
+        period["completion_tone"] = "neutral"
+        try:
+            cursor.execute(
+                """
+                WITH active_inputs AS (
+                    SELECT i.id,
+                           i.relation_id,
+                           i.arrangement_id,
+                           i.employee_name,
+                           i.payroll_status,
+                           a.contract_hours_4w,
+                           a.net_base_40h,
+                           a.gross_hourly_wage,
+                           a.phase,
+                           a.pension_scheme
+                    FROM payroll_week_inputs i
+                    JOIN payroll_periods p ON p.id = i.payroll_period_id
+                    LEFT JOIN whatsapp_timesheet_inbox wi ON wi.id = i.timesheet_inbox_id
+                    LEFT JOIN payroll_employee_arrangements a ON a.id = i.arrangement_id
+                    WHERE i.payroll_period_id = %s
+                      AND """ + _active_period_payroll_status_condition("i", "p") + """
+                      AND """ + _active_timesheet_condition("i", "wi") + """
+                )
+                SELECT COUNT(*),
+                       COUNT(*) FILTER (
+                           WHERE relation_id IS NULL
+                              OR arrangement_id IS NULL
+                              OR contract_hours_4w IS NULL
+                              OR net_base_40h IS NULL
+                              OR gross_hourly_wage IS NULL
+                              OR COALESCE(phase, '') = ''
+                              OR COALESCE(pension_scheme, '') = ''
+                       ),
+                       COUNT(*) FILTER (WHERE COALESCE(payroll_status, '') = 'uit_te_betalen'),
+                       COUNT(*) FILTER (WHERE COALESCE(payroll_status, '') = 'uitbetaald')
+                FROM active_inputs;
+                """,
+                (period_id, *_active_period_payroll_status_params()),
+            )
+            input_count, blocker_count, payable_count, paid_count = cursor.fetchone() or (0, 0, 0, 0)
+        except Exception:
+            cursor.connection.rollback()
+            continue
+
+        if str(period.get("status") or "").strip().lower() == "archief":
+            period["completion_note"] = f"Afgerond: {paid_count} declaratie(s) uitbetaald en periode gearchiveerd."
+            period["completion_tone"] = "success"
+        elif not input_count:
+            period["completion_note"] = "Geen urenregels in deze periode."
+            period["completion_tone"] = "neutral"
+        elif blocker_count:
+            period["completion_note"] = f"{blocker_count} blokkade(s): vul medewerkerinrichting, koppeling of netto basisloon aan."
+            period["completion_tone"] = "danger"
+        elif payable_count:
+            period["completion_note"] = f"{payable_count} declaratie(s) klaar om uit te betalen."
+            period["completion_tone"] = "warning"
+        elif paid_count and paid_count == input_count:
+            period["completion_note"] = "Alle declaraties zijn uitbetaald; archiveer de periode in de geopende loonperiode."
+            period["completion_tone"] = "success"
+        else:
+            period["completion_note"] = f"{input_count - paid_count} declaratie(s) nog controleren of doorzetten."
+            period["completion_tone"] = "warning"
+
+
+def _payroll_period_status_label(status: str | None) -> str:
+    normalized = str(status or "").strip().lower()
+    if normalized == "archief":
+        return "Archief"
+    if normalized in {"gesloten", "afgesloten"}:
+        return "Gesloten"
+    return "Open"
+
+
+def _payroll_period_status_tone(status: str | None) -> str:
+    normalized = str(status or "").strip().lower()
+    if normalized == "archief":
+        return "success"
+    if normalized in {"gesloten", "afgesloten"}:
+        return "warning"
+    return "neutral"
 
 
 def get_payroll_data_diagnostics() -> list[dict]:

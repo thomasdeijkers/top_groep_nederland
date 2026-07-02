@@ -940,6 +940,58 @@ h2 {
     font-weight: 800;
 }
 
+.period-status-tile,
+.period-remark-tile {
+    display: grid;
+    width: 100%;
+    min-height: 52px;
+    align-content: center;
+    gap: 2px;
+    padding: 7px 10px;
+    border: 1px solid rgba(110, 231, 183, 0.24);
+    border-radius: 7px;
+    background: rgba(11, 27, 34, 0.72);
+    color: #f6fbff;
+    font-weight: 900;
+}
+
+.period-status-tile {
+    max-width: 160px;
+    text-transform: uppercase;
+    letter-spacing: 0;
+}
+
+.period-status-tile--success,
+.period-remark-tile--success {
+    border-color: rgba(127, 209, 160, 0.56);
+    background: rgba(127, 209, 160, 0.16);
+    color: #d7f8e4;
+}
+
+.period-status-tile--warning,
+.period-remark-tile--warning {
+    border-color: rgba(245, 185, 95, 0.5);
+    background: rgba(245, 185, 95, 0.13);
+    color: #ffe6b0;
+}
+
+.period-remark-tile--danger {
+    border-color: rgba(248, 113, 113, 0.48);
+    background: rgba(127, 29, 29, 0.18);
+    color: #ffd0d0;
+}
+
+.period-remark-tile strong {
+    color: inherit;
+    font-size: 0.82rem;
+}
+
+.period-remark-tile small {
+    color: #afbfca;
+    font-size: 0.72rem;
+    font-weight: 800;
+}
+
 .period-weeks-row td {
     padding-top: 0;
     background: rgba(255, 255, 255, 0.025);
