@@ -1050,43 +1050,41 @@ h2 {
     top: 0;
     z-index: 6;
     display: flex;
-    align-items: flex-end;
-    gap: 4px;
-    padding: 10px 10px 0;
+    align-items: stretch;
+    gap: 6px;
+    padding: 10px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.13);
     background: rgba(4, 12, 17, 0.72);
     overflow-x: auto;
 }
 
 .payroll-workbook-tab {
-    display: grid;
+    display: inline-grid;
+    align-content: center;
     gap: 2px;
-    min-width: 82px;
-    min-height: 48px;
-    padding: 8px 12px 7px;
-    border: 1px solid rgba(127, 209, 160, 0.22);
-    border-bottom: 0;
-    border-radius: 7px 7px 0 0;
-    background: #22333f;
+    min-width: 132px;
+    min-height: 52px;
+    padding: 7px 9px;
+    border: 1px solid rgba(110, 231, 183, 0.24);
+    border-radius: 7px;
+    background: rgba(11, 27, 34, 0.72);
     color: #f5fbff;
     cursor: pointer;
     font-size: 0.82rem;
     font-weight: 800;
+    text-align: left;
     white-space: nowrap;
 }
 
 .payroll-workbook-tab small {
-    color: #b8c8d2;
-    font-size: 0.68rem;
+    color: #afbfca;
+    font-size: 0.72rem;
     font-weight: 800;
 }
 
-.payroll-workbook-tab small:first-of-type:nth-last-of-type(2) {
-    display: none;
-}
-
 .payroll-workbook-tab--active {
-    background: #29443d;
+    border-color: rgba(127, 209, 160, 0.56);
+    background: rgba(127, 209, 160, 0.16);
     color: #d9ffe8;
     box-shadow: inset 0 -3px 0 #0a8f66;
 }

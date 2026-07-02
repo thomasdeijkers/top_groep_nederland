@@ -213,6 +213,7 @@ def _audit_relation_fields(data: dict) -> str:
         "payroll_scale": "inregeling",
         "payroll_function": "functie",
         "payroll_hourly_wage": "bruto uurloon",
+        "payroll_net_base_40h": "netto basis 40 uur",
         "notes": "notitie",
     }
     changed = [label for key, label in labels.items() if str(data.get(key) or "").strip()]
@@ -1492,6 +1493,7 @@ async def save_relation(
     payroll_scale: str = Form(""),
     payroll_function: str = Form(""),
     payroll_hourly_wage: str = Form(""),
+    payroll_net_base_40h: str = Form(""),
     kvk_number: str = Form(""),
     vat_number: str = Form(""),
     notes: str = Form(""),
@@ -1538,6 +1540,7 @@ async def edit_relation(
     payroll_scale: str = Form(""),
     payroll_function: str = Form(""),
     payroll_hourly_wage: str = Form(""),
+    payroll_net_base_40h: str = Form(""),
     kvk_number: str = Form(""),
     vat_number: str = Form(""),
     notes: str = Form(""),

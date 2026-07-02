@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from uuid import uuid4
 
@@ -89,6 +90,7 @@ def create_relation(data: dict, photo: dict | None = None) -> int:
             )
             record_id = cursor.fetchone()[0]
         conn.commit()
+    _sync_relation_payroll_arrangement(record_id, payload)
     return record_id
 
 
@@ -156,6 +158,7 @@ def update_relation(relation_id: int, data: dict, photo: dict | None = None) -> 
                 payload,
             )
         conn.commit()
+    _sync_relation_payroll_arrangement(relation_id, payload)
 
 
 def delete_relation(relation_id: int) -> None:
@@ -530,6 +533,7 @@ def _relation_payload(data: dict, relation_type: str) -> dict:
         "payroll_scale": data.get("payroll_scale"),
         "payroll_function": data.get("payroll_function"),
         "payroll_hourly_wage": data.get("payroll_hourly_wage"),
+        "payroll_net_base_40h": data.get("payroll_net_base_40h"),
         "has_payroll_settings": any(
             (data.get(key) or "").strip()
             for key in (
@@ -542,6 +546,7 @@ def _relation_payload(data: dict, relation_type: str) -> dict:
                 "payroll_scale",
                 "payroll_function",
                 "payroll_hourly_wage",
+                "payroll_net_base_40h",
             )
         ),
         "kvk_number": data.get("kvk_number"),
@@ -558,6 +563,112 @@ def _compose_address(data: dict) -> str:
     house_number = data.get("house_number") or ""
     addition = data.get("house_number_addition") or ""
     return " ".join(part for part in (street, house_number, addition) if part).strip()
+
+
+def _sync_relation_payroll_arrangement(relation_id: int, payload: dict) -> None:
+    if payload.get("relation_type") != "candidate":
+        return
+    ensure_dashboard_tables()
+    has_settings = bool(payload.get("has_payroll_settings"))
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT id
+                FROM payroll_employee_arrangements
+                WHERE relation_id = %s
+                  AND COALESCE(status, 'concept') <> 'archief'
+                ORDER BY valid_from_year DESC, valid_from_period_number DESC, id DESC
+                LIMIT 1;
+                """,
+                (relation_id,),
+            )
+            existing = cursor.fetchone()
+            if not existing and not has_settings:
+                return
+            values = (
+                payload.get("payroll_phase") or None,
+                payload.get("payroll_pension") or None,
+                _decimal_or_none(payload.get("payroll_cao_hours")),
+                payload.get("payroll_days_right") or None,
+                payload.get("payroll_scale") or None,
+                payload.get("payroll_function") or None,
+                _decimal_or_none(payload.get("payroll_hourly_wage")),
+                _decimal_or_none(payload.get("payroll_net_base_40h")),
+                payload.get("payroll_license_plate") or None,
+            )
+            if existing:
+                cursor.execute(
+                    """
+                    UPDATE payroll_employee_arrangements
+                    SET phase = %s,
+                        pension_scheme = %s,
+                        contract_hours_4w = %s,
+                        days_right_code = %s,
+                        scale_code = %s,
+                        function_name = %s,
+                        gross_hourly_wage = %s,
+                        net_base_40h = %s,
+                        license_plate = %s,
+                        source = 'relation_card',
+                        updated_at = NOW()
+                    WHERE id = %s;
+                    """,
+                    (*values, existing[0]),
+                )
+            else:
+                cursor.execute(
+                    """
+                    INSERT INTO payroll_employee_arrangements (
+                        relation_id, valid_from_year, valid_from_period_number,
+                        cao_branch, phase, pension_scheme, contract_hours_4w,
+                        days_right_code, scale_code, function_name, gross_hourly_wage,
+                        net_base_40h, license_plate, status, source, notes,
+                        created_at, updated_at
+                    )
+                    VALUES (
+                        %s, 2026, 1, 'bouwplaats', %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, 'concept', 'relation_card',
+                        'Concept-inrichting vastgelegd vanaf medewerkerkaart.',
+                        NOW(), NOW()
+                    )
+                    ON CONFLICT (relation_id, valid_from_year, valid_from_period_number)
+                    DO UPDATE SET
+                        phase = EXCLUDED.phase,
+                        pension_scheme = EXCLUDED.pension_scheme,
+                        contract_hours_4w = EXCLUDED.contract_hours_4w,
+                        days_right_code = EXCLUDED.days_right_code,
+                        scale_code = EXCLUDED.scale_code,
+                        function_name = EXCLUDED.function_name,
+                        gross_hourly_wage = EXCLUDED.gross_hourly_wage,
+                        net_base_40h = EXCLUDED.net_base_40h,
+                        license_plate = EXCLUDED.license_plate,
+                        source = 'relation_card',
+                        updated_at = NOW();
+                    """,
+                    (relation_id, *values),
+                )
+        conn.commit()
+    try:
+        from apps.dashboard.records import recalculate_open_payroll_for_relation
+
+        recalculate_open_payroll_for_relation(relation_id)
+    except Exception as exc:
+        print(f"PAYROLL_RELATION_RECALC_WARNING {type(exc).__name__}: {exc}")
+
+
+def _decimal_or_none(value):
+    text = str(value or "").strip()
+    if not text:
+        return None
+    cleaned = text.replace("€", "").replace(" ", "").replace("\u00a0", "")
+    if "," in cleaned and "." in cleaned:
+        cleaned = cleaned.replace(".", "")
+    cleaned = cleaned.replace(",", ".")
+    try:
+        return Decimal(cleaned)
+    except (InvalidOperation, ValueError):
+        return None
 
 
 def _relation_status(data: dict) -> str:

@@ -960,6 +960,9 @@
                                         </label>
                                         <label>Functie <input type="text" name="payroll_function" value="{{ selected_relation.payroll_function|default('', true) if selected_relation else '' }}" placeholder="Medewerker bouw"></label>
                                         <label>Bruto uurloon <input type="text" name="payroll_hourly_wage" value="{{ selected_relation.payroll_hourly_wage|default('', true) if selected_relation else '' }}" placeholder="€ 18,50"></label>
+                                        {% set relation_payroll_arrangement = selected_relation_payroll.current_arrangement if selected_relation_payroll else none %}
+                                        {% set relation_net_base_40h = relation_payroll_arrangement.raw_net_base_40h|default('', true) if relation_payroll_arrangement else '' %}
+                                        <label>Netto basis 40 uur <input type="text" name="payroll_net_base_40h" value="{{ relation_net_base_40h }}" placeholder="€ 550,00"></label>
                                     </div>
                                 </section>
                                 <label data-principal-field>KvK <input type="text" name="kvk_number" value="{{ selected_relation.kvk_number|default('', true) if selected_relation else '' }}"></label>
@@ -1916,7 +1919,6 @@ Metadata:
                                 <button class="payroll-workbook-tab {% if loop.first %}payroll-workbook-tab--active{% endif %}" type="button" role="tab" data-payroll-tab="{{ tab.label }}" aria-selected="{{ 'true' if loop.first else 'false' }}">
                                     <strong>{{ tab.label }}</strong>
                                     {% if tab.kind == 'week' and tab.summary %}
-                                    <small>{{ tab.summary.total_hours }} uur · {{ tab.summary.booking_count }} regels</small>
                                     <small class="payroll-week-tab-summary">{{ tab.summary.total_hours }} uur - {{ tab.summary.booking_count }} regels</small>
                                     {% elif tab.kind in ['payment', 'paid'] %}
                                     <small>{{ tab.rows|length }} declaraties</small>
