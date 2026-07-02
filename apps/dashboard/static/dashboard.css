@@ -1839,8 +1839,8 @@ h2 {
 }
 
 .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    display: flex;
+    flex-wrap: wrap;
     align-items: stretch;
     gap: 14px;
     margin-bottom: 18px;
@@ -1858,6 +1858,7 @@ h2 {
 .stat-card {
     display: grid;
     grid-template-columns: 34px minmax(0, 1fr) minmax(62px, auto);
+    flex: 1 1 240px;
     align-items: center;
     min-height: 74px;
     padding: 12px;
@@ -7439,6 +7440,19 @@ body[data-theme="light"] .theme-toggle strong {
 }
 
 /* Tile rows should always use the full available width. Keep this after media rules. */
+.stats-grid {
+    display: flex;
+    width: 100%;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 14px;
+}
+
+.stats-grid .stat-card {
+    flex: 1 1 min(100%, 240px);
+    min-width: min(100%, 220px);
+}
+
 .timesheet-status-grid {
     width: 100%;
     grid-auto-flow: row;
