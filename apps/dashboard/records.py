@@ -303,13 +303,30 @@ def get_payroll_flow_summary(period_id: int | None = None) -> dict:
                 params = [period_id] if period_id else []
                 cursor.execute(
                     f"""
-                    WITH active_rows AS (
+                    WITH day_context AS (
+                        SELECT payroll_week_input_id,
+                               COALESCE(SUM(hours), 0) AS day_hours
+                        FROM payroll_week_input_days
+                        GROUP BY payroll_week_input_id
+                    ),
+                    active_rows AS (
                         SELECT i.id,
                                COALESCE(NULLIF(i.payroll_status, ''), 'loon_berekenen') AS payroll_status,
-                               COALESCE(r.net_week_total, 0) AS net_week_total
+                               COALESCE(
+                                   NULLIF(r.net_week_total, 0),
+                                   ROUND(
+                                       COALESCE(a.net_base_40h, 0)
+                                       * COALESCE(NULLIF(i.worked_hours, 0), NULLIF(dc.day_hours, 0), 0)
+                                       / 40,
+                                       2
+                                   ),
+                                   0
+                               ) AS net_week_total
                         FROM payroll_week_inputs i
                         JOIN payroll_periods p ON p.id = i.payroll_period_id
                         LEFT JOIN payroll_week_results r ON r.payroll_week_input_id = i.id
+                        LEFT JOIN payroll_employee_arrangements a ON a.id = i.arrangement_id
+                        LEFT JOIN day_context dc ON dc.payroll_week_input_id = i.id
                         LEFT JOIN whatsapp_timesheet_inbox wi ON wi.id = i.timesheet_inbox_id
                         WHERE {_active_period_payroll_status_condition("i", "p")}
                           AND {_active_timesheet_condition("i", "wi")}
@@ -2917,6 +2934,7 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                             "week_hours_raw": [Decimal("0"), Decimal("0"), Decimal("0"), Decimal("0")],
                             "week_days_raw": [Decimal("0"), Decimal("0"), Decimal("0"), Decimal("0")],
                             "week_km_raw": [Decimal("0"), Decimal("0"), Decimal("0"), Decimal("0")],
+                            "week_net_amount_raw": [Decimal("0"), Decimal("0"), Decimal("0"), Decimal("0")],
                             "week_timesheet_ids": [[], [], [], []],
                             "week_statuses": [set(), set(), set(), set()],
                             "week_blockers": [set(), set(), set(), set()],
@@ -2931,6 +2949,7 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                             "payroll_scale": row[19] or "",
                             "payroll_function": row[20] or "",
                             "payroll_hourly_wage": row[21] or "",
+                            "net_base_40h_raw": _decimal_or_none(row[30]) or Decimal("0"),
                         },
                     )
                     parsed_fields = row[22] or {}
@@ -2938,6 +2957,9 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                     parsed_hours = _parsed_total_hours(parsed_fields)
                     if not hours and parsed_hours is not None:
                         hours = parsed_hours
+                    row_net_base_40h = _decimal_or_none(row[30])
+                    if row_net_base_40h is not None and not item["net_base_40h_raw"]:
+                        item["net_base_40h_raw"] = row_net_base_40h
                     worked_days = Decimal(str(row[24] or 0))
                     if not worked_days:
                         worked_days = _parsed_worked_days(parsed_fields, row[10])
@@ -2965,6 +2987,7 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                         item["week_hours_raw"][week_index_from_input - 1] += hours
                         item["week_days_raw"][week_index_from_input - 1] += worked_days
                         item["week_km_raw"][week_index_from_input - 1] += total_km
+                        item["week_net_amount_raw"][week_index_from_input - 1] += (item["net_base_40h_raw"] * hours / Decimal("40")) if item["net_base_40h_raw"] and hours else Decimal("0")
                         if row[0]:
                             item["week_timesheet_ids"][week_index_from_input - 1].append(row[0])
                         item["week_statuses"][week_index_from_input - 1].add(row[12] or "concept")
@@ -2976,6 +2999,7 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                                 item["week_hours_raw"][week_index - 1] += hours
                                 item["week_days_raw"][week_index - 1] += worked_days
                                 item["week_km_raw"][week_index - 1] += total_km
+                                item["week_net_amount_raw"][week_index - 1] += (item["net_base_40h_raw"] * hours / Decimal("40")) if item["net_base_40h_raw"] and hours else Decimal("0")
                                 if row[0]:
                                     item["week_timesheet_ids"][week_index - 1].append(row[0])
                                 item["week_statuses"][week_index - 1].add(row[12] or "concept")
@@ -3003,6 +3027,7 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                             "week_hours": [_format_number(value) for value in item["week_hours_raw"]],
                             "week_worked_days": [_format_number(value) for value in item["week_days_raw"]],
                             "week_total_km": [_format_number(value) for value in item["week_km_raw"]],
+                            "week_net_amount": [_format_money(value) if value else "" for value in item["week_net_amount_raw"]],
                             "week_timesheet_ids": item["week_timesheet_ids"],
                             "week_statuses": [sorted(statuses) for statuses in item["week_statuses"]],
                             "week_blockers": [sorted(blockers) for blockers in item["week_blockers"]],

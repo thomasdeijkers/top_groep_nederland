@@ -194,6 +194,7 @@ def build_week_sheet_rows(sheet_label: str, candidates: list[dict], payroll_rows
             continue
         weekly_days = payroll_row.get("week_worked_days", [])
         weekly_km = payroll_row.get("week_total_km", [])
+        weekly_net_amount = payroll_row.get("week_net_amount", [])
         week_timesheet_ids = payroll_row.get("week_timesheet_ids", [])
         timesheet_ids = week_timesheet_ids[week_index - 1] if len(week_timesheet_ids) >= week_index else []
         timesheet_label = "Open" if len(timesheet_ids) <= 1 else f"Open ({len(timesheet_ids)})"
@@ -224,7 +225,7 @@ def build_week_sheet_rows(sheet_label: str, candidates: list[dict], payroll_rows
                 "rv_hours": payroll_row.get("rv_hours") or "",
                 "kv_hours": payroll_row.get("kv_hours") or "",
                 "holiday_hours": payroll_row.get("holiday_hours") or "",
-                "net_amount": payroll_row.get("net_amount") or "",
+                "net_amount": (weekly_net_amount[week_index - 1] if len(weekly_net_amount) >= week_index else "") or payroll_row.get("net_amount") or "",
                 "commute_km": _format_number(total_km) if total_km else "",
                 "work_km": _format_number(work_km) if work_km else "",
                 "total_km": _format_number(total_km) if total_km else "",

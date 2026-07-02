@@ -1261,6 +1261,27 @@ class CompletePeriodTimesheetImportTests(unittest.TestCase):
         self.assertIn("LEFT JOIN whatsapp_timesheet_inbox wi", records_source)
         self.assertIn("_active_timesheet_condition(\"i\", \"wi\")", records_source)
 
+    def test_payment_rows_keep_week_net_amount_after_status_move(self):
+        from apps.dashboard.payroll_calculations import build_payment_sheet_rows, build_week_sheet_rows
+
+        week = {"week_index": 1, "week_number": 22}
+        payroll_rows = [
+            {
+                "employee_name": "Shafieq Asgarali",
+                "week_hours": ["30", "", "", ""],
+                "week_worked_days": ["4", "", "", ""],
+                "week_total_km": ["25", "", "", ""],
+                "week_net_amount": [f"{chr(8364)} 412,50", "", "", ""],
+                "week_statuses": [["uit_te_betalen"], [], [], []],
+                "week_timesheet_ids": [[123], [], [], []],
+            }
+        ]
+
+        week_rows = build_week_sheet_rows("WK22", [], payroll_rows, week)
+        payment_rows = build_payment_sheet_rows([{"label": "WK22", "rows": week_rows}], "uit_te_betalen")
+
+        self.assertEqual(payment_rows[0]["net_amount"], f"{chr(8364)} 412,50")
+
 
 class DashboardDatabaseStatusTests(unittest.TestCase):
     def test_non_overview_pages_use_real_database_status(self):
