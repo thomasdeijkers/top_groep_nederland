@@ -1519,6 +1519,8 @@ class DashboardContextSafetyTests(unittest.TestCase):
     def test_timesheet_processed_status_moves_to_archive_stage(self):
         self.assertEqual(dashboard_router._timesheet_stage("processed"), "archief")
         self.assertEqual(dashboard_router._timesheet_stage("doorgestuurd_naar_loonadministratie"), "archief")
+        self.assertEqual(dashboard_router._timesheet_stage("uit_te_betalen"), "archief")
+        self.assertEqual(dashboard_router._timesheet_stage("uitbetaald"), "archief")
         self.assertEqual(dashboard_router._timesheet_stage("loon_te_berekenen"), "loon")
 
         tabs = dashboard_router._timesheet_workflow_tabs(

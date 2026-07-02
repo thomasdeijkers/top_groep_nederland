@@ -227,7 +227,7 @@ def _audit_relation_fields(data: dict) -> str:
 
 def _timesheet_stage(status: str) -> str:
     normalized = (status or "").strip().lower().replace(" ", "_")
-    if normalized in {"doorgestuurd_naar_loonadministratie", "verwerkt", "processed", "definitief_loonbetaling"}:
+    if normalized in {"doorgestuurd_naar_loonadministratie", "verwerkt", "processed", "definitief_loonbetaling", "uit_te_betalen", "uitbetaald"}:
         return "archief"
     if normalized in {"goed_te_keuren", "approval", "akkoord_nodig"}:
         return "valideren"
