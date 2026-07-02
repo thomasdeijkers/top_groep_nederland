@@ -265,6 +265,7 @@ def get_overview_data() -> dict:
             "recent": recent,
             "whatsapp_workflow": _whatsapp_workflow(whatsapp_statuses),
             "weekly_hours_yoy": weekly_hours_yoy or _demo_weekly_hours_yoy(),
+            "payroll_flow": get_payroll_flow_summary(),
         }
     except Exception:
         return {
@@ -278,7 +279,63 @@ def get_overview_data() -> dict:
             "recent": [],
             "whatsapp_workflow": _whatsapp_workflow({}),
             "weekly_hours_yoy": _demo_weekly_hours_yoy(),
+            "payroll_flow": _empty_payroll_flow_summary(),
         }
+
+
+def _empty_payroll_flow_summary() -> dict:
+    return {
+        "validate_count": 0,
+        "validate_total": _format_money(0),
+        "payable_count": 0,
+        "payable_total": _format_money(0),
+        "paid_count": 0,
+        "paid_total": _format_money(0),
+    }
+
+
+def get_payroll_flow_summary(period_id: int | None = None) -> dict:
+    try:
+        _ensure_dashboard_tables_for_read()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                period_filter = "AND p.id = %s" if period_id else "AND LOWER(COALESCE(p.status, '')) <> 'archief'"
+                params = [period_id] if period_id else []
+                cursor.execute(
+                    f"""
+                    WITH active_rows AS (
+                        SELECT i.id,
+                               COALESCE(NULLIF(i.payroll_status, ''), 'loon_berekenen') AS payroll_status,
+                               COALESCE(r.net_week_total, 0) AS net_week_total
+                        FROM payroll_week_inputs i
+                        JOIN payroll_periods p ON p.id = i.payroll_period_id
+                        LEFT JOIN payroll_week_results r ON r.payroll_week_input_id = i.id
+                        LEFT JOIN whatsapp_timesheet_inbox wi ON wi.id = i.timesheet_inbox_id
+                        WHERE {_active_period_payroll_status_condition("i", "p")}
+                          AND {_active_timesheet_condition("i", "wi")}
+                          {period_filter}
+                    )
+                    SELECT COUNT(*) FILTER (WHERE payroll_status = 'loon_berekenen') AS validate_count,
+                           COALESCE(SUM(net_week_total) FILTER (WHERE payroll_status = 'loon_berekenen'), 0) AS validate_total,
+                           COUNT(*) FILTER (WHERE payroll_status = 'uit_te_betalen') AS payable_count,
+                           COALESCE(SUM(net_week_total) FILTER (WHERE payroll_status = 'uit_te_betalen'), 0) AS payable_total,
+                           COUNT(*) FILTER (WHERE payroll_status = 'uitbetaald') AS paid_count,
+                           COALESCE(SUM(net_week_total) FILTER (WHERE payroll_status = 'uitbetaald'), 0) AS paid_total
+                    FROM active_rows;
+                    """,
+                    (*_active_period_payroll_status_params(), *params),
+                )
+                row = cursor.fetchone() or (0, 0, 0, 0, 0, 0)
+                return {
+                    "validate_count": row[0] or 0,
+                    "validate_total": _format_money(row[1]),
+                    "payable_count": row[2] or 0,
+                    "payable_total": _format_money(row[3]),
+                    "paid_count": row[4] or 0,
+                    "paid_total": _format_money(row[5]),
+                }
+    except Exception:
+        return _empty_payroll_flow_summary()
 
 
 def _weekly_hours_yoy(cursor, weeks_back: int = 8) -> list[dict]:

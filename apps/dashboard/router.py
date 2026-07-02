@@ -34,6 +34,7 @@ from apps.dashboard.records import (
     get_timesheet_payroll_lock,
     get_project,
     get_overview_data,
+    get_payroll_flow_summary,
     get_payroll_period_defaults,
     get_relation_payroll_context,
     get_timesheet_channel_tiles,
@@ -418,6 +419,7 @@ def _dashboard_context(
                 },
                 "recent": [],
                 "whatsapp_workflow": [],
+                "payroll_flow": {"validate_count": 0, "validate_total": "€ 0,00", "payable_count": 0, "payable_total": "€ 0,00", "paid_count": 0, "paid_total": "€ 0,00"},
             },
             "openai_usage": {"month_cost_usd": 0, "month_requests": 0, "month_tokens": 0, "requests": 0, "total_tokens": 0},
             "principal_options": [],
@@ -430,6 +432,7 @@ def _dashboard_context(
             "payroll_year_overview": [],
             "payroll_datamodel_status": [],
             "payroll_data_diagnostics": [],
+            "payroll_flow_summary": {"validate_count": 0, "validate_total": "€ 0,00", "payable_count": 0, "payable_total": "€ 0,00", "paid_count": 0, "paid_total": "€ 0,00"},
             "payroll_period_defaults": {},
             "payroll_parameters": [],
             "selected_payroll_parameter_version": None,
@@ -496,6 +499,7 @@ def _dashboard_context(
         "recent": [],
         "whatsapp_workflow": [],
         "weekly_hours_yoy": [],
+        "payroll_flow": {"validate_count": 0, "validate_total": "€ 0,00", "payable_count": 0, "payable_total": "€ 0,00", "paid_count": 0, "paid_total": "€ 0,00"},
     }, get_overview_data) if data_page == "overview" else {
         "counts": {
             "candidates": 0,
@@ -507,6 +511,7 @@ def _dashboard_context(
         "recent": [],
         "whatsapp_workflow": [],
         "weekly_hours_yoy": [],
+        "payroll_flow": {"validate_count": 0, "validate_total": "€ 0,00", "payable_count": 0, "payable_total": "€ 0,00", "paid_count": 0, "paid_total": "€ 0,00"},
     }
     audit_events = _context_value(data_page, "audit_events", [], lambda: list_audit_events(160 if data_page == "audit" else 8)) if data_page in {"overview", "audit", "settings", "periods"} else []
     audit_menu_groups = _audit_menu_groups(audit_events) if data_page == "audit" else []
@@ -520,6 +525,7 @@ def _dashboard_context(
     payroll_year_overview = _context_value(data_page, "payroll_year_overview", [], list_payroll_year_overview) if data_page == "periods" else []
     payroll_datamodel_status = _context_value(data_page, "payroll_datamodel_status", [], lambda: list_payroll_datamodel_status(limit=40)) if data_page == "periods" else []
     payroll_data_diagnostics = _context_value(data_page, "payroll_data_diagnostics", [], get_payroll_data_diagnostics) if data_page == "periods" else []
+    payroll_flow_summary = _context_value(data_page, "payroll_flow_summary", {"validate_count": 0, "validate_total": "€ 0,00", "payable_count": 0, "payable_total": "€ 0,00", "paid_count": 0, "paid_total": "€ 0,00"}, get_payroll_flow_summary) if data_page == "periods" else {"validate_count": 0, "validate_total": "€ 0,00", "payable_count": 0, "payable_total": "€ 0,00", "paid_count": 0, "paid_total": "€ 0,00"}
     payroll_period_defaults = _context_value(data_page, "payroll_period_defaults", {}, get_payroll_period_defaults) if data_page == "periods" else {}
     selected_payroll_period = _context_value(data_page, "selected_payroll_period", None, lambda: get_payroll_period(period_id)) if data_page == "periods" and period_id else None
     payroll_parameters = _context_value(data_page, "payroll_parameters", [], list_payroll_parameters) if data_page == "settings" else []
@@ -638,6 +644,7 @@ def _dashboard_context(
         "payroll_year_overview": payroll_year_overview,
         "payroll_datamodel_status": payroll_datamodel_status,
         "payroll_data_diagnostics": payroll_data_diagnostics,
+        "payroll_flow_summary": payroll_flow_summary,
         "payroll_period_defaults": payroll_period_defaults,
         "payroll_parameters": payroll_parameters,
         "selected_payroll_parameter_version": selected_payroll_parameter_version,

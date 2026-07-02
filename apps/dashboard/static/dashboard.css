@@ -955,6 +955,56 @@ h2 {
     font-weight: 900;
 }
 
+.payroll-flow-tiles {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(180px, 1fr));
+    gap: 10px;
+    margin: 14px 0;
+}
+
+.payroll-flow-tile {
+    display: grid;
+    min-height: 72px;
+    align-content: center;
+    gap: 4px;
+    padding: 12px 14px;
+    border: 1px solid rgba(245, 185, 95, 0.5);
+    border-radius: 7px;
+    background: rgba(245, 185, 95, 0.13);
+    color: #ffe6b0;
+    text-decoration: none;
+}
+
+.payroll-flow-tile--payable {
+    border-color: rgba(127, 209, 160, 0.56);
+    background: rgba(127, 209, 160, 0.16);
+    color: #d7f8e4;
+}
+
+.payroll-flow-tile--paid {
+    border-color: rgba(110, 231, 183, 0.24);
+    background: rgba(11, 27, 34, 0.72);
+    color: #f6fbff;
+}
+
+.payroll-flow-tile span {
+    color: #bdd0db;
+    font-size: 0.74rem;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.payroll-flow-tile strong {
+    color: inherit;
+    font-size: 1.28rem;
+}
+
+.payroll-flow-tile small {
+    color: #afbfca;
+    font-size: 0.76rem;
+    font-weight: 800;
+}
+
 .period-status-tile {
     max-width: 160px;
     text-transform: uppercase;
