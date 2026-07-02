@@ -311,7 +311,11 @@ def get_payroll_flow_summary(period_id: int | None = None) -> dict:
                     ),
                     active_rows AS (
                         SELECT i.id,
-                               COALESCE(NULLIF(i.payroll_status, ''), 'loon_berekenen') AS payroll_status,
+                               CASE
+                                   WHEN LOWER(REPLACE(COALESCE(i.status, ''), ' ', '_')) IN ('uit_te_betalen', 'uitbetaald')
+                                       THEN LOWER(REPLACE(COALESCE(i.status, ''), ' ', '_'))
+                                   ELSE COALESCE(NULLIF(i.payroll_status, ''), NULLIF(i.status, ''), 'loon_berekenen')
+                               END AS payroll_status,
                                COALESCE(
                                    NULLIF(r.net_week_total, 0),
                                    ROUND(
@@ -332,8 +336,8 @@ def get_payroll_flow_summary(period_id: int | None = None) -> dict:
                           AND {_active_timesheet_condition("i", "wi")}
                           {period_filter}
                     )
-                    SELECT COUNT(*) FILTER (WHERE payroll_status = 'loon_berekenen') AS validate_count,
-                           COALESCE(SUM(net_week_total) FILTER (WHERE payroll_status = 'loon_berekenen'), 0) AS validate_total,
+                    SELECT COUNT(*) FILTER (WHERE payroll_status IN ('loon_berekenen', 'loon_te_berekenen', 'loon')) AS validate_count,
+                           COALESCE(SUM(net_week_total) FILTER (WHERE payroll_status IN ('loon_berekenen', 'loon_te_berekenen', 'loon')), 0) AS validate_total,
                            COUNT(*) FILTER (WHERE payroll_status = 'uit_te_betalen') AS payable_count,
                            COALESCE(SUM(net_week_total) FILTER (WHERE payroll_status = 'uit_te_betalen'), 0) AS payable_total,
                            COUNT(*) FILTER (WHERE payroll_status = 'uitbetaald') AS paid_count,
@@ -3583,12 +3587,13 @@ def update_payroll_payment_status(period_id: int, payload: dict) -> dict:
                 """
                 UPDATE payroll_week_inputs
                 SET status = %s,
+                    payroll_status = %s,
                     updated_at = NOW()
                 WHERE payroll_period_id = %s
                   AND timesheet_inbox_id = ANY(%s)
                 RETURNING id, timesheet_inbox_id, employee_name;
                 """,
-                (raw_status, period_id, timesheet_ids),
+                (raw_status, raw_status, period_id, timesheet_ids),
             )
             updated_inputs = cursor.fetchall()
             if not updated_inputs:
