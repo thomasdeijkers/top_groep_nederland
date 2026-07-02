@@ -1633,6 +1633,19 @@ class DashboardContextSafetyTests(unittest.TestCase):
         self.assertIn("Gevalideerd voor loonbetaling", template)
         self.assertIn("disabled title", template)
 
+    def test_timesheet_detail_has_visible_delete_action(self):
+        template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
+        stylesheet = Path("apps/dashboard/static/dashboard.css").read_text(encoding="utf-8-sig")
+        detail_block = template[
+            template.index('<div class="compact-review-bar">'):
+            template.index('<details class="review-message-actions compact-actions message-tools">')
+        ]
+
+        self.assertIn("compact-review-delete", detail_block)
+        self.assertIn('/api/whatsapp/timesheet/{{ selected_message.id }}/delete', detail_block)
+        self.assertIn("Dit urenbriefje staat op slot voor loonbetaling.", detail_block)
+        self.assertIn(".compact-review-delete", stylesheet)
+
 
 class PayrollPeriodDetailSafetyTests(unittest.TestCase):
     def test_period_detail_uses_safe_defaults_and_warning(self):

@@ -6698,7 +6698,13 @@ body[data-theme="light"] .theme-toggle strong {
 .compact-review-bar__right {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
     gap: 8px;
+}
+
+.compact-review-delete {
+    margin: 0;
 }
 
 .document-zoom-backdrop {

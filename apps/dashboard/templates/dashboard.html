@@ -2617,6 +2617,9 @@ Metadata:
                                         <span class="confidence-pill confidence-{{ 'high' if gated_overall_confidence >= 95 else 'medium' if gated_overall_confidence >= 80 else 'low' }}">
                                             {{ gated_overall_confidence }}%
                                         </span>
+                                        <form class="compact-review-delete" action="/api/whatsapp/timesheet/{{ selected_message.id }}/delete" method="post">
+                                            <button class="ghost-button danger-button" type="submit" {% if selected_message.payroll_locked %}disabled title="Dit urenbriefje staat op slot voor loonbetaling."{% endif %}>Verwijderen</button>
+                                        </form>
                                     </div>
                                 </div>
                                 {% if request.query_params.get('validate_error') %}
@@ -2644,9 +2647,6 @@ Metadata:
                                         </form>
                                         <form action="/api/whatsapp/timesheet/{{ selected_message.id }}/archive" method="post">
                                             <button class="ghost-button" type="submit" {% if selected_message.payroll_locked %}disabled{% endif %}>Archiveren</button>
-                                        </form>
-                                        <form action="/api/whatsapp/timesheet/{{ selected_message.id }}/delete" method="post">
-                                            <button class="ghost-button danger-button" type="submit" {% if selected_message.payroll_locked %}disabled{% endif %}>Verwijderen</button>
                                         </form>
                                     </div>
                                 </details>
