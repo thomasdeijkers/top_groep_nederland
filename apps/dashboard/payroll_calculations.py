@@ -165,7 +165,7 @@ def build_workbook_tabs(period_weeks: list[dict], candidates: list[dict], payrol
                 "summary": summarize_week_rows(week_rows),
             }
         )
-    aggregated_totals = aggregate_week_sheet_totals(week_tabs)
+    aggregated_totals = aggregate_week_sheet_totals(payment_source_tabs)
     period_rows = build_period_sheet_rows(workbook_candidates, payroll_rows)
     payslip_rows = build_payslip_sheet_rows(period_rows, aggregated_totals)
     payable_rows = build_payment_sheet_rows(payment_source_tabs, "uit_te_betalen")
