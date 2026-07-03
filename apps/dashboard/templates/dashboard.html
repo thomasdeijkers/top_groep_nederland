@@ -1649,6 +1649,20 @@ Metadata:
                                                 </a>
                                                 {% endfor %}
                                             </div>
+                                            <div class="period-flow-mini" aria-label="Loonflow {{ period.name }}">
+                                                <span class="period-flow-mini__tile">
+                                                    <strong>{{ period.payroll_flow.validate_total }}</strong>
+                                                    <small>Loon te valideren &middot; {{ period.payroll_flow.validate_count }}</small>
+                                                </span>
+                                                <span class="period-flow-mini__tile period-flow-mini__tile--payable">
+                                                    <strong>{{ period.payroll_flow.payable_total }}</strong>
+                                                    <small>Uit te betalen &middot; {{ period.payroll_flow.payable_count }}</small>
+                                                </span>
+                                                <span class="period-flow-mini__tile period-flow-mini__tile--paid">
+                                                    <strong>{{ period.payroll_flow.paid_total }}</strong>
+                                                    <small>Uitbetaald &middot; {{ period.payroll_flow.paid_count }}</small>
+                                                </span>
+                                            </div>
                                         </td>
                                         <td>
                                             <span class="period-status-tile period-status-tile--{{ period.status_tone }}">{{ period.status_label }}</span>
@@ -1714,6 +1728,20 @@ Metadata:
                                                     <small>{{ period.total_hours }} uur · {{ period.booking_count }} regels</small>
                                                 </a>
                                                 {% endfor %}
+                                            </div>
+                                            <div class="period-flow-mini" aria-label="Loonflow {{ period.name }}">
+                                                <span class="period-flow-mini__tile">
+                                                    <strong>{{ period.payroll_flow.validate_total }}</strong>
+                                                    <small>Loon te valideren &middot; {{ period.payroll_flow.validate_count }}</small>
+                                                </span>
+                                                <span class="period-flow-mini__tile period-flow-mini__tile--payable">
+                                                    <strong>{{ period.payroll_flow.payable_total }}</strong>
+                                                    <small>Uit te betalen &middot; {{ period.payroll_flow.payable_count }}</small>
+                                                </span>
+                                                <span class="period-flow-mini__tile period-flow-mini__tile--paid">
+                                                    <strong>{{ period.payroll_flow.paid_total }}</strong>
+                                                    <small>Uitbetaald &middot; {{ period.payroll_flow.paid_count }}</small>
+                                                </span>
                                             </div>
                                         </td>
                                         <td>

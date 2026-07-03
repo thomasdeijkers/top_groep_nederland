@@ -302,6 +302,7 @@ def get_payroll_flow_summary(period_id: int | None = None) -> dict:
             with conn.cursor() as cursor:
                 period_filter = "AND p.id = %s" if period_id else "AND LOWER(COALESCE(p.status, '')) <> 'archief'"
                 params = [period_id] if period_id else []
+                effective_status = _payroll_effective_status_sql("i")
                 cursor.execute(
                     f"""
                     WITH day_context AS (
@@ -312,11 +313,7 @@ def get_payroll_flow_summary(period_id: int | None = None) -> dict:
                     ),
                     active_rows AS (
                         SELECT i.id,
-                               CASE
-                                   WHEN LOWER(REPLACE(COALESCE(i.status, ''), ' ', '_')) IN ('uit_te_betalen', 'uitbetaald')
-                                       THEN LOWER(REPLACE(COALESCE(i.status, ''), ' ', '_'))
-                                   ELSE COALESCE(NULLIF(i.payroll_status, ''), NULLIF(i.status, ''), 'loon_berekenen')
-                               END AS payroll_status,
+                               {effective_status} AS payroll_status,
                                COALESCE(
                                    NULLIF(r.net_week_total, 0),
                                    ROUND(
@@ -1698,15 +1695,33 @@ def _attach_period_list_notes(cursor, periods: list[dict]) -> None:
         period["status_tone"] = _payroll_period_status_tone(period.get("status"))
         period["completion_note"] = "Geen periodegegevens beschikbaar."
         period["completion_tone"] = "neutral"
+        period["payroll_flow"] = _empty_payroll_flow_summary()
         try:
+            effective_status = _payroll_effective_status_sql("i")
             cursor.execute(
-                """
-                WITH active_inputs AS (
+                f"""
+                WITH day_context AS (
+                    SELECT payroll_week_input_id,
+                           COALESCE(SUM(hours), 0) AS day_hours
+                    FROM payroll_week_input_days
+                    GROUP BY payroll_week_input_id
+                ),
+                active_inputs AS (
                     SELECT i.id,
                            i.relation_id,
                            i.arrangement_id,
                            i.employee_name,
-                           i.payroll_status,
+                           {effective_status} AS payroll_status,
+                           COALESCE(
+                               NULLIF(wr.net_week_total, 0),
+                               ROUND(
+                                   COALESCE(a.net_base_40h, 0)
+                                   * COALESCE(NULLIF(i.worked_hours, 0), NULLIF(dc.day_hours, 0), 0)
+                                   / 40,
+                                   2
+                               ),
+                               0
+                           ) AS net_week_total,
                            a.contract_hours_4w,
                            a.net_base_40h,
                            a.gross_hourly_wage,
@@ -1715,10 +1730,12 @@ def _attach_period_list_notes(cursor, periods: list[dict]) -> None:
                     FROM payroll_week_inputs i
                     JOIN payroll_periods p ON p.id = i.payroll_period_id
                     LEFT JOIN whatsapp_timesheet_inbox wi ON wi.id = i.timesheet_inbox_id
+                    LEFT JOIN day_context dc ON dc.payroll_week_input_id = i.id
+                    LEFT JOIN payroll_week_results wr ON wr.payroll_week_input_id = i.id
                     LEFT JOIN payroll_employee_arrangements a ON a.id = i.arrangement_id
                     WHERE i.payroll_period_id = %s
-                      AND """ + _active_period_payroll_status_condition("i", "p") + """
-                      AND """ + _active_timesheet_condition("i", "wi") + """
+                      AND {_active_period_payroll_status_condition("i", "p")}
+                      AND {_active_timesheet_condition("i", "wi")}
                 )
                 SELECT COUNT(*),
                        COUNT(*) FILTER (
@@ -1730,13 +1747,34 @@ def _attach_period_list_notes(cursor, periods: list[dict]) -> None:
                               OR COALESCE(phase, '') = ''
                               OR COALESCE(pension_scheme, '') = ''
                        ),
-                       COUNT(*) FILTER (WHERE COALESCE(payroll_status, '') = 'uit_te_betalen'),
-                       COUNT(*) FILTER (WHERE COALESCE(payroll_status, '') = 'uitbetaald')
+                       COUNT(*) FILTER (WHERE payroll_status IN ('loon_berekenen', 'loon_te_berekenen', 'loon')),
+                       COALESCE(SUM(net_week_total) FILTER (WHERE payroll_status IN ('loon_berekenen', 'loon_te_berekenen', 'loon')), 0),
+                       COUNT(*) FILTER (WHERE payroll_status = 'uit_te_betalen'),
+                       COALESCE(SUM(net_week_total) FILTER (WHERE payroll_status = 'uit_te_betalen'), 0),
+                       COUNT(*) FILTER (WHERE payroll_status = 'uitbetaald'),
+                       COALESCE(SUM(net_week_total) FILTER (WHERE payroll_status = 'uitbetaald'), 0)
                 FROM active_inputs;
                 """,
                 (period_id, *_active_period_payroll_status_params()),
             )
-            input_count, blocker_count, payable_count, paid_count = cursor.fetchone() or (0, 0, 0, 0)
+            (
+                input_count,
+                blocker_count,
+                validate_count,
+                validate_total,
+                payable_count,
+                payable_total,
+                paid_count,
+                paid_total,
+            ) = cursor.fetchone() or (0, 0, 0, 0, 0, 0, 0, 0)
+            period["payroll_flow"] = {
+                "validate_count": validate_count or 0,
+                "validate_total": _format_money(validate_total),
+                "payable_count": payable_count or 0,
+                "payable_total": _format_money(payable_total),
+                "paid_count": paid_count or 0,
+                "paid_total": _format_money(paid_total),
+            }
         except Exception:
             cursor.connection.rollback()
             continue
@@ -2389,12 +2427,25 @@ def _employee_week_result_status(concept_count, missing_arrangement_count, missi
     return "controle"
 
 
+def _payroll_effective_status_sql(alias: str = "i") -> str:
+    status = f"LOWER(REPLACE(COALESCE({alias}.status, ''), ' ', '_'))"
+    payroll_status = f"LOWER(REPLACE(COALESCE({alias}.payroll_status, ''), ' ', '_'))"
+    return (
+        "CASE "
+        f"WHEN {status} IN ('uit_te_betalen', 'uitbetaald') THEN {status} "
+        f"WHEN {payroll_status} IN ('uit_te_betalen', 'uitbetaald') THEN {payroll_status} "
+        f"ELSE COALESCE(NULLIF({payroll_status}, ''), NULLIF({status}, ''), 'loon_berekenen') "
+        "END"
+    )
+
+
 def _active_period_payroll_status_condition(alias: str = "i", period_alias: str = "p") -> str:
+    effective_status = _payroll_effective_status_sql(alias)
     return (
         f"((LOWER(COALESCE({period_alias}.status, '')) = 'archief' "
-        f"AND LOWER(REPLACE(COALESCE({alias}.status, ''), ' ', '_')) = ANY(%s)) "
+        f"AND {effective_status} = ANY(%s)) "
         f"OR (LOWER(COALESCE({period_alias}.status, '')) <> 'archief' "
-        f"AND LOWER(REPLACE(COALESCE({alias}.status, ''), ' ', '_')) = ANY(%s)))"
+        f"AND {effective_status} = ANY(%s)))"
     )
 
 

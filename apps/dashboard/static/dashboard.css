@@ -747,6 +747,45 @@ h2 {
     color: #d7f8e4;
 }
 
+.period-flow-mini {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.period-flow-mini__tile {
+    display: grid;
+    min-height: 48px;
+    align-content: center;
+    gap: 2px;
+    padding: 7px 9px;
+    border: 1px solid rgba(245, 185, 95, 0.32);
+    border-radius: 7px;
+    background: rgba(245, 185, 95, 0.1);
+}
+
+.period-flow-mini__tile--payable {
+    border-color: rgba(127, 209, 160, 0.44);
+    background: rgba(127, 209, 160, 0.13);
+}
+
+.period-flow-mini__tile--paid {
+    border-color: rgba(110, 231, 183, 0.22);
+    background: rgba(11, 27, 34, 0.72);
+}
+
+.period-flow-mini__tile strong {
+    color: #ffffff;
+    font-size: 0.86rem;
+}
+
+.period-flow-mini__tile small {
+    color: #c4d2dc;
+    font-size: 0.68rem;
+    font-weight: 800;
+}
+
 .relation-audit-panel {
     grid-column: 1 / -1;
     display: grid;
