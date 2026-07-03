@@ -2889,8 +2889,9 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                     (period_id,),
                 )
                 weeks = cursor.fetchall()
+                effective_status = _payroll_effective_status_sql("i")
                 cursor.execute(
-                    """
+                    f"""
                     WITH day_context AS (
                         SELECT payroll_week_input_id,
                                COUNT(*) FILTER (WHERE COALESCE(hours, 0) > 0) AS worked_days,
@@ -2934,7 +2935,7 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                                    ELSE 0
                                END
                            ) AS hours,
-                           COALESCE(i.status, pc.booking_status, 'concept') AS status,
+                           {effective_status} AS status,
                            r.payroll_license_plate,
                            r.payroll_choice_budget,
                            r.payroll_phase,
@@ -2944,7 +2945,7 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                            r.payroll_scale,
                            r.payroll_function,
                            r.payroll_hourly_wage,
-                           COALESCE(i.raw_fields, '{}'::jsonb) AS parsed_fields,
+                           COALESCE(i.raw_fields, '{{}}'::jsonb) AS parsed_fields,
                            COALESCE(pw.week_index, 0) AS week_index,
                            COALESCE(NULLIF(dc.worked_days, 0), 0) AS worked_days,
                            COALESCE(NULLIF(dc.day_km, 0), i.total_km, 0) AS total_km,
@@ -2977,8 +2978,8 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                     LEFT JOIN payroll_cao_settings c
                         ON c.id = pc.payroll_cao_setting_id
                     WHERE i.payroll_period_id = %s
-                      AND """ + _active_period_payroll_status_condition("i", "pp") + """
-                      AND """ + _active_timesheet_condition("i", "wi") + """
+                      AND {_active_period_payroll_status_condition("i", "pp")}
+                      AND {_active_timesheet_condition("i", "wi")}
                     ORDER BY employee_name, i.work_date, i.id;
                     """,
                     (period_id, *_active_period_payroll_status_params()),

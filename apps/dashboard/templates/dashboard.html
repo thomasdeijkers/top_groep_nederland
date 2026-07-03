@@ -1624,7 +1624,7 @@ Metadata:
                                         <th>Periode</th>
                                         <th>Samenvatting</th>
                                         <th>Status</th>
-                                        <th>Opmerkingen</th>
+                                        <th>Loonflow</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1649,6 +1649,11 @@ Metadata:
                                                 </a>
                                                 {% endfor %}
                                             </div>
+                                        </td>
+                                        <td>
+                                            <span class="period-status-tile period-status-tile--{{ period.status_tone }}">{{ period.status_label }}</span>
+                                        </td>
+                                        <td>
                                             <div class="period-flow-mini" aria-label="Loonflow {{ period.name }}">
                                                 <span class="period-flow-mini__tile">
                                                     <strong>{{ period.payroll_flow.validate_total }}</strong>
@@ -1662,15 +1667,6 @@ Metadata:
                                                     <strong>{{ period.payroll_flow.paid_total }}</strong>
                                                     <small>Uitbetaald &middot; {{ period.payroll_flow.paid_count }}</small>
                                                 </span>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <span class="period-status-tile period-status-tile--{{ period.status_tone }}">{{ period.status_label }}</span>
-                                        </td>
-                                        <td>
-                                            <div class="period-remark-tile period-remark-tile--{{ period.completion_tone }}">
-                                                <strong>{{ period.completion_note }}</strong>
-                                                <small>{{ period.total_hours }} uur &middot; {{ period.booking_count }} regels</small>
                                             </div>
                                         </td>
                                     </tr>
@@ -1704,7 +1700,7 @@ Metadata:
                                         <th>Periode</th>
                                         <th>Samenvatting</th>
                                         <th>Status</th>
-                                        <th>Opmerkingen</th>
+                                        <th>Loonflow</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1729,6 +1725,11 @@ Metadata:
                                                 </a>
                                                 {% endfor %}
                                             </div>
+                                        </td>
+                                        <td>
+                                            <span class="period-status-tile period-status-tile--{{ period.status_tone }}">{{ period.status_label }}</span>
+                                        </td>
+                                        <td>
                                             <div class="period-flow-mini" aria-label="Loonflow {{ period.name }}">
                                                 <span class="period-flow-mini__tile">
                                                     <strong>{{ period.payroll_flow.validate_total }}</strong>
@@ -1742,15 +1743,6 @@ Metadata:
                                                     <strong>{{ period.payroll_flow.paid_total }}</strong>
                                                     <small>Uitbetaald &middot; {{ period.payroll_flow.paid_count }}</small>
                                                 </span>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <span class="period-status-tile period-status-tile--{{ period.status_tone }}">{{ period.status_label }}</span>
-                                        </td>
-                                        <td>
-                                            <div class="period-remark-tile period-remark-tile--{{ period.completion_tone }}">
-                                                <strong>{{ period.completion_note }}</strong>
-                                                <small>{{ period.total_hours }} uur &middot; {{ period.booking_count }} regels</small>
                                             </div>
                                         </td>
                                     </tr>

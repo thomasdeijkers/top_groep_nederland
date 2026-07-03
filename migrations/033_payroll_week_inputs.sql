@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS payroll_week_inputs (
     source_channel TEXT NOT NULL DEFAULT 'dashboard',
     parse_source TEXT NOT NULL DEFAULT 'manual',
     status TEXT NOT NULL DEFAULT 'concept',
+    payroll_status TEXT NOT NULL DEFAULT 'loon_berekenen',
     worked_hours NUMERIC(10,2) NOT NULL DEFAULT 0,
     total_km NUMERIC(10,2) NOT NULL DEFAULT 0,
     day_codes JSONB NOT NULL DEFAULT '{}'::jsonb,
