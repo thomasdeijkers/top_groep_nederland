@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from decimal import Decimal, ROUND_HALF_UP
@@ -1128,6 +1129,11 @@ def list_relations(limit: int = 15, query: str = "", relation_type: str = "", st
 def search_candidate_matches(query: str = "", limit: int = 40) -> list[dict]:
     search = str(query or "").strip()
     limit = max(1, min(int(limit or 40), 80))
+    tokens = [
+        token
+        for token in re.split(r"[^0-9A-Za-zÀ-ÿ]+", search)
+        if len(token) >= 2
+    ][:5]
     try:
         _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
@@ -1139,6 +1145,13 @@ def search_candidate_matches(query: str = "", limit: int = 40) -> list[dict]:
                     AND LOWER(COALESCE(status, '')) NOT IN ('archief', 'gearchiveerd', 'archived')
                 """
                 if search:
+                    token_filters = []
+                    for token in tokens:
+                        token_filters.append(
+                            "(name ILIKE %s OR email ILIKE %s OR phone ILIKE %s OR city ILIKE %s OR external_id ILIKE %s)"
+                        )
+                        params.extend([f"%{token}%"] * 5)
+                    token_where = " OR " + " OR ".join(token_filters) if token_filters else ""
                     where_relation += """
                         AND (
                             name ILIKE %s
@@ -1146,10 +1159,11 @@ def search_candidate_matches(query: str = "", limit: int = 40) -> list[dict]:
                             OR phone ILIKE %s
                             OR city ILIKE %s
                             OR external_id ILIKE %s
+                            {token_where}
                         )
-                    """
+                    """.format(token_where=token_where)
                     like = f"%{search}%"
-                    params.extend([like] * 5)
+                    params = [like] * 5 + params
                 params.append(limit)
                 cursor.execute(
                     f"""
@@ -1157,11 +1171,12 @@ def search_candidate_matches(query: str = "", limit: int = 40) -> list[dict]:
                     FROM relations
                     WHERE {where_relation}
                     ORDER BY
+                        CASE WHEN %s <> '' AND name ILIKE %s THEN 0 ELSE 1 END,
                         CASE WHEN %s = '' THEN updated_at ELSE NULL END DESC NULLS LAST,
                         name ASC
                     LIMIT %s;
                     """,
-                    tuple([*params[:-1], search, params[-1]]),
+                    tuple([*params[:-1], search, f"%{search}%", search, params[-1]]),
                 )
                 return [
                     {

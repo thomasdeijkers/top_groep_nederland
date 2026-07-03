@@ -915,9 +915,17 @@
             const hits = queryParts.filter((part) => nameParts.has(part) || [...nameParts].some((namePart) => (
                 namePart.startsWith(part)
                 || part.startsWith(namePart)
+                || (part.length >= 3 && namePart.includes(part))
                 || (part.length >= 5 && namePart.length >= 5 && editDistance(part, namePart) <= 2)
             ))).length;
-            return queryParts.length ? Math.round((hits / queryParts.length) * 72) : 0;
+            const partialHits = queryParts.filter((part) => [...nameParts].some((namePart) => (
+                part.length >= 3
+                && namePart.length >= 3
+                && (namePart.startsWith(part.slice(0, 3)) || part.startsWith(namePart.slice(0, 3)))
+            ))).length;
+            const tokenScore = queryParts.length ? Math.round((hits / queryParts.length) * 82) : 0;
+            const partialScore = queryParts.length ? Math.round((partialHits / queryParts.length) * 48) : 0;
+            return Math.max(tokenScore, partialScore);
         };
 
         const applySelectedCandidate = () => {
@@ -1044,9 +1052,9 @@
             const scored = [...select.options]
                 .filter((option) => option.value)
                 .map((option) => ({ option, score: scoreCandidate(option, parsedName, parsedPhone) }))
-                .filter((item) => item.score >= 35)
+                .filter((item) => item.score >= 25)
                 .sort((a, b) => b.score - a.score)
-                .slice(0, 4);
+                .slice(0, 8);
             suggestionsTarget.innerHTML = "";
             if (!scored.length) {
                 const empty = document.createElement("div");

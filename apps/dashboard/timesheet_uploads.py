@@ -9,6 +9,7 @@ from psycopg2.extras import Json
 from apps.dashboard.data_store import ensure_dashboard_tables
 from apps.dashboard.openai_usage import record_openai_api_audit, record_openai_usage
 from apps.dashboard.phone_match import find_candidate_by_phone
+from apps.dashboard.records import search_candidate_matches
 from apps.dashboard.timesheet_parser import parse_timesheet
 from shared.db.connection import get_connection
 
@@ -206,8 +207,15 @@ def _is_supported_archive_or_document(filename: str) -> bool:
 def _match_candidate(sender_phone: str, parsed: dict) -> dict | None:
     parsed_phone = parsed.get("parsed_fields", {}).get("employee_phone", {}).get("value", "")
     if str(parsed_phone or "").strip():
-        return find_candidate_by_phone(parsed_phone)
-    return find_candidate_by_phone(sender_phone)
+        phone_match = find_candidate_by_phone(parsed_phone)
+        if phone_match:
+            return phone_match
+    sender_match = find_candidate_by_phone(sender_phone)
+    if sender_match:
+        return sender_match
+    parsed_name = parsed.get("parsed_fields", {}).get("employee_name", {}).get("value", "")
+    name_matches = search_candidate_matches(parsed_name, limit=8) if str(parsed_name or "").strip() else []
+    return name_matches[0] if len(name_matches) == 1 else None
 
 
 def save_timesheet_upload(

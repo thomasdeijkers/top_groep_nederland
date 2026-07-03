@@ -1335,6 +1335,20 @@ class TimesheetCandidateValidationTests(unittest.TestCase):
         self.assertIn("validateButton.disabled = !canUseWorkflowButton", script)
         self.assertIn("workflowCandidateTarget.value = option.value", script)
 
+    def test_candidate_matching_suggests_partial_name_matches(self):
+        records_source = Path("apps/dashboard/records.py").read_text(encoding="utf-8-sig")
+        script = Path("apps/dashboard/static/dashboard.js").read_text(encoding="utf-8-sig")
+        uploads_source = Path("apps/dashboard/timesheet_uploads.py").read_text(encoding="utf-8-sig")
+
+        self.assertIn("re.split", records_source)
+        self.assertIn("token_filters", records_source)
+        self.assertIn("name ILIKE %s OR email ILIKE %s OR phone ILIKE %s OR city ILIKE %s OR external_id ILIKE %s", records_source)
+        self.assertIn("item.score >= 25", script)
+        self.assertIn(".slice(0, 8)", script)
+        self.assertIn("namePart.includes(part)", script)
+        self.assertIn("search_candidate_matches(parsed_name, limit=8)", uploads_source)
+        self.assertIn("return name_matches[0] if len(name_matches) == 1 else None", uploads_source)
+
     def test_control_stage_can_advance_to_validation_without_payroll(self):
         template = Path("apps/dashboard/templates/dashboard.html").read_text(encoding="utf-8-sig")
         router_source = Path("apps/dashboard/router.py").read_text(encoding="utf-8-sig")
