@@ -77,6 +77,14 @@
         tabs.forEach((tab) => {
             tab.addEventListener("click", () => {
                 const target = tab.dataset.periodTab || "active";
+                const params = new URLSearchParams(window.location.search);
+                if (params.has("flow")) {
+                    params.delete("flow");
+                    const query = params.toString();
+                    const hash = target === "archive" ? "#periode-archief" : "#periodes";
+                    window.location.href = `${window.location.pathname}${query ? `?${query}` : ""}${hash}`;
+                    return;
+                }
                 activateTab(target);
                 if (target === "archive") {
                     window.history.replaceState(null, "", "#periode-archief");
