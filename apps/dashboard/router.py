@@ -225,6 +225,44 @@ def _audit_relation_fields(data: dict) -> str:
     return f"Relatiekaart bijgewerkt. Aangepast/ingevuld: {', '.join(shown)}{suffix}."
 
 
+PAYROLL_FLOW_FILTERS = {
+    "calculate": {
+        "count_key": "validate_count",
+        "label": "Loon berekenen",
+        "description": "Alleen actieve periodes met declaraties klaar voor loonberekening.",
+    },
+    "payable": {
+        "count_key": "payable_count",
+        "label": "Uit te betalen loon",
+        "description": "Alleen actieve periodes met declaraties klaar voor betaling.",
+    },
+    "paid": {
+        "count_key": "paid_count",
+        "label": "Uitbetaald loon",
+        "description": "Alleen actieve periodes met uitbetaalde declaraties.",
+    },
+}
+
+
+def _payroll_flow_filter_meta(flow_filter: str) -> dict:
+    key = str(flow_filter or "").strip().lower()
+    item = PAYROLL_FLOW_FILTERS.get(key)
+    if not item:
+        return {"key": "", "label": "Alle actieve periodes", "description": "Geen loonflow-filter actief."}
+    return {"key": key, **item}
+
+
+def _filter_payroll_periods_by_flow(periods: list[dict], flow_filter: str) -> list[dict]:
+    meta = _payroll_flow_filter_meta(flow_filter)
+    count_key = meta.get("count_key")
+    if not count_key:
+        return periods
+    return [
+        period
+        for period in periods
+        if int(((period.get("payroll_flow") or {}).get(count_key)) or 0) > 0
+    ]
+
 def _timesheet_stage(status: str) -> str:
     normalized = (status or "").strip().lower().replace(" ", "_")
     if normalized in {"doorgestuurd_naar_loonadministratie", "verwerkt", "processed", "definitief_loonbetaling", "uit_te_betalen", "uitbetaald"}:
@@ -366,6 +404,7 @@ def _dashboard_context(
     parameter_version_id: int | None = None,
     show_cao_form: bool = False,
     return_to: str = "",
+    payroll_flow_filter: str = "",
 ):
     data_page = "timesheets" if active_page in {"timesheets", "whatsapp"} else "relations" if active_page in {"relations", "candidates", "principals"} else active_page
     relation_return_url = _safe_dashboard_return_url(return_to)
@@ -522,6 +561,9 @@ def _dashboard_context(
     selected_project = _context_value(data_page, "selected_project", None, lambda: get_project(project_id)) if data_page == "projects" and project_id else None
     payroll_periods = _context_value(data_page, "payroll_periods", [], list_payroll_periods) if data_page in {"periods", "timesheets"} else []
     archived_payroll_periods = _context_value(data_page, "archived_payroll_periods", [], lambda: list_payroll_periods(archived=True)) if data_page in {"periods", "timesheets"} else []
+    payroll_flow_filter_meta = _payroll_flow_filter_meta(payroll_flow_filter if data_page == "periods" else "")
+    if data_page == "periods":
+        payroll_periods = _filter_payroll_periods_by_flow(payroll_periods, payroll_flow_filter_meta["key"])
     payroll_year_overview = _context_value(data_page, "payroll_year_overview", [], list_payroll_year_overview) if data_page == "periods" else []
     payroll_datamodel_status = _context_value(data_page, "payroll_datamodel_status", [], lambda: list_payroll_datamodel_status(limit=40)) if data_page == "periods" else []
     payroll_data_diagnostics = _context_value(data_page, "payroll_data_diagnostics", [], get_payroll_data_diagnostics) if data_page == "periods" else []
@@ -646,6 +688,7 @@ def _dashboard_context(
         "payroll_data_diagnostics": payroll_data_diagnostics,
         "payroll_flow_summary": payroll_flow_summary,
         "payroll_period_defaults": payroll_period_defaults,
+        "payroll_flow_filter": payroll_flow_filter_meta,
         "payroll_parameters": payroll_parameters,
         "selected_payroll_parameter_version": selected_payroll_parameter_version,
         "payroll_employee_arrangements": payroll_employee_arrangements,
@@ -719,9 +762,10 @@ def _render_dashboard(
     parameter_version_id: int | None = None,
     show_cao_form: bool = False,
     return_to: str = "",
+    payroll_flow_filter: str = "",
 ):
     try:
-        context = _dashboard_context(active_page, edit_id, query, timesheet_id, workflow_stage, timesheet_tab, relation_tab, status_filter, show_relation_form, project_id, period_id, cao_id, parameter_version_id, show_cao_form, return_to)
+        context = _dashboard_context(active_page, edit_id, query, timesheet_id, workflow_stage, timesheet_tab, relation_tab, status_filter, show_relation_form, project_id, period_id, cao_id, parameter_version_id, show_cao_form, return_to, payroll_flow_filter)
     except Exception as exc:
         print(f"DASHBOARD_CONTEXT_ERROR {active_page}: {type(exc).__name__}: {exc}")
         return HTMLResponse(
@@ -797,8 +841,8 @@ def projects_page(request: Request, q: str = "", project: int | None = None):
 
 
 @router.get("/dashboard/periods", response_class=HTMLResponse)
-def periods_page(request: Request, period: int | None = None):
-    return _render_dashboard(request, "periods", period_id=period)
+def periods_page(request: Request, period: int | None = None, flow: str = ""):
+    return _render_dashboard(request, "periods", period_id=period, payroll_flow_filter=flow)
 
 
 @router.get("/dashboard/tickets", response_class=HTMLResponse)

@@ -199,7 +199,7 @@
                         </div>
                         <strong>{{ overview_data.counts.whatsapp_timesheet_inbox }}</strong>
                     </a>
-                    <a class="stat-card" href="/dashboard/periods#periodes">
+                    <a class="stat-card" href="/dashboard/periods?flow=calculate#periodes">
                         <span class="stat-card__icon" aria-hidden="true">
                             <svg viewBox="0 0 24 24"><path d="M4 7h16"></path><path d="M4 12h10"></path><path d="m15 15 3 3 3-3"></path><path d="M18 6v12"></path></svg>
                         </span>
@@ -209,7 +209,7 @@
                         </div>
                         <strong>{{ overview_data.payroll_flow.validate_total }}</strong>
                     </a>
-                    <a class="stat-card" href="/dashboard/periods#periodes">
+                    <a class="stat-card" href="/dashboard/periods?flow=payable#periodes">
                         <span class="stat-card__icon" aria-hidden="true">
                             <svg viewBox="0 0 24 24"><path d="M12 2v20"></path><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7H14a3.5 3.5 0 0 1 0 7H6"></path></svg>
                         </span>
@@ -1516,22 +1516,29 @@ Metadata:
                         {% endif %}
 
                         <div class="payroll-flow-tiles" aria-label="Loonbetaling flow">
-                            <a class="payroll-flow-tile" href="/dashboard/periods#periodes">
+                            <a class="payroll-flow-tile {% if payroll_flow_filter.key == 'calculate' %}payroll-flow-tile--active{% endif %}" href="/dashboard/periods?flow=calculate#periodes">
                                 <span>Loon berekenen</span>
                                 <strong>{{ payroll_flow_summary.validate_total }}</strong>
                                 <small>{{ payroll_flow_summary.validate_count }} declaraties klaar voor loonberekening</small>
                             </a>
-                            <a class="payroll-flow-tile payroll-flow-tile--payable" href="/dashboard/periods#periodes">
+                            <a class="payroll-flow-tile payroll-flow-tile--payable {% if payroll_flow_filter.key == 'payable' %}payroll-flow-tile--active{% endif %}" href="/dashboard/periods?flow=payable#periodes">
                                 <span>Uit te betalen loon</span>
                                 <strong>{{ payroll_flow_summary.payable_total }}</strong>
                                 <small>{{ payroll_flow_summary.payable_count }} declaraties klaar voor betaling</small>
                             </a>
-                            <div class="payroll-flow-tile payroll-flow-tile--paid">
+                            <a class="payroll-flow-tile payroll-flow-tile--paid {% if payroll_flow_filter.key == 'paid' %}payroll-flow-tile--active{% endif %}" href="/dashboard/periods?flow=paid#periodes">
                                 <span>Uitbetaald loon</span>
                                 <strong>{{ payroll_flow_summary.paid_total }}</strong>
                                 <small>{{ payroll_flow_summary.paid_count }} declaraties afgerond</small>
-                            </div>
+                            </a>
                         </div>
+
+                        {% if payroll_flow_filter.key %}
+                        <div class="payroll-flow-filter-notice">
+                            <span>Filter actief: <strong>{{ payroll_flow_filter.label }}</strong>. {{ payroll_flow_filter.description }}</span>
+                            <a href="/dashboard/periods#periodes">Alle actieve periodes tonen</a>
+                        </div>
+                        {% endif %}
 
                         <div class="period-tabs" aria-label="Periode overzicht" data-period-tabs>
                             <button class="period-tab period-tab--active" type="button" data-period-tab="active" aria-selected="true">Actief <span>{{ payroll_periods|length }}</span></button>

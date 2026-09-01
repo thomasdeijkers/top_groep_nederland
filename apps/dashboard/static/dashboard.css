@@ -1043,6 +1043,40 @@ h2 {
     font-size: 0.76rem;
     font-weight: 800;
 }
+.payroll-flow-tile--active {
+    border-color: rgba(255, 255, 255, 0.72);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18), 0 0 0 2px rgba(127, 209, 160, 0.12);
+}
+
+.payroll-flow-filter-notice {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin: -2px 0 14px;
+    padding: 10px 12px;
+    border: 1px solid rgba(127, 209, 160, 0.28);
+    border-radius: 7px;
+    background: rgba(11, 27, 34, 0.72);
+    color: #c8d8df;
+    font-size: 0.84rem;
+}
+
+.payroll-flow-filter-notice strong {
+    color: #ffffff;
+}
+
+.payroll-flow-filter-notice a {
+    color: #9df0be;
+    font-weight: 850;
+    text-decoration: none;
+}
+
+.payroll-flow-filter-notice a:hover {
+    text-decoration: underline;
+}
+
 
 .period-status-tile {
     max-width: 160px;
