@@ -2455,10 +2455,10 @@ def _active_period_payroll_status_params() -> tuple[list[str], list[str]]:
 
 def _active_timesheet_condition(input_alias: str = "i", timesheet_alias: str = "wi") -> str:
     return (
-        f"({input_alias}.timesheet_inbox_id IS NULL OR "
-        f"({timesheet_alias}.id IS NOT NULL "
+        f"({input_alias}.timesheet_inbox_id IS NOT NULL "
+        f"AND {timesheet_alias}.id IS NOT NULL "
         f"AND {timesheet_alias}.deleted_at IS NULL "
-        f"AND {timesheet_alias}.archived_at IS NULL))"
+        f"AND {timesheet_alias}.archived_at IS NULL)"
     )
 
 
