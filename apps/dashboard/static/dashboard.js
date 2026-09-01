@@ -1167,9 +1167,15 @@
         const autosaveStatus = form.querySelector("[data-autosave-status]");
         let autosaveTimer = null;
         let autosaveController = null;
+
         const principalSearchInput = form.querySelector("[data-principal-search]");
+        const principalSuggestions = form.querySelector("[data-principal-suggestions]");
+        const projectSearchInput = form.querySelector("[data-project-search]");
+        const projectSuggestions = form.querySelector("[data-project-suggestions]");
         let principalSearchTimer = null;
         let principalSearchSequence = 0;
+        let projectSearchTimer = null;
+        let projectSearchSequence = 0;
         const dayCodeInputs = [
             ["field_monday_code", "field_monday_hours"],
             ["field_tuesday_code", "field_tuesday_hours"],
@@ -1183,6 +1189,8 @@
             hours: form.elements[hoursName],
         })).filter((item) => item.code && item.hours);
 
+        const sortByLabel = (items, key = "name") => [...items].sort((left, right) => String(left[key] || "").localeCompare(String(right[key] || ""), "nl", { sensitivity: "base" }));
+
         const syncWorkflowIds = () => {
             if (principalTarget && principalSelect) {
                 principalTarget.value = principalSelect.selectedOptions[0]?.dataset.id || "";
@@ -1192,20 +1200,44 @@
             }
         };
 
-        const renderPrincipalOptions = (principals, selectedValue, selectedLabel) => {
-            if (!principalSelect) {
+        const renderEntitySuggestions = (target, items, labelKey, metaBuilder, onPick) => {
+            if (!target) {
                 return;
             }
+            target.innerHTML = "";
+            const visible = items.slice(0, 6);
+            if (!visible.length) {
+                const empty = document.createElement("div");
+                empty.className = "entity-suggestion-empty";
+                empty.textContent = "Geen resultaten";
+                target.append(empty);
+                return;
+            }
+            visible.forEach((item) => {
+                const button = document.createElement("button");
+                button.type = "button";
+                button.className = "entity-suggestion";
+                button.innerHTML = `<strong>${item[labelKey] || "Onbekend"}</strong><span>${metaBuilder(item)}</span>`;
+                button.addEventListener("click", () => onPick(item));
+                target.append(button);
+            });
+        };
+
+        const renderPrincipalOptions = (principals, selectedValue, selectedLabel) => {
+            if (!principalSelect) {
+                return [];
+            }
+            const sorted = sortByLabel(principals, "name");
             principalSelect.innerHTML = "";
             principalSelect.append(new Option("Kies opdrachtgever", ""));
-            const hasSelectedInResults = principals.some((principal) => String(principal.name || "") === selectedValue);
+            const hasSelectedInResults = sorted.some((principal) => String(principal.name || "") === selectedValue);
             if (selectedValue && selectedLabel && !hasSelectedInResults) {
                 const selectedOption = new Option(selectedLabel, selectedValue);
                 selectedOption.dataset.id = principalTarget?.value || "";
                 selectedOption.selected = true;
                 principalSelect.append(selectedOption);
             }
-            principals.forEach((principal) => {
+            sorted.forEach((principal) => {
                 if (!principal.name) {
                     return;
                 }
@@ -1214,51 +1246,140 @@
                 option.selected = principal.name === selectedValue;
                 principalSelect.append(option);
             });
+            renderEntitySuggestions(principalSuggestions, sorted, "name", (item) => [item.city, item.contact].filter(Boolean).join(" - ") || "Opdrachtgever", (item) => {
+                principalSelect.value = item.name || "";
+                principalSelect.dispatchEvent(new Event("change", { bubbles: true }));
+            });
+            return sorted;
         };
 
-        const searchPrincipals = () => {
-            const searchUrl = principalSelect?.dataset.principalSearchUrl;
-            if (!searchUrl || !principalSearchInput) {
+        const renderProjectOptions = (projects, selectedValue, selectedLabel) => {
+            if (!projectSelect) {
+                return [];
+            }
+            const sorted = sortByLabel(projects, "title");
+            projectSelect.innerHTML = "";
+            projectSelect.append(new Option("Kies project", ""));
+            const hasSelectedInResults = sorted.some((project) => String(project.title || "") === selectedValue);
+            if (selectedValue && selectedLabel && !hasSelectedInResults) {
+                const selectedOption = new Option(selectedLabel, selectedValue);
+                selectedOption.dataset.id = projectTarget?.value || "";
+                selectedOption.selected = true;
+                projectSelect.append(selectedOption);
+            }
+            sorted.forEach((project) => {
+                if (!project.title) {
+                    return;
+                }
+                const meta = [project.reference_number, project.relation_name, project.cao_name ? `CAO: ${project.cao_name}` : ""].filter(Boolean).join(" - ");
+                const option = new Option(meta ? `${project.title} - ${meta}` : project.title, project.title);
+                option.dataset.id = project.id || "";
+                option.selected = project.title === selectedValue;
+                projectSelect.append(option);
+            });
+            renderEntitySuggestions(projectSuggestions, sorted, "title", (item) => [item.reference_number, item.relation_name, item.cao_name].filter(Boolean).join(" - ") || "Project", (item) => {
+                projectSelect.value = item.title || "";
+                projectSelect.dispatchEvent(new Event("change", { bubbles: true }));
+            });
+            return sorted;
+        };
+
+        const searchEntities = ({ input, select, timerRef, sequenceRef, setTimer, setSequence, renderOptions, label }) => {
+            const searchUrl = select?.dataset.principalSearchUrl || select?.dataset.projectSearchUrl;
+            if (!searchUrl || !input) {
                 return;
             }
-            window.clearTimeout(principalSearchTimer);
-            principalSearchTimer = window.setTimeout(async () => {
-                const sequence = principalSearchSequence + 1;
-                principalSearchSequence = sequence;
-                const selectedOption = principalSelect.selectedOptions[0];
-                const selectedValue = principalSelect.value;
+            window.clearTimeout(timerRef());
+            setTimer(window.setTimeout(async () => {
+                const sequence = sequenceRef() + 1;
+                setSequence(sequence);
+                const selectedOption = select.selectedOptions[0];
+                const selectedValue = select.value;
                 const selectedLabel = selectedOption?.textContent?.trim() || selectedValue;
                 try {
-                    const response = await fetch(`${searchUrl}?q=${encodeURIComponent(principalSearchInput.value.trim())}&limit=250`);
-                    if (!response.ok || sequence !== principalSearchSequence) {
+                    const response = await fetch(`${searchUrl}?q=${encodeURIComponent(input.value.trim())}&limit=250`);
+                    if (!response.ok || sequence !== sequenceRef()) {
                         return;
                     }
                     const data = await response.json();
-                    renderPrincipalOptions(Array.isArray(data.results) ? data.results : [], selectedValue, selectedLabel);
+                    renderOptions(Array.isArray(data.results) ? data.results : [], selectedValue, selectedLabel);
                     syncWorkflowIds();
                 } catch (error) {
-                    console.warn("Opdrachtgevers zoeken mislukt", error);
+                    console.warn(`${label} zoeken mislukt`, error);
                 }
-            }, 120);
+            }, 120));
+        };
+
+        const searchPrincipals = () => searchEntities({
+            input: principalSearchInput,
+            select: principalSelect,
+            timerRef: () => principalSearchTimer,
+            sequenceRef: () => principalSearchSequence,
+            setTimer: (timer) => { principalSearchTimer = timer; },
+            setSequence: (sequence) => { principalSearchSequence = sequence; },
+            renderOptions: renderPrincipalOptions,
+            label: "Opdrachtgevers",
+        });
+
+        const searchProjects = () => searchEntities({
+            input: projectSearchInput,
+            select: projectSelect,
+            timerRef: () => projectSearchTimer,
+            sequenceRef: () => projectSearchSequence,
+            setTimer: (timer) => { projectSearchTimer = timer; },
+            setSequence: (sequence) => { projectSearchSequence = sequence; },
+            renderOptions: renderProjectOptions,
+            label: "Projecten",
+        });
+
+        const chooseFirstVisibleOption = (select) => {
+            const first = [...(select?.options || [])].find((option) => option.value);
+            if (first) {
+                select.value = first.value;
+                select.dispatchEvent(new Event("change", { bubbles: true }));
+            }
         };
 
         principalSelect?.addEventListener("change", () => {
             if (principalSearchInput) {
-                principalSearchInput.value = principalSelect.value || "";
+                principalSearchInput.value = principalSelect.value || principalSearchInput.value || "";
+            }
+            syncWorkflowIds();
+        });
+        projectSelect?.addEventListener("change", () => {
+            if (projectSearchInput) {
+                projectSearchInput.value = projectSelect.value || projectSearchInput.value || "";
             }
             syncWorkflowIds();
         });
         principalSearchInput?.addEventListener("input", searchPrincipals);
+        projectSearchInput?.addEventListener("input", searchProjects);
         principalSearchInput?.addEventListener("keydown", (event) => {
             if (event.key === "Enter") {
                 event.preventDefault();
                 searchPrincipals();
+                window.setTimeout(() => chooseFirstVisibleOption(principalSelect), 180);
             }
         });
-        if (principalSearchInput && principalSelect?.value) {
-            principalSearchInput.value = principalSelect.value;
+        projectSearchInput?.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                searchProjects();
+                window.setTimeout(() => chooseFirstVisibleOption(projectSelect), 180);
+            }
+        });
+        if (principalSearchInput) {
+            principalSearchInput.value = principalSelect?.value || principalSearchInput.value || "";
+            if (principalSearchInput.value) {
+                searchPrincipals();
+            }
         }
-        projectSelect?.addEventListener("change", syncWorkflowIds);
+        if (projectSearchInput) {
+            projectSearchInput.value = projectSelect?.value || projectSearchInput.value || "";
+            if (projectSearchInput.value) {
+                searchProjects();
+            }
+        }
         syncWorkflowIds();
 
         const parseHours = (value) => {

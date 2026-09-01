@@ -1279,24 +1279,48 @@ def ensure_relation_for_candidate_match(match_value: str) -> int | None:
 
 
 def list_principals(limit: int = 25, query: str = "") -> list[dict]:
+    search = str(query or "").strip()
+    tokens = _candidate_name_tokens(search)[:6]
+    compact_search = re.sub(r"[^0-9a-z]+", "", search.lower())
     try:
         _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 params = []
                 where_clause = ""
-                if query:
-                    where_clause = """
+                if search:
+                    token_filters = []
+                    for token in tokens:
+                        token_filters.append(
+                            """
+                            (
+                                name ILIKE %s
+                                OR contact_name ILIKE %s
+                                OR email ILIKE %s
+                                OR phone ILIKE %s
+                                OR city ILIKE %s
+                                OR status ILIKE %s
+                                OR external_id ILIKE %s
+                            )
+                            """
+                        )
+                        params.extend([f"%{token}%"] * 7)
+                    token_where = " OR " + " OR ".join(token_filters) if token_filters else ""
+                    where_clause = f"""
                     AND (
                        name ILIKE %s
+                       OR contact_name ILIKE %s
                        OR email ILIKE %s
                        OR phone ILIKE %s
                        OR city ILIKE %s
                        OR status ILIKE %s
+                       OR external_id ILIKE %s
+                       OR regexp_replace(LOWER(COALESCE(name, '')), '[^a-z0-9]', '', 'g') ILIKE %s
+                       {token_where}
                     )
                     """
-                    like_query = f"%{query}%"
-                    params.extend([like_query] * 5)
+                    like_query = f"%{search}%"
+                    params = [like_query] * 7 + [f"%{compact_search}%"] + params
                 params.append(limit)
                 cursor.execute(
                     f"""
@@ -1306,7 +1330,7 @@ def list_principals(limit: int = 25, query: str = "") -> list[dict]:
                       AND archived_at IS NULL
                       AND LOWER(COALESCE(status, '')) NOT IN ('archief', 'gearchiveerd', 'archived')
                     {where_clause}
-                    ORDER BY updated_at DESC, id DESC
+                    ORDER BY LOWER(name) ASC NULLS LAST, id ASC
                     LIMIT %s;
                     """,
                     tuple(params),
@@ -1326,13 +1350,55 @@ def list_principals(limit: int = 25, query: str = "") -> list[dict]:
         return []
 
 
-def list_project_options(limit: int = 100) -> list[dict]:
+def list_project_options(limit: int = 100, query: str = "") -> list[dict]:
+    search = str(query or "").strip()
+    tokens = _candidate_name_tokens(search)[:6]
+    compact_search = re.sub(r"[^0-9a-z]+", "", search.lower())
     try:
         _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
             with conn.cursor() as cursor:
-                cursor.execute(
+                params = []
+                where_clause = """
+                    WHERE (
+                        COALESCE(v.raw_data->>'record_type', '') = 'project'
+                        OR LOWER(COALESCE(v.status, '')) IN ('project', 'actief project', 'actief')
+                    )
+                """
+                if search:
+                    token_filters = []
+                    for token in tokens:
+                        token_filters.append(
+                            """
+                            (
+                                v.title ILIKE %s
+                                OR v.reference_number ILIKE %s
+                                OR v.relation_name ILIKE %s
+                                OR v.location ILIKE %s
+                                OR v.status ILIKE %s
+                                OR c.name ILIKE %s
+                            )
+                            """
+                        )
+                        params.extend([f"%{token}%"] * 6)
+                    token_where = " OR " + " OR ".join(token_filters) if token_filters else ""
+                    where_clause += f"""
+                    AND (
+                        v.title ILIKE %s
+                        OR v.reference_number ILIKE %s
+                        OR v.relation_name ILIKE %s
+                        OR v.location ILIKE %s
+                        OR v.status ILIKE %s
+                        OR c.name ILIKE %s
+                        OR regexp_replace(LOWER(COALESCE(v.title, '') || COALESCE(v.reference_number, '') || COALESCE(v.relation_name, '')), '[^a-z0-9]', '', 'g') ILIKE %s
+                        {token_where}
+                    )
                     """
+                    like_query = f"%{search}%"
+                    params = [like_query] * 6 + [f"%{compact_search}%"] + params
+                params.append(limit)
+                cursor.execute(
+                    f"""
                     SELECT v.id,
                            v.title,
                            v.reference_number,
@@ -1343,15 +1409,11 @@ def list_project_options(limit: int = 100) -> list[dict]:
                     FROM vacancies v
                     LEFT JOIN payroll_cao_settings c
                         ON c.id = v.payroll_cao_setting_id
-                    WHERE COALESCE(v.raw_data->>'record_type', '') = 'project'
-                       OR LOWER(COALESCE(v.status, '')) IN ('project', 'actief project', 'actief')
-                    ORDER BY
-                        CASE WHEN COALESCE(v.raw_data->>'record_type', '') = 'project' THEN 0 ELSE 1 END,
-                        v.updated_at DESC,
-                        v.id DESC
+                    {where_clause}
+                    ORDER BY LOWER(v.title) ASC NULLS LAST, v.id ASC
                     LIMIT %s;
                     """,
-                    (limit,),
+                    tuple(params),
                 )
                 return [
                     {
@@ -1439,7 +1501,7 @@ def list_projects(limit: int = 100, query: str = "") -> list[dict]:
                         ON b.project_id = v.id
                     WHERE {' AND '.join(filters)}
                     GROUP BY v.id, c.name
-                    ORDER BY v.updated_at DESC, v.id DESC
+                    ORDER BY LOWER(v.title) ASC NULLS LAST, v.id ASC
                     LIMIT %s;
                     """,
                     tuple(params),

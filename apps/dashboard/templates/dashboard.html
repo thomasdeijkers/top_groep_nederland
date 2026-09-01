@@ -2853,7 +2853,8 @@ Metadata:
                                                     {% endif %}
                                                 </div>
                                                 <label class="search-select-field"><span class="field-title">Opdrachtgever {{ confidence_light(selected_message.parsed_map.principal_name) }}</span>
-                                                    <input type="search" placeholder="Zoek opdrachtgever..." data-principal-search autocomplete="off">
+                                                    <input type="search" value="{{ selected_message.parsed_map.principal_name.value if selected_message.parsed_map.principal_name is defined else selected_message.principal_name }}" placeholder="Zoek opdrachtgever op deel van naam..." data-principal-search autocomplete="off">
+                                                    <div class="entity-suggestions" data-principal-suggestions aria-label="Opdrachtgeversuggesties"></div>
                                                     <select name="field_principal_name" data-principal-search-select data-principal-search-url="/api/principals/search">
                                                         <option value="">Kies opdrachtgever</option>
                                                         {% for principal in principal_options %}
@@ -2861,8 +2862,10 @@ Metadata:
                                                         {% endfor %}
                                                     </select>
                                                 </label>
-                                                <label><span class="field-title">Project {{ confidence_light(selected_message.parsed_map.work_name) }}</span>
-                                                    <select name="field_work_name">
+                                                <label class="search-select-field"><span class="field-title">Project {{ confidence_light(selected_message.parsed_map.work_name) }}</span>
+                                                    <input type="search" value="{{ selected_message.parsed_map.work_name.value if selected_message.parsed_map.work_name is defined else selected_message.project_name }}" placeholder="Zoek project op naam, nummer of opdrachtgever..." data-project-search autocomplete="off">
+                                                    <div class="entity-suggestions" data-project-suggestions aria-label="Projectsuggesties"></div>
+                                                    <select name="field_work_name" data-project-search-select data-project-search-url="/api/projects/search">
                                                         <option value="">Kies project</option>
                                                         {% for project in project_options %}
                                                         <option value="{{ project.title }}" data-id="{{ project.id }}" {% if selected_message.selected_project_id == project.id or selected_message.project_name == project.title %}selected{% endif %}>{{ project.title }}{% if project.reference_number %} &middot; {{ project.reference_number }}{% endif %}{% if project.cao_name %} &middot; CAO: {{ project.cao_name }}{% endif %}</option>

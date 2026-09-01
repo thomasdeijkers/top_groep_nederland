@@ -1042,6 +1042,10 @@ def create_candidate_from_timesheet(
 def search_principals(q: str = "", limit: int = Query(120, ge=1, le=500)):
     return {"results": list_principals(limit=limit, query=q)}
 
+@router.get("/api/projects/search")
+def search_projects(q: str = "", limit: int = Query(120, ge=1, le=500)):
+    return {"results": list_project_options(limit=limit, query=q)}
+
 
 @router.post("/api/whatsapp/timesheet/{timesheet_id}/reparse")
 def reparse_whatsapp_timesheet(timesheet_id: int):

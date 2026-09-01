@@ -3241,6 +3241,53 @@ select.select-has-value {
     font-size: 0.76rem;
     font-weight: 600;
 }
+.entity-suggestions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(140px, 1fr));
+    gap: 8px;
+}
+
+.entity-suggestion,
+.entity-suggestion-empty {
+    min-height: 42px;
+    padding: 8px 10px;
+    border: 1px solid rgba(127, 209, 160, 0.24);
+    border-radius: 7px;
+    background: rgba(127, 209, 160, 0.08);
+    color: #f5fff8;
+    text-align: left;
+}
+
+.entity-suggestion {
+    display: grid;
+    gap: 3px;
+    cursor: pointer;
+}
+
+.entity-suggestion:hover {
+    border-color: rgba(127, 209, 160, 0.52);
+    background: rgba(127, 209, 160, 0.15);
+}
+
+.entity-suggestion strong {
+    overflow: hidden;
+    color: #f8fbfd;
+    font-size: 0.84rem;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.entity-suggestion span,
+.entity-suggestion-empty {
+    overflow: hidden;
+    color: #b8c6cf;
+    font-size: 0.74rem;
+    font-weight: 650;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 
 .candidate-suggestion-empty {
     grid-column: 1 / -1;
