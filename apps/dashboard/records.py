@@ -1041,7 +1041,7 @@ def list_relations(limit: int = 15, query: str = "", relation_type: str = "", st
                 where_clause = "WHERE " + " AND ".join(filters)
                 cursor.execute(
                     f"""
-                    SELECT id, relation_type, name, contact_name, email, phone,
+                    SELECT id, relation_type, name, first_name, last_name, contact_name, email, phone,
                            city, status, COALESCE(source, ''), photo_path,
                            street, house_number, house_number_addition, postal_code, country,
                            external_id, updated_at
@@ -1054,31 +1054,31 @@ def list_relations(limit: int = 15, query: str = "", relation_type: str = "", st
                 )
                 rows = []
                 for row in cursor.fetchall():
-                    street, house_number, house_number_addition = split_street_house_number(row[10], row[11], row[12])
-                    postal_code = row[13]
-                    country = row[14]
+                    street, house_number, house_number_addition = split_street_house_number(row[12], row[13], row[14])
+                    postal_code = row[15]
+                    country = row[16]
                     required_fields = [
                         row[2],  # naam
-                        row[5],  # telefoon
+                        row[7],  # telefoon
                         street,
                         house_number,
                         postal_code,
-                        row[6],  # plaats
+                        row[8],  # plaats
                     ]
                     completion_fields = [
                         row[2],
-                        row[4],
-                        row[5],
                         row[6],
                         row[7],
+                        row[8],
+                        row[9],
                         street,
                         house_number,
                         postal_code,
                         country,
-                        row[15],
+                        row[17],
                     ]
                     if row[1] == "principal":
-                        completion_fields.extend([row[3]])
+                        completion_fields.extend([row[5]])
                     filled_count = sum(1 for value in completion_fields if str(value or "").strip())
                     completion_total = len(completion_fields)
                     completion_percent = round((filled_count / completion_total) * 100) if completion_total else 0
@@ -1097,21 +1097,23 @@ def list_relations(limit: int = 15, query: str = "", relation_type: str = "", st
                         "relation_type": row[1],
                         "type": "Opdrachtgever" if row[1] == "principal" else "Kandidaat",
                         "name": row[2] or "",
-                        "contact": row[5] or "",
-                        "email": row[4] or "",
-                        "phone": row[5] or "",
-                        "city": row[6] or "",
-                        "status": row[7] or "",
-                        "source": row[8] or "",
-                        "has_photo": bool(row[9]),
+                        "first_name": row[3] or "",
+                        "last_name": row[4] or "",
+                        "contact": row[7] or "",
+                        "email": row[6] or "",
+                        "phone": row[7] or "",
+                        "city": row[8] or "",
+                        "status": row[9] or "",
+                        "source": row[10] or "",
+                        "has_photo": bool(row[11]),
                         "initials": _initials(row[2]),
                         "street": street,
                         "house_number": house_number,
                         "house_number_addition": house_number_addition,
-                        "postal_code": row[13] or "",
-                        "country": row[14] or "",
-                        "external_id": row[15] or "",
-                        "updated_at": row[16].strftime("%d-%m-%Y %H:%M") if row[16] else "",
+                        "postal_code": row[15] or "",
+                        "country": row[16] or "",
+                        "external_id": row[17] or "",
+                        "updated_at": row[18].strftime("%d-%m-%Y %H:%M") if row[18] else "",
                         "completion_percent": completion_percent,
                         "completion_label": f"{completion_percent}%",
                         "completion_status": completion_status,
@@ -1123,14 +1125,66 @@ def list_relations(limit: int = 15, query: str = "", relation_type: str = "", st
         return []
 
 
+
+_DUTCH_NAME_PREFIXES = {
+    "de", "den", "der", "het", "in", "op", "te", "ten", "ter", "tot", "uit", "van", "vd", "von",
+}
+
+
+def _candidate_name_tokens(value: str) -> list[str]:
+    normalized = str(value or "").lower()
+    return [token for token in re.findall(r"[^\W_]+", normalized, flags=re.UNICODE) if len(token) >= 2]
+
+
+def _candidate_last_name_query(value: str) -> str:
+    tokens = _candidate_name_tokens(value)
+    if not tokens:
+        return ""
+    if len(tokens) == 1:
+        return tokens[0]
+    last = tokens[-1]
+    prefix_tokens = []
+    for token in reversed(tokens[:-1]):
+        if token in _DUTCH_NAME_PREFIXES:
+            prefix_tokens.insert(0, token)
+        else:
+            break
+    return " ".join([*prefix_tokens, last]) if prefix_tokens else last
+
+
+def _candidate_match_score(candidate: dict, query: str) -> int:
+    query_tokens = _candidate_name_tokens(query)
+    if not query_tokens:
+        return 0
+    candidate_name = " ".join(_candidate_name_tokens(candidate.get("name", "")))
+    candidate_last = " ".join(_candidate_name_tokens(candidate.get("last_name", "")))
+    candidate_first = " ".join(_candidate_name_tokens(candidate.get("first_name", "")))
+    query_last = _candidate_last_name_query(query)
+    if not candidate_name:
+        return 0
+    if candidate_name == " ".join(query_tokens):
+        return 120
+    score = 0
+    if query_last:
+        plain_query_last = query_last.split()[-1]
+        candidate_last_tokens = set(_candidate_name_tokens(candidate_last or candidate_name))
+        if candidate_last == query_last or candidate_name.endswith(query_last):
+            score += 85
+        elif plain_query_last in candidate_last_tokens or candidate_name.endswith(plain_query_last):
+            score += 75
+    candidate_tokens = set(_candidate_name_tokens(candidate_name))
+    hits = sum(1 for token in query_tokens if token in candidate_tokens)
+    score += min(30, hits * 15)
+    if candidate_first and query_tokens[0] in _candidate_name_tokens(candidate_first):
+        score += 15
+    return min(score, 130)
+
+
 def search_candidate_matches(query: str = "", limit: int = 40) -> list[dict]:
     search = str(query or "").strip()
     limit = max(1, min(int(limit or 40), 80))
-    tokens = [
-        token
-        for token in re.split(r"[^0-9A-Za-zÀ-ÿ]+", search)
-        if len(token) >= 2
-    ][:5]
+    tokens = _candidate_name_tokens(search)[:5]
+    last_name_query = _candidate_last_name_query(search)
     try:
         _ensure_dashboard_tables_for_read()
         with get_connection() as conn:
@@ -1142,52 +1196,77 @@ def search_candidate_matches(query: str = "", limit: int = 40) -> list[dict]:
                     AND LOWER(COALESCE(status, '')) NOT IN ('archief', 'gearchiveerd', 'archived')
                 """
                 if search:
-                    token_filters = []
-                    for token in tokens:
-                        token_filters.append(
-                            "(name ILIKE %s OR email ILIKE %s OR phone ILIKE %s OR city ILIKE %s OR external_id ILIKE %s)"
-                        )
-                        params.extend([f"%{token}%"] * 5)
-                    token_where = " OR " + " OR ".join(token_filters) if token_filters else ""
-                    where_relation += """
-                        AND (
-                            name ILIKE %s
-                            OR email ILIKE %s
-                            OR phone ILIKE %s
-                            OR city ILIKE %s
-                            OR external_id ILIKE %s
-                            {token_where}
-                        )
-                    """.format(token_where=token_where)
-                    like = f"%{search}%"
-                    params = [like] * 5 + params
-                params.append(limit)
+                    phone_query = re.sub(r"\D+", "", search)
+                    if last_name_query and not phone_query:
+                        like_last = f"%{last_name_query}%"
+                        like_plain_last = f"%{last_name_query.split()[-1]}%"
+                        where_relation += """
+                            AND (
+                                last_name ILIKE %s
+                                OR name ILIKE %s
+                                OR last_name ILIKE %s
+                                OR name ILIKE %s
+                            )
+                        """
+                        params.extend([like_last, like_last, like_plain_last, like_plain_last])
+                    else:
+                        where_relation += """
+                            AND (
+                                name ILIKE %s
+                                OR first_name ILIKE %s
+                                OR last_name ILIKE %s
+                                OR email ILIKE %s
+                                OR phone ILIKE %s
+                                OR city ILIKE %s
+                                OR external_id ILIKE %s
+                            )
+                        """
+                        like = f"%{search}%"
+                        params.extend([like] * 7)
+                    if tokens and len(tokens) <= 2:
+                        token_filters = []
+                        for token in tokens:
+                            token_filters.append("(name ILIKE %s OR first_name ILIKE %s OR last_name ILIKE %s)")
+                            params.extend([f"%{token}%"] * 3)
+                        where_relation += " AND (" + " OR ".join(token_filters) + ")"
+                fetch_limit = max(limit * 4, 80) if search else limit
                 cursor.execute(
                     f"""
-                    SELECT id::text AS value, name, phone, city, 'Dashboard' AS source
+                    SELECT id::text AS value,
+                           name,
+                           first_name,
+                           last_name,
+                           phone,
+                           city,
+                           'Dashboard' AS source,
+                           updated_at
                     FROM relations
                     WHERE {where_relation}
                     ORDER BY
-                        CASE WHEN %s <> '' AND name ILIKE %s THEN 0 ELSE 1 END,
+                        CASE WHEN %s <> '' AND (last_name ILIKE %s OR name ILIKE %s) THEN 0 ELSE 1 END,
                         CASE WHEN %s = '' THEN updated_at ELSE NULL END DESC NULLS LAST,
                         name ASC
                     LIMIT %s;
                     """,
-                    tuple([*params[:-1], search, f"%{search}%", search, params[-1]]),
+                    tuple([*params, search, f"%{last_name_query or search}%", f"%{last_name_query or search}%", search, fetch_limit]),
                 )
-                return [
+                rows = [
                     {
                         "value": row[0],
                         "name": row[1] or "",
-                        "phone": row[2] or "",
-                        "city": row[3] or "",
-                        "source": row[4],
+                        "first_name": row[2] or "",
+                        "last_name": row[3] or "",
+                        "phone": row[4] or "",
+                        "city": row[5] or "",
+                        "source": row[6],
                     }
                     for row in cursor.fetchall()
                 ]
+                if search:
+                    rows.sort(key=lambda item: (-_candidate_match_score(item, search), item["name"].lower()))
+                return rows[:limit]
     except Exception:
         return []
-
 
 def ensure_relation_for_candidate_match(match_value: str) -> int | None:
     value = str(match_value or "").strip()
@@ -5918,7 +5997,6 @@ def _format_whatsapp_row(row) -> dict:
     _ensure_total_check(fields)
     source_channel = (row[25] or "manual_upload").strip() or "manual_upload"
     work_date = row[15]
-    date_input_value = _timesheet_date_input_value((fields.get("date") or {}).get("value"), work_date)
     parsed_week_number = _int_or_none((fields.get("week_number") or {}).get("value"))
     week_number = parsed_week_number or (work_date.isocalendar().week if work_date else None)
     source_labels = {
@@ -5947,7 +6025,6 @@ def _format_whatsapp_row(row) -> dict:
         "work_date": work_date,
         "work_date_display": work_date.strftime("%d-%m-%Y") if work_date else "-",
         "work_date_sort": work_date.isoformat() if work_date else "",
-        "date_input_value": date_input_value,
         "week_number": week_number,
         "week_number_display": f"WK{week_number}" if week_number else "-",
         "week_number_sort": f"{week_number:02d}" if week_number else "",
@@ -5967,20 +6044,6 @@ def _format_whatsapp_row(row) -> dict:
         "source_channel_label": source_labels.get(source_channel, "Handmatige verwerking"),
         "matched_relation_id": row[26],
     }
-
-
-def _timesheet_date_input_value(parsed_value, work_date) -> str:
-    if work_date:
-        return work_date.isoformat()
-    text = str(parsed_value or "").strip()
-    if not text:
-        return ""
-    for pattern in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%d-%m-%y", "%d/%m/%y"):
-        try:
-            return datetime.strptime(text, pattern).date().isoformat()
-        except ValueError:
-            continue
-    return ""
 
 
 def _decimal_or_none(value):

@@ -15,7 +15,6 @@ load_dotenv()
 
 FIELD_KEYS = (
     "week_number",
-    "date",
     "principal_name",
     "project_number",
     "employee_name",
@@ -258,7 +257,7 @@ def _normalize_openai_result(data: dict, filename: str) -> dict:
         "overall_confidence": _average_confidence(fields),
         "hours": _decimal_or_none(fields["total_hours"]["value"]),
         "break_minutes": None,
-        "work_date": _date_or_none(fields["date"]["value"]),
+        "work_date": None,
         "principal_name": fields["principal_name"]["value"],
         "project_name": fields["work_name"]["value"],
         "employee_name": fields["employee_name"]["value"],

@@ -883,8 +883,31 @@
             .replace(/[^a-z0-9]+/g, " ")
             .trim();
 
+        const namePrefixes = new Set(["de", "den", "der", "het", "in", "op", "te", "ten", "ter", "tot", "uit", "van", "vd", "von"]);
+        const nameParts = (value) => normalize(value).split(" ").filter((part) => part.length >= 2);
+        const lastNameQuery = (value) => {
+            const parts = nameParts(value);
+            if (!parts.length) {
+                return "";
+            }
+            if (parts.length === 1) {
+                return parts[0];
+            }
+            const last = parts[parts.length - 1];
+            const prefixes = [];
+            for (let index = parts.length - 2; index >= 0; index -= 1) {
+                if (!namePrefixes.has(parts[index])) {
+                    break;
+                }
+                prefixes.unshift(parts[index]);
+            }
+            return [...prefixes, last].join(" ");
+        };
+
         const scoreCandidate = (option, parsedName, parsedPhone) => {
             const name = normalize(option.dataset.name || option.textContent);
+            const firstName = normalize(option.dataset.firstName || "");
+            const lastName = normalize(option.dataset.lastName || "");
             const phone = (option.dataset.phone || "").replace(/\D/g, "");
             const query = normalize(parsedName);
             const queryPhone = (parsedPhone || "").replace(/\D/g, "");
@@ -898,47 +921,29 @@
                 return 0;
             }
             if (name === query) {
-                return 100;
+                return 120;
             }
-            if (name.includes(query) || query.includes(name)) {
-                return 82;
+            const queryParts = nameParts(query);
+            const queryLast = lastNameQuery(query);
+            const plainQueryLast = queryLast.split(" ").pop() || "";
+            const candidateLast = lastName || lastNameQuery(name);
+            const candidateParts = new Set(nameParts(name));
+            let score = 0;
+            if (queryLast && (candidateLast === queryLast || name.endsWith(queryLast))) {
+                score += 85;
+            } else if (plainQueryLast && (candidateLast.split(" ").includes(plainQueryLast) || name.endsWith(plainQueryLast))) {
+                score += 75;
             }
-            const nameParts = new Set(name.split(" ").filter(Boolean));
-            const queryParts = query.split(" ").filter(Boolean);
-            const editDistance = (left, right) => {
-                if (Math.abs(left.length - right.length) > 2) {
-                    return 3;
-                }
-                const costs = Array.from({ length: right.length + 1 }, (_, index) => index);
-                for (let i = 1; i <= left.length; i += 1) {
-                    let previous = i;
-                    for (let j = 1; j <= right.length; j += 1) {
-                        const next = left[i - 1] === right[j - 1]
-                            ? costs[j - 1]
-                            : Math.min(costs[j - 1], previous, costs[j]) + 1;
-                        costs[j - 1] = previous;
-                        previous = next;
-                    }
-                    costs[right.length] = previous;
-                }
-                return costs[right.length];
-            };
-            const hits = queryParts.filter((part) => nameParts.has(part) || [...nameParts].some((namePart) => (
-                namePart.startsWith(part)
-                || part.startsWith(namePart)
-                || (part.length >= 3 && namePart.includes(part))
-                || (part.length >= 5 && namePart.length >= 5 && editDistance(part, namePart) <= 2)
-            ))).length;
-            const partialHits = queryParts.filter((part) => [...nameParts].some((namePart) => (
-                part.length >= 3
-                && namePart.length >= 3
-                && (namePart.startsWith(part.slice(0, 3)) || part.startsWith(namePart.slice(0, 3)))
-            ))).length;
-            const tokenScore = queryParts.length ? Math.round((hits / queryParts.length) * 82) : 0;
-            const partialScore = queryParts.length ? Math.round((partialHits / queryParts.length) * 48) : 0;
-            return Math.max(tokenScore, partialScore);
+            const hits = queryParts.filter((part) => candidateParts.has(part)).length;
+            score += Math.min(30, hits * 15);
+            if (firstName && queryParts[0] && firstName.split(" ").includes(queryParts[0])) {
+                score += 15;
+            }
+            if (!score && name.includes(query)) {
+                score = 45;
+            }
+            return Math.min(score, 130);
         };
-
         const applySelectedCandidate = () => {
             const option = select.selectedOptions[0];
             if (!option || !option.value) {
@@ -1008,6 +1013,8 @@
                 const parts = [candidate.name, candidate.phone, candidate.city].filter(Boolean);
                 const option = new Option(parts.join(" | "), candidate.value);
                 option.dataset.name = candidate.name || "";
+                option.dataset.firstName = candidate.first_name || "";
+                option.dataset.lastName = candidate.last_name || "";
                 option.dataset.phone = candidate.phone || "";
                 option.dataset.city = candidate.city || "";
                 select.append(option);

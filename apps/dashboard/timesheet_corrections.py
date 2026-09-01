@@ -218,15 +218,16 @@ def validate_timesheet(timesheet_id: int, principal_id: int | None, project_id: 
                 raise TimesheetValidationError("De gekoppelde kandidaat bestaat niet meer of is gearchiveerd.")
             parsed_fields = parsed_fields or {}
             _recalculate_total_checks(parsed_fields)
-            work_date = _date_from_fields(parsed_fields) or work_date
-            if not work_date:
-                raise TimesheetValidationError("Vul eerst een werkdatum in zodat de juiste loonperiode bepaald kan worden.")
+            parsed_week_number = _int_or_none((parsed_fields.get("week_number") or {}).get("value"))
+            if not parsed_week_number:
+                raise TimesheetValidationError("Vul eerst een weeknummer in zodat de juiste loonperiode bepaald kan worden.")
             hours = _decimal_or_none((parsed_fields.get("total_hours") or {}).get("value")) or hours or _hours_from_fields(parsed_fields)
             payroll_cao_setting_id = _project_cao_setting_id(cursor, project_id)
-            payroll_period = _payroll_period_context(cursor, work_date)
+            payroll_period = _payroll_period_context_for_week(cursor, parsed_week_number)
             if not payroll_period:
-                raise TimesheetValidationError("Geen loonperiode gevonden voor de werkdatum van dit urenbriefje.")
-            payroll_period_id, payroll_period_week_id, week_number, period_number, period_year = payroll_period
+                raise TimesheetValidationError("Geen loonperiode gevonden voor weeknummer van dit urenbriefje.")
+            payroll_period_id, payroll_period_week_id, week_number, period_number, period_year, week_start_date = payroll_period
+            work_date = week_start_date or work_date
             arrangement_id = _arrangement_id_for_period(cursor, relation_id, period_year, period_number)
 
             cursor.execute(
@@ -351,26 +352,29 @@ def _project_cao_setting_id(cursor, project_id: int | None):
     return row[0] if row else None
 
 
-def _payroll_period_context(cursor, work_date):
+def _payroll_period_context_for_week(cursor, week_number: int):
     cursor.execute(
         """
         SELECT p.id,
                w.id,
                w.week_number,
                p.period_number,
-               p.year
+               p.year,
+               w.start_date
         FROM payroll_periods p
-        JOIN payroll_period_weeks w
-            ON w.payroll_period_id = p.id
-           AND %s BETWEEN w.start_date AND w.end_date
-        WHERE %s BETWEEN p.start_date AND p.end_date
-        ORDER BY p.start_date DESC, w.week_index DESC
+        JOIN payroll_period_weeks w ON w.payroll_period_id = p.id
+        WHERE w.week_number = %s
+          AND LOWER(COALESCE(p.status, '')) <> 'archief'
+        ORDER BY
+            CASE WHEN LOWER(COALESCE(p.status, '')) IN ('open', 'actief') THEN 0 ELSE 1 END,
+            p.year DESC,
+            p.period_number DESC,
+            w.week_index DESC
         LIMIT 1;
         """,
-        (work_date, work_date),
+        (week_number,),
     )
     return cursor.fetchone()
-
 
 def _arrangement_id_for_period(cursor, relation_id: int, year: int, period_number: int):
     cursor.execute(
@@ -565,6 +569,13 @@ def _decimal_or_none(value):
     except Exception:
         return None
 
+
+def _int_or_none(value):
+    try:
+        text = str(value or "").strip()
+        return int(text) if text else None
+    except Exception:
+        return None
 
 def _date_from_fields(parsed_fields: dict):
     value = str((parsed_fields.get("date") or {}).get("value") or "").strip()

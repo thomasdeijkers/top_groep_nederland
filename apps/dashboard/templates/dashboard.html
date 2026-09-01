@@ -2793,7 +2793,6 @@ Metadata:
                                                     <strong>Basisgegevens</strong>
                                                     <span class="accordion-metrics">
                                                         {{ summary_status(selected_message.parsed_map.week_number, 'Week', none, '', 'week_number') }}
-                                                        {{ summary_status(selected_message.parsed_map.date, 'Datum', selected_message.parsed_map.date.value if selected_message.parsed_map.date is defined else selected_message.work_date, '', 'date') }}
                                                         <span class="accordion-metric accordion-metric--{{ 'green' if selected_message.matched_relation_id else 'red' }}" data-candidate-match-summary>
                                                             <i></i>Kandidaat: {{ selected_message.matched_name if selected_message.matched_relation_id else 'Niet gekoppeld' }}
                                                         </span>
@@ -2804,7 +2803,6 @@ Metadata:
                                                 </summary>
                                                 <div class="digital-timesheet-grid digital-timesheet-grid--primary">
                                                 <label><span class="field-title">Week {{ confidence_light(selected_message.parsed_map.week_number) }}</span><input name="field_week_number" value="{{ selected_message.parsed_map.week_number.value if selected_message.parsed_map.week_number is defined else '' }}"></label>
-                                                <label><span class="field-title">Datum {{ confidence_light(selected_message.parsed_map.date) }}</span><input type="date" name="field_date" value="{{ selected_message.date_input_value }}"></label>
                                                 {% set parsed_employee_name = selected_message.parsed_map.employee_name.value if selected_message.parsed_map.employee_name is defined else selected_message.employee_name %}
                                                 {% set parsed_employee_phone = selected_message.parsed_map.employee_phone.value if selected_message.parsed_map.employee_phone is defined else selected_message.sender_phone %}
                                                 <label>
@@ -2834,7 +2832,7 @@ Metadata:
                                                                 {% for candidate in timesheet_candidate_options %}
                                                                 {% set candidate_name_match = parsed_employee_name and candidate.name and parsed_employee_name|lower == candidate.name|lower %}
                                                                 {% set candidate_phone_match = parsed_employee_phone and candidate.phone and (parsed_employee_phone|string|replace(' ', '')|replace('-', '') == candidate.phone|string|replace(' ', '')|replace('-', '')) %}
-                                                                <option value="{{ candidate.id }}" data-name="{{ candidate.name }}" data-phone="{{ candidate.phone if candidate.phone != '-' else '' }}" data-city="{{ candidate.city }}" {% if selected_message.matched_relation_id == candidate.id %}selected{% endif %}>
+                                                                <option value="{{ candidate.id }}" data-name="{{ candidate.name }}" data-first-name="{{ candidate.first_name|default('', true) }}" data-last-name="{{ candidate.last_name|default('', true) }}" data-phone="{{ candidate.phone if candidate.phone != '-' else '' }}" data-city="{{ candidate.city }}" {% if selected_message.matched_relation_id == candidate.id %}selected{% endif %}>
                                                                     {% if candidate_phone_match or candidate_name_match %}Suggestie - {% endif %}{{ candidate.name }}{% if candidate.phone and candidate.phone != '-' %} | {{ candidate.phone }}{% endif %}{% if candidate.city and candidate.city != '-' %} | {{ candidate.city }}{% endif %}
                                                                 </option>
                                                                 {% endfor %}
