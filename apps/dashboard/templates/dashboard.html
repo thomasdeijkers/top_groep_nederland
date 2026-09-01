@@ -204,7 +204,7 @@
                             <svg viewBox="0 0 24 24"><path d="M4 7h16"></path><path d="M4 12h10"></path><path d="m15 15 3 3 3-3"></path><path d="M18 6v12"></path></svg>
                         </span>
                         <div class="stat-card__copy">
-                            <p>Loon te valideren</p>
+                            <p>Loon berekenen</p>
                             <span>{{ overview_data.payroll_flow.validate_count }} declaraties</span>
                         </div>
                         <strong>{{ overview_data.payroll_flow.validate_total }}</strong>
@@ -1516,9 +1516,9 @@ Metadata:
 
                         <div class="payroll-flow-tiles" aria-label="Loonbetaling flow">
                             <a class="payroll-flow-tile" href="/dashboard/periods#periodes">
-                                <span>Loon te valideren</span>
+                                <span>Loon berekenen</span>
                                 <strong>{{ payroll_flow_summary.validate_total }}</strong>
-                                <small>{{ payroll_flow_summary.validate_count }} declaraties nog niet doorgezet naar uitbetalen</small>
+                                <small>{{ payroll_flow_summary.validate_count }} declaraties klaar voor loonberekening</small>
                             </a>
                             <a class="payroll-flow-tile payroll-flow-tile--payable" href="/dashboard/periods#periodes">
                                 <span>Uit te betalen loon</span>
@@ -1657,7 +1657,7 @@ Metadata:
                                             <div class="period-flow-mini" aria-label="Loonflow {{ period.name }}">
                                                 <span class="period-flow-mini__tile">
                                                     <strong>{{ period.payroll_flow.validate_total }}</strong>
-                                                    <small>Loon te valideren &middot; {{ period.payroll_flow.validate_count }}</small>
+                                                    <small>Loon berekenen &middot; {{ period.payroll_flow.validate_count }}</small>
                                                 </span>
                                                 <span class="period-flow-mini__tile period-flow-mini__tile--payable">
                                                     <strong>{{ period.payroll_flow.payable_total }}</strong>
@@ -1733,7 +1733,7 @@ Metadata:
                                             <div class="period-flow-mini" aria-label="Loonflow {{ period.name }}">
                                                 <span class="period-flow-mini__tile">
                                                     <strong>{{ period.payroll_flow.validate_total }}</strong>
-                                                    <small>Loon te valideren &middot; {{ period.payroll_flow.validate_count }}</small>
+                                                    <small>Loon berekenen &middot; {{ period.payroll_flow.validate_count }}</small>
                                                 </span>
                                                 <span class="period-flow-mini__tile period-flow-mini__tile--payable">
                                                     <strong>{{ period.payroll_flow.payable_total }}</strong>
