@@ -407,6 +407,7 @@ def build_period_sheet_rows(candidates: list[dict], payroll_rows: list[dict]) ->
         cao_name = payroll_row.get("cao_name") or payroll_row.get("payroll_cao_name") or ""
         phase = payroll_row.get("payroll_phase") or ""
         bruto_total = hourly_wage * contract_hours if hourly_wage and contract_hours else Decimal("0")
+        net_base_40h = _decimal(payroll_row.get("payroll_net_base_40h"))
         rows.append(
             {
                 "employee_name": employee_name,
@@ -438,7 +439,8 @@ def build_period_sheet_rows(candidates: list[dict], payroll_rows: list[dict]) ->
                 "pension_component": payroll_row.get("pension_component") or "",
                 "labor_cost_margin": payroll_row.get("labor_cost_margin") or "",
                 "staffing_factor": payroll_row.get("staffing_factor") or "",
-                "net_period_basis": payroll_row.get("net_period_basis") or "",
+                "payroll_net_base_40h": _format_money(net_base_40h) if net_base_40h else "",
+                "net_period_basis": _format_money(net_base_40h) if net_base_40h else (payroll_row.get("net_period_basis") or ""),
                 "period_basis": payroll_row.get("period_basis") or "",
                 "reservation_basis": payroll_row.get("reservation_basis") or "",
                 "source": "urenverwerking",
@@ -461,6 +463,7 @@ def build_payslip_sheet_rows(period_rows: list[dict], total_rows: list[dict]) ->
         worked_hours = _decimal(totals.get("total_worked_hours"))
         worked_days = _decimal(totals.get("total_worked_days"))
         hourly_wage = _decimal(period_row.get("gross_hourly_wage"))
+        net_base_40h = _decimal(period_row.get("payroll_net_base_40h") or period_row.get("net_period_basis"))
         km_total = _decimal(totals.get("total_km"))
         declarations = _decimal(totals.get("total_declarations"))
         net_advance = _decimal(totals.get("total_net_advance"))
@@ -468,7 +471,8 @@ def build_payslip_sheet_rows(period_rows: list[dict], total_rows: list[dict]) ->
         travel_allowance = km_total * Decimal("0.23")
         pension_deduction = gross_reference * Decimal("0.035")
         payroll_tax = gross_reference * Decimal("0.29")
-        net_reference = (gross_reference * Decimal("0.62")) + travel_allowance + declarations
+        net_wage_reference = net_base_40h * worked_hours / Decimal("40") if net_base_40h and worked_hours else Decimal("0")
+        net_reference = net_wage_reference + travel_allowance + declarations
         net_to_receive = max(net_reference - net_advance, Decimal("0"))
         rows.append(
             {
@@ -500,7 +504,7 @@ def build_payslip_sheet_rows(period_rows: list[dict], total_rows: list[dict]) ->
                 "ik": "0,00",
                 "net_total": _format_money(net_to_receive),
                 "car_license_plate": period_row.get("license_plate"),
-                "weekly_wage": _format_money(gross_reference / Decimal("4") if gross_reference else Decimal("0")),
+                "weekly_wage": _format_money(net_base_40h if net_base_40h else Decimal("0")),
                 "ntf_sl": _format_money(Decimal("0")),
                 "bkp_ntfsl": _format_money(Decimal("0")),
                 "sickness_value": _format_money(Decimal("0")),

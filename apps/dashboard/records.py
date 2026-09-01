@@ -1786,7 +1786,7 @@ def _attach_period_list_notes(cursor, periods: list[dict]) -> None:
             period["completion_note"] = "Geen urenregels in deze periode."
             period["completion_tone"] = "neutral"
         elif blocker_count:
-            period["completion_note"] = f"{blocker_count} blokkade(s): vul medewerkerinrichting, koppeling of netto basisloon aan."
+            period["completion_note"] = f"{blocker_count} blokkade(s): vul medewerkerinrichting, koppeling of netto weekloonafspraak aan."
             period["completion_tone"] = "danger"
         elif payable_count:
             period["completion_note"] = f"{payable_count} declaratie(s) klaar om uit te betalen."
@@ -2421,7 +2421,7 @@ def _employee_week_result_status(concept_count, missing_arrangement_count, missi
     if missing_arrangement_count:
         return "mist inrichting"
     if missing_wage_count:
-        return "mist netto basisloon"
+        return "mist netto weekloonafspraak"
     if concept_count:
         return "concept"
     return "controle"
@@ -2582,12 +2582,12 @@ def _payroll_arrangement_missing_fields_text(
     pension_scheme=None,
 ) -> str:
     if not arrangement_id:
-        return "Medewerker-inrichting mist: geldige periode-inrichting, contracturen, netto basisloon 40 uur, bruto uurloon, fase, pensioenregeling."
+        return "Medewerker-inrichting mist: geldige periode-inrichting, contracturen, netto weekloonafspraak 40 uur, bruto uurloon, fase, pensioenregeling."
     missing = []
     if contract_hours is None:
         missing.append("contracturen")
     if net_base_40h is None:
-        missing.append("netto basisloon 40 uur")
+        missing.append("netto weekloonafspraak 40 uur")
     if gross_hourly_wage is None:
         missing.append("bruto uurloon")
     if not phase:
@@ -2646,7 +2646,7 @@ def list_payroll_period_exceptions(period_id: int, limit: int = 100) -> list[dic
                                            CONCAT_WS(', ',
                                                CASE WHEN i.arrangement_id IS NULL THEN 'geen geldige medewerker-inrichting voor deze loonperiode' END,
                                                CASE WHEN a.contract_hours_4w IS NULL THEN 'contracturen' END,
-                                               CASE WHEN a.net_base_40h IS NULL THEN 'netto basisloon 40 uur' END,
+                                               CASE WHEN a.net_base_40h IS NULL THEN 'netto weekloonafspraak 40 uur' END,
                                                CASE WHEN a.gross_hourly_wage IS NULL THEN 'bruto uurloon' END,
                                                CASE WHEN COALESCE(a.phase, '') = '' THEN 'fase' END,
                                                CASE WHEN COALESCE(a.pension_scheme, '') = '' THEN 'pensioenregeling' END
@@ -2684,8 +2684,8 @@ def list_payroll_period_exceptions(period_id: int, limit: int = 100) -> list[dic
                                r.employee_name,
                                COUNT(*) AS occurrence_count,
                                STRING_AGG(DISTINCT COALESCE(r.week_number::text, '-'), ', ' ORDER BY COALESCE(r.week_number::text, '-')) AS week_numbers,
-                               'Netto basisloon ontbreekt' AS title,
-                               'Vul netto basis 40 uur in zodat de netto indicatie per week en periode kan worden berekend.' AS detail,
+                               'Netto weekloonafspraak ontbreekt' AS title,
+                               'Vul de netto weekloonafspraak bij 40 uur in. De loonperiode rekent dit automatisch terug op basis van de gewerkte uren.' AS detail,
                                'Medewerkerkaart openen' AS next_step
                         FROM payroll_week_results r
                         JOIN payroll_week_inputs i ON i.id = r.payroll_week_input_id
@@ -3044,7 +3044,7 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                     if row[1] and arrangement_missing:
                         row_blockers.add(arrangement_missing)
                     if row[27] == "mist_netto_basisloon" and not arrangement_missing:
-                        row_blockers.add("Netto basisloon ontbreekt.")
+                        row_blockers.add("Netto weekloonafspraak ontbreekt.")
                     if hours > 0 and not int(row[28] or 0):
                         row_blockers.add("Projectregel ontbreekt: controleer opdrachtgever/project voor facturatie en CAO-context.")
                     item["booking_count"] += 1
@@ -3118,6 +3118,7 @@ def list_payroll_period_payroll(period_id: int) -> list[dict]:
                             "payroll_scale": item["payroll_scale"],
                             "payroll_function": item["payroll_function"],
                             "payroll_hourly_wage": item["payroll_hourly_wage"],
+                            "payroll_net_base_40h": _format_money(item["net_base_40h_raw"]) if item["net_base_40h_raw"] else "",
                         }
                     )
                 return sorted(rows, key=lambda item: item["employee_name"])
@@ -3504,7 +3505,7 @@ def _recalculate_payroll_derived_cells(tab: dict, row: dict) -> None:
         if single_trip_km and worked_days:
             commute_km = single_trip_km * worked_days * Decimal("2")
             row["commute_km"] = _format_number(commute_km)
-        row["net_amount"] = _format_money(worked_hours * Decimal("13.75"))
+        row["net_amount"] = _format_money(worked_hours * Decimal("18.75"))
         row["total_km"] = _format_number(commute_km + work_km)
         return
     if kind == "period":
@@ -3513,23 +3514,24 @@ def _recalculate_payroll_derived_cells(tab: dict, row: dict) -> None:
         gross_total = contract_hours * gross_hourly_wage
         row["gross_total"] = _format_money(gross_total)
         row["labor_cost_margin"] = _format_money(gross_total * Decimal("0.18"))
-        row["net_period_basis"] = _format_money(gross_total * Decimal("0.62"))
+        row["net_period_basis"] = row.get("net_period_basis") or _format_money(Decimal("750"))
         return
     if kind != "payslip":
         return
     worked_hours = _payroll_number_decimal(row.get("total_worked_hours"))
     hourly_wage = _payroll_money_decimal(row.get("hourly_wage") or row.get("gross_hourly_wage"))
     gross_wage = worked_hours * hourly_wage if worked_hours and hourly_wage else _payroll_money_decimal(row.get("gross_wage"))
+    net_week_agreement = _payroll_money_decimal(row.get("weekly_wage")) or Decimal("750")
     if gross_wage:
         row["gross_wage"] = _format_money(gross_wage)
-        row["weekly_wage"] = _format_money(gross_wage / Decimal("4"))
+        row["weekly_wage"] = _format_money(net_week_agreement)
         row["pension_deduction"] = _format_money(gross_wage * Decimal("0.035"))
         row["payroll_tax"] = _format_money(gross_wage * Decimal("0.29"))
         row["net_after_deductions"] = _format_money(max(gross_wage - (gross_wage * Decimal("0.035")) - (gross_wage * Decimal("0.29")), Decimal("0")))
     travel_allowance = _payroll_number_decimal(row.get("total_km")) * Decimal("0.23")
     declarations = _payroll_money_decimal(row.get("extra_reimbursements"))
     if gross_wage:
-        period_total = (gross_wage * Decimal("0.62")) + travel_allowance + declarations
+        period_total = (net_week_agreement * worked_hours / Decimal("40")) + travel_allowance + declarations
         row["period_total"] = _format_money(period_total)
         row["wkr_reimbursements"] = _format_money(travel_allowance)
     else:

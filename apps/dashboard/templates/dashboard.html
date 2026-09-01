@@ -499,7 +499,7 @@
                                                         <label>Schaal <input name="scale_code" value="{{ arrangement.raw_scale_code }}"></label>
                                                         <label>Functie <input name="function_name" value="{{ arrangement.raw_function_name }}"></label>
                                                         <label>Bruto uurloon <input name="gross_hourly_wage" value="{{ arrangement.raw_gross_hourly_wage }}"></label>
-                                                        <label>Netto 40u <input name="net_base_40h" value="{{ arrangement.raw_net_base_40h }}"></label>
+                                                        <label>Netto weekloon <input name="net_base_40h" value="{{ arrangement.raw_net_base_40h }}"></label>
                                                         <label>Vakantie 40u <input name="vacation_rate_40h" value="{{ arrangement.raw_vacation_rate_40h }}"></label>
                                                         <label>Ziekte 40u <input name="sickness_rate_40h" value="{{ arrangement.raw_sickness_rate_40h }}"></label>
                                                         <label>Feestdag 40u <input name="holiday_rate_40h" value="{{ arrangement.raw_holiday_rate_40h }}"></label>
@@ -983,7 +983,7 @@
                                         <label>Bruto uurloon <input type="text" name="payroll_hourly_wage" value="{{ selected_relation.payroll_hourly_wage|default('', true) if selected_relation else '' }}" placeholder="€ 18,50"></label>
                                         {% set relation_payroll_arrangement = selected_relation_payroll.current_arrangement if selected_relation_payroll else none %}
                                         {% set relation_net_base_40h = relation_payroll_arrangement.raw_net_base_40h|default('', true) if relation_payroll_arrangement else '' %}
-                                        <label>Netto basis 40 uur <input type="text" name="payroll_net_base_40h" value="{{ relation_net_base_40h }}" placeholder="€ 550,00"></label>
+                                        <label>Netto weekloonafspraak 40 uur <input type="text" name="payroll_net_base_40h" value="{{ relation_net_base_40h }}" placeholder="€ 750,00"></label>
                                     </div>
                                 </section>
                                 <label data-principal-field>KvK <input type="text" name="kvk_number" value="{{ selected_relation.kvk_number|default('', true) if selected_relation else '' }}"></label>
@@ -1009,7 +1009,7 @@
                                         <small>{{ payroll_arrangement.valid_from }} tot {{ payroll_arrangement.valid_until }}</small>
                                     </div>
                                     <div>
-                                        <span>Netto basis 40 uur</span>
+                                        <span>Netto weekloonafspraak 40 uur</span>
                                         <strong>{{ payroll_arrangement.net_base_40h }}</strong>
                                         <small>{{ payroll_arrangement.phase }} &middot; {{ payroll_arrangement.pension_scheme }}</small>
                                     </div>
@@ -1908,7 +1908,7 @@ Metadata:
                                 {% else %}
                                 <div class="empty-state empty-state--compact">
                                     <strong>{% if week_input.input_count|int == 0 %}Nog geen gevalideerde uren{% else %}Geen payroll-uitzonderingen{% endif %}</strong>
-                                    <span>{% if week_input.input_count|int == 0 %}Zodra urenbriefjes zijn gevalideerd en doorgestuurd naar loonberekening, worden hier de payroll-controles en eventuele blokkades zichtbaar.{% else %}De bekende blokkades voor medewerkerinrichting, netto basisloon, kandidaatkoppeling, ontbrekende weken en projectregels zijn niet gevonden.{% endif %}</span>
+                                    <span>{% if week_input.input_count|int == 0 %}Zodra urenbriefjes zijn gevalideerd en doorgestuurd naar loonberekening, worden hier de payroll-controles en eventuele blokkades zichtbaar.{% else %}De bekende blokkades voor medewerkerinrichting, netto weekloonafspraak, kandidaatkoppeling, ontbrekende weken en projectregels zijn niet gevonden.{% endif %}</span>
                                 </div>
                                 {% endfor %}
                             </div>

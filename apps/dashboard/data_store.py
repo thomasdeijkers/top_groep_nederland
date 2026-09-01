@@ -74,6 +74,7 @@ def ensure_dashboard_tables():
         Path("migrations/047_deduplicate_project_time_bookings.sql"),
         Path("migrations/048_payroll_parameter_management.sql"),
         Path("migrations/049_payroll_week_input_payment_status.sql"),
+        Path("migrations/050_default_net_week_wage.sql"),
     ]
 
     optional_migrations = set()

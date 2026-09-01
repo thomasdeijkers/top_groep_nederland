@@ -594,7 +594,7 @@ def _sync_relation_payroll_arrangement(relation_id: int, payload: dict) -> None:
                 payload.get("payroll_scale") or None,
                 payload.get("payroll_function") or None,
                 _decimal_or_none(payload.get("payroll_hourly_wage")),
-                _decimal_or_none(payload.get("payroll_net_base_40h")),
+                _decimal_or_none(payload.get("payroll_net_base_40h")) or Decimal("750"),
                 payload.get("payroll_license_plate") or None,
             )
             if existing:

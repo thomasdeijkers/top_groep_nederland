@@ -515,7 +515,7 @@
                         commuteKm = singleTripKm * workedDays * 2;
                         setFieldValue("commute-km", formatNumber(commuteKm));
                     }
-                    setFieldValue("net-amount", formatMoney(workedHours * 13.75));
+                    setFieldValue("net-amount", formatMoney((750 * workedHours) / 40));
                     setFieldValue("total-km", formatNumber(commuteKm + workKm));
                     return;
                 }
@@ -525,7 +525,9 @@
                     const grossTotal = contractHours * grossHourlyWage;
                     setFieldValue("gross-total", formatMoney(grossTotal));
                     setFieldValue("labor-cost-margin", formatMoney(grossTotal * 0.18));
-                    setFieldValue("net-period-basis", formatMoney(grossTotal * 0.62));
+                    if (!field("net-period-basis")?.value) {
+                        setFieldValue("net-period-basis", formatMoney(750));
+                    }
                     return;
                 }
                 const field = (key) => row.querySelector(`.payroll-col-${key} [data-payroll-cell]`);
@@ -542,9 +544,10 @@
                     const pension = grossWage * 0.035;
                     const tax = grossWage * 0.29;
                     const travel = totalKm * 0.23;
-                    periodTotal = (grossWage * 0.62) + travel + declarations;
+                    const weeklyAgreement = parseNumber(field("weekly-wage")?.value) || 750;
+                    periodTotal = ((weeklyAgreement * totalHours) / 40) + travel + declarations;
                     setFieldValue("gross-wage", formatMoney(grossWage));
-                    setFieldValue("weekly-wage", formatMoney(grossWage / 4));
+                    setFieldValue("weekly-wage", formatMoney(weeklyAgreement));
                     setFieldValue("pension-deduction", formatMoney(pension));
                     setFieldValue("payroll-tax", formatMoney(tax));
                     setFieldValue("net-after-deductions", formatMoney(Math.max(grossWage - pension - tax, 0)));

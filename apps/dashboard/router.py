@@ -214,7 +214,7 @@ def _audit_relation_fields(data: dict) -> str:
         "payroll_scale": "inregeling",
         "payroll_function": "functie",
         "payroll_hourly_wage": "bruto uurloon",
-        "payroll_net_base_40h": "netto basis 40 uur",
+        "payroll_net_base_40h": "netto weekloonafspraak 40 uur",
         "notes": "notitie",
     }
     changed = [label for key, label in labels.items() if str(data.get(key) or "").strip()]
