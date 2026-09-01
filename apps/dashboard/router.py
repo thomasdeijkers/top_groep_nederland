@@ -1048,10 +1048,14 @@ def reparse_whatsapp_timesheet(timesheet_id: int):
     locked_response = _timesheet_locked_response(timesheet_id)
     if locked_response:
         return locked_response
-    reparse_timesheet_upload(timesheet_id, allow_openai=True)
+    try:
+        reparse_timesheet_upload(timesheet_id, allow_openai=True)
+    except Exception as exc:
+        print(f"TIMESHEET_REPARSE_ERROR {type(exc).__name__}: {_db_error_detail(exc)}")
+        query = urlencode({"tab": "task", "stage": "controle", "timesheet": timesheet_id, "validate_error": "Parsing opnieuw uitvoeren mislukt. Controleer het briefje handmatig."})
+        return RedirectResponse(f"/dashboard/timesheets?{query}#digital-timesheet", status_code=303)
     _audit("Urenbriefje met OCR en OpenAI geparsed", "urenbriefje", timesheet_id, f"Urenbriefje {timesheet_id}", "OCR/OpenAI parsing opnieuw uitgevoerd voor alle weekstaatvelden.", "Controle")
     return RedirectResponse(f"/dashboard/timesheets?tab=task&stage=controle&timesheet={timesheet_id}#digital-timesheet", status_code=303)
-
 
 @router.post("/api/whatsapp/timesheet/{timesheet_id}/validate")
 def validate_whatsapp_timesheet(

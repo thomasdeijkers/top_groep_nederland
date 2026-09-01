@@ -1252,6 +1252,7 @@ def search_candidate_matches(query: str = "", limit: int = 40) -> list[dict]:
                 )
                 rows = [
                     {
+                        "id": int(row[0]) if str(row[0]).isdigit() else None,
                         "value": row[0],
                         "name": row[1] or "",
                         "first_name": row[2] or "",
