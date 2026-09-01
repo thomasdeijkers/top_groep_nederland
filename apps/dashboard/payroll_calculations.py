@@ -355,9 +355,13 @@ def aggregate_week_sheet_totals(week_tabs: list[dict]) -> list[dict]:
 
 
 def summarize_week_rows(rows: list[dict]) -> dict:
+    total_hours = _format_number(sum((_decimal(row.get("worked_hours")) for row in rows), Decimal("0")))
+    employee_count = len(rows)
     return {
-        "employees": len(rows),
-        "hours": _format_number(sum((_decimal(row.get("worked_hours")) for row in rows), Decimal("0"))),
+        "employees": employee_count,
+        "booking_count": employee_count,
+        "hours": total_hours,
+        "total_hours": total_hours,
         "days": _format_number(sum((_decimal(row.get("worked_days")) for row in rows), Decimal("0"))),
         "km": _format_number(sum((_decimal(row.get("total_km")) for row in rows), Decimal("0"))),
     }

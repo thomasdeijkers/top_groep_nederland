@@ -1653,6 +1653,9 @@ Metadata:
                                         </td>
                                         <td>
                                             <span class="period-status-tile period-status-tile--{{ period.status_tone }}">{{ period.status_label }}</span>
+                                            <form class="period-status-action-form" action="/api/periods/{{ period.id }}/archive" method="post">
+                                                <button class="period-status-action period-status-action--archive" type="submit">Archiveren</button>
+                                            </form>
                                         </td>
                                         <td>
                                             <div class="period-flow-mini" aria-label="Loonflow {{ period.name }}">
@@ -1729,6 +1732,9 @@ Metadata:
                                         </td>
                                         <td>
                                             <span class="period-status-tile period-status-tile--{{ period.status_tone }}">{{ period.status_label }}</span>
+                                            <form class="period-status-action-form" action="/api/periods/{{ period.id }}/restore" method="post">
+                                                <button class="period-status-action" type="submit">Terugzetten</button>
+                                            </form>
                                         </td>
                                         <td>
                                             <div class="period-flow-mini" aria-label="Loonflow {{ period.name }}">

@@ -1049,6 +1049,35 @@ h2 {
     text-transform: uppercase;
     letter-spacing: 0;
 }
+.period-status-action-form {
+    margin: 6px 0 0;
+}
+
+.period-status-action {
+    display: inline-flex;
+    min-height: 28px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 10px;
+    border: 1px solid rgba(127, 209, 160, 0.22);
+    border-radius: 6px;
+    background: rgba(34, 51, 63, 0.92);
+    color: #f5fbff;
+    font-size: 0.74rem;
+    font-weight: 850;
+    cursor: pointer;
+}
+
+.period-status-action:hover {
+    border-color: rgba(157, 240, 190, 0.6);
+    background: rgba(42, 72, 83, 0.95);
+}
+
+.period-status-action--archive {
+    border-color: rgba(255, 149, 128, 0.36);
+    color: #ffd8ce;
+}
+
 
 .period-status-tile--success,
 .period-remark-tile--success {
