@@ -1895,6 +1895,51 @@
         syncInvoiceRegime(form);
     });
 
+    document.querySelectorAll(".invoice-agreement-form").forEach((form) => {
+        const preview = form.querySelector("[data-agreement-preview]");
+        const emptyState = form.querySelector("[data-agreement-preview-empty]");
+        let previewTimer;
+        const refreshAgreementPreview = () => {
+            if (!preview) return;
+            const relationId = form.querySelector('[name="relation_id"]')?.value;
+            const principalId = form.querySelector('[name="principal_id"]')?.value;
+            const projectId = form.querySelector('[name="project_id"]')?.value;
+            const regime = form.querySelector('[name="regime"]')?.value || "regie";
+            const hourlyRate = form.querySelector('[name="hourly_rate"]')?.value;
+            const startDate = form.querySelector('[name="start_date"]')?.value;
+            const isComplete = relationId && principalId && projectId && startDate && (regime !== "regie" || hourlyRate);
+            if (!isComplete) {
+                preview.hidden = true;
+                preview.src = "about:blank";
+                if (emptyState) emptyState.hidden = false;
+                return;
+            }
+            const params = new URLSearchParams({
+                relation_id: relationId,
+                principal_id: principalId,
+                project_id: projectId,
+                regime,
+                hourly_rate: hourlyRate || "0",
+                start_date: startDate,
+                end_date: form.querySelector('[name="end_date"]')?.value || "",
+                status: form.querySelector('[name="status"]')?.value || "concept",
+                notes: form.querySelector('[name="notes"]')?.value || "",
+            });
+            preview.src = `/api/invoicing/agreements/preview?${params.toString()}`;
+            preview.hidden = false;
+            if (emptyState) emptyState.hidden = true;
+        };
+        const schedulePreview = () => {
+            window.clearTimeout(previewTimer);
+            previewTimer = window.setTimeout(refreshAgreementPreview, 250);
+        };
+        form.querySelectorAll("select, input[type='date'], input[type='text'], textarea").forEach((field) => {
+            field.addEventListener("change", schedulePreview);
+            field.addEventListener("input", schedulePreview);
+        });
+        refreshAgreementPreview();
+    });
+
     document.querySelectorAll("[data-invoice-agreement-select]").forEach((select) => {
         const form = select.closest("form");
         const preview = form?.querySelector("[data-invoice-logo-preview]");

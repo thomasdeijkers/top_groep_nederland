@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from io import BytesIO
 from mimetypes import guess_type
 from pathlib import Path
 import re
@@ -569,12 +570,13 @@ def _input_row(cursor, input_id: int):
 
 def _safe_document_path(path_value: str | Path) -> Path | None:
     path = Path(path_value).resolve()
-    root = INVOICE_DOCUMENT_DIR.resolve()
-    try:
-        path.relative_to(root)
-    except ValueError:
-        return None
-    return path if path.is_file() else None
+    for root in (INVOICE_DOCUMENT_DIR.resolve(), INVOICE_EXPORT_DIR.resolve()):
+        try:
+            path.relative_to(root)
+            return path if path.is_file() else None
+        except ValueError:
+            continue
+    return None
 
 
 def get_invoice_document_path(document_id: int) -> Path | None:
@@ -928,6 +930,208 @@ def _factuur_kader(c, x: float, y: float, width: float, height: float, rows: lis
         c.drawString(x + width * 0.52 + 8, baseline, right_label)
         c.setFont("Helvetica", 8)
         c.drawString(x + width * 0.52 + 62, baseline, str(right_value or "-"))
+
+
+def _agreement_pdf_context(data: dict) -> dict:
+    relation_id = int(data.get("relation_id") or 0)
+    principal_id = int(data.get("principal_id") or 0)
+    project_id = int(data.get("project_id") or 0)
+    if not all((relation_id, principal_id, project_id)):
+        raise ValueError("Kies een zzp'er, opdrachtgever en project voor de PDF-preview.")
+    _ensure()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            names = _lookup_names(cursor, relation_id, principal_id, project_id)
+            cursor.execute(
+                """
+                SELECT name, first_name, last_name, contact_name, email, phone, street, house_number,
+                       house_number_addition, postal_code, city, kvk_number, vat_number,
+                       COALESCE(logo_path, photo_path, ''), COALESCE(invoice_obs_number, '')
+                FROM relations WHERE id = %s;
+                """,
+                (relation_id,),
+            )
+            employee_row = cursor.fetchone()
+            cursor.execute(
+                """
+                SELECT name, contact_name, email, street, house_number, house_number_addition,
+                       postal_code, city, kvk_number, vat_number, COALESCE(invoice_customer_number, '')
+                FROM relations WHERE id = %s;
+                """,
+                (principal_id,),
+            )
+            principal_row = cursor.fetchone()
+    employee = dict(zip((
+        "name", "first_name", "last_name", "contact_name", "email", "phone", "street", "house_number",
+        "house_number_addition", "postal_code", "city", "kvk_number", "vat_number", "logo_path", "obs_number",
+    ), employee_row or ("",) * 15))
+    principal = dict(zip((
+        "name", "contact_name", "email", "street", "house_number", "house_number_addition", "postal_code",
+        "city", "kvk_number", "vat_number", "customer_number",
+    ), principal_row or ("",) * 11))
+    regime = "aangenomen werk" if str(data.get("regime") or "").strip().lower() in {"aangenomen", "aangenomen werk"} else "regie"
+    return {
+        "relation_id": relation_id,
+        "principal_id": principal_id,
+        "project_id": project_id,
+        "employee": employee,
+        "principal": principal,
+        "employee_name": names["employee_name"],
+        "principal_name": names["principal_name"],
+        "project_name": names["project_name"],
+        "project_reference": names["project_reference"],
+        "project_location": names["project_location"],
+        "regime": regime,
+        "hourly_rate": _money(data.get("hourly_rate")),
+        "start_date": _parse_date(data.get("start_date")),
+        "end_date": str(data.get("end_date") or "").strip(),
+        "status": str(data.get("status") or "concept").strip(),
+        "notes": str(data.get("notes") or "").strip(),
+    }
+
+
+def _agreement_pdf_bytes(data: dict) -> bytes:
+    context = _agreement_pdf_context(data)
+    colors, A4, canvas = _reportlab_dependencies()
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+    employee = context["employee"]
+    principal = context["principal"]
+    employee_name = _relation_full_name(employee, context["employee_name"])
+    principal_name = principal.get("name") or context["principal_name"]
+    obs_code = f"ZZP OBS {employee.get('obs_number') or context['relation_id']} {principal.get('customer_number') or context['principal_id']}"
+    brand_logo = None
+    _ensure()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            brand_logo = _brand_logo_path(cursor)
+
+    _draw_logo(c, brand_logo, 410, height - 36, 120, 58)
+    c.setFillColor(colors.HexColor("#24559c"))
+    c.setFont("Helvetica-Bold", 21)
+    c.drawString(42, height - 65, "OPDRACHTFORMULIER")
+    c.setFillColor(colors.HexColor("#27333a"))
+    c.setFont("Helvetica", 9)
+    c.drawString(42, height - 84, "Uitvoeringsovereenkomst voor zzp-opdracht in de bouw")
+    _draw_lines(c, 42, height - 124, ["Opdrachtgever", principal_name, f"T.a.v. {principal.get('contact_name') or 'Financiele administratie'}"] + _relation_address_lines(principal), size=9, leading=12)
+    _draw_lines(c, 302, height - 124, ["Opdrachtnemer", employee_name, employee.get("name") or employee_name] + _relation_address_lines(employee), size=9, leading=12)
+    _factuur_kader(c, 42, height - 300, width - 84, 84, [
+        ("OBS-code", obs_code, "Project", context["project_name"]),
+        ("Ingangsdatum", _date_text(context["start_date"]), "Werknummer", context["project_reference"] or "-"),
+        ("Regime", "Regie" if context["regime"] == "regie" else "Aangenomen werk", "Plaats", context["project_location"] or "-"),
+        ("Tarief", _money_text(context["hourly_rate"]) + " per uur" if context["regime"] == "regie" else "Volgens aanneemsom per week", "Status", context["status"].capitalize()),
+    ], accent="#24559c")
+    y = height - 340
+    c.setFillColor(colors.HexColor("#111111"))
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(42, y, "Afspraken over de opdracht")
+    c.setFont("Helvetica", 9)
+    lines = [
+        f"{employee_name} voert werkzaamheden uit voor {principal_name} op bovengenoemd project.",
+        "De werkzaamheden worden zelfstandig uitgevoerd; Olympus Bouw B.V. bemiddelt en verzorgt de facturatie.",
+        f"Facturatie vindt plaats op basis van de geaccordeerde weekstaat onder referentie {obs_code}.",
+        "Doorbelaste parkeer- en materiaalkosten worden uitsluitend met bijbehorende bewijsstukken verwerkt.",
+    ]
+    for line in lines:
+        c.drawString(48, y - 18, line)
+        y -= 18
+    if context["notes"]:
+        c.setFont("Helvetica-Oblique", 8.5)
+        c.drawString(48, y - 10, f"Bijzonderheden: {context['notes']}")
+        y -= 24
+    c.setStrokeColor(colors.HexColor("#24559c"))
+    c.line(42, 150, 250, 150)
+    c.line(330, 150, 538, 150)
+    c.setFillColor(colors.HexColor("#27333a"))
+    c.setFont("Helvetica", 8)
+    c.drawString(42, 137, "Opdrachtgever: naam, datum en handtekening")
+    c.drawString(330, 137, "Opdrachtnemer: naam, datum en handtekening")
+    c.setFillColor(colors.HexColor("#6b777d"))
+    c.drawString(42, 36, "Olympus Bouw B.V. | Bemiddeling en facturatie namens de zelfstandige")
+    c.showPage()
+
+    _draw_logo(c, brand_logo, 410, height - 36, 120, 58)
+    c.setFillColor(colors.HexColor("#24559c"))
+    c.setFont("Helvetica-Bold", 20)
+    c.drawString(42, height - 65, "MODELOVEREENKOMST")
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(42, height - 88, "Aanneming van werk")
+    c.setFillColor(colors.HexColor("#27333a"))
+    c.setFont("Helvetica", 9)
+    article_lines = [
+        ("1. Partijen", f"Opdrachtgever {principal_name} en opdrachtnemer {employee_name} sluiten deze uitvoeringsovereenkomst."),
+        ("2. Opdracht", f"De opdracht betreft {context['project_name']} ({context['project_reference'] or 'werknummer volgt'}) te {context['project_location'] or 'nader te bepalen plaats'}."),
+        ("3. Uitvoering", "De opdrachtnemer bepaalt zelfstandig de wijze van uitvoering, planning en inzet binnen de overeengekomen opdracht."),
+        ("4. Vergoeding", _money_text(context["hourly_rate"]) + " per uur exclusief btw en exclusief doorbelastbare kosten." if context["regime"] == "regie" else "De vergoeding wordt per geaccordeerde aanneemsom en weekstaat vastgesteld."),
+        ("5. Facturatie", f"Olympus Bouw B.V. verzorgt de facturatie namens de opdrachtnemer met OBS-code {obs_code}."),
+        ("6. Geldigheid", f"Deze overeenkomst gaat in op {_date_text(context['start_date'])}" + (f" en eindigt op {context['end_date']}." if context["end_date"] else ".")),
+    ]
+    y = height - 130
+    for title, text in article_lines:
+        c.setFillColor(colors.HexColor("#24559c"))
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(42, y, title)
+        c.setFillColor(colors.HexColor("#111111"))
+        c.setFont("Helvetica", 9)
+        y = _draw_lines(c, 48, y - 14, [text], size=9, leading=13) - 10
+    c.setStrokeColor(colors.HexColor("#24559c"))
+    c.line(42, 150, 250, 150)
+    c.line(330, 150, 538, 150)
+    c.setFillColor(colors.HexColor("#27333a"))
+    c.setFont("Helvetica", 8)
+    c.drawString(42, 137, "Namens opdrachtgever")
+    c.drawString(330, 137, "Namens opdrachtnemer")
+    c.drawString(42, 36, f"Referentie: {obs_code} | Gegenereerd als conceptdocument")
+    c.save()
+    return buffer.getvalue()
+
+
+def save_invoice_agreement_pdf(agreement_id: int) -> int:
+    _ensure()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            agreement = _agreement_row(cursor, agreement_id)
+            if not agreement:
+                raise ValueError("Overeenkomst niet gevonden.")
+    content = _agreement_pdf_bytes(agreement)
+    context = _agreement_pdf_context(agreement)
+    filename = "Overeenkomst " + _document_filename_part(context["employee_name"], "zzper") + " - " + _document_filename_part(context["principal_name"], "opdrachtgever") + ".pdf"
+    dossier_dir = INVOICE_EXPORT_DIR / _dossier_name(context["employee_name"])
+    dossier_dir.mkdir(parents=True, exist_ok=True)
+    path = dossier_dir / filename
+    path.write_bytes(content)
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("DELETE FROM invoice_documents WHERE agreement_id = %s AND document_type = 'opdrachtovereenkomst';", (agreement_id,))
+            cursor.execute(
+                """
+                INSERT INTO invoice_documents
+                    (relation_id, principal_id, project_id, agreement_id, document_type, filename, file_path, content_type)
+                VALUES (%s, %s, %s, %s, 'opdrachtovereenkomst', %s, %s, 'application/pdf')
+                RETURNING id;
+                """,
+                (context["relation_id"], context["principal_id"], context["project_id"], agreement_id, filename, str(path)),
+            )
+            document_id = cursor.fetchone()[0]
+        conn.commit()
+    return document_id
+
+
+def get_invoice_agreement_pdf_path(agreement_id: int) -> Path | None:
+    _ensure()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT file_path FROM invoice_documents
+                WHERE agreement_id = %s AND document_type = 'opdrachtovereenkomst'
+                ORDER BY id DESC LIMIT 1;
+                """,
+                (agreement_id,),
+            )
+            row = cursor.fetchone()
+    return _safe_document_path(row[0]) if row else None
 
 
 def _amount_line(c, y: float, label: str, amount: str, detail: str = "", color="#111111") -> float:

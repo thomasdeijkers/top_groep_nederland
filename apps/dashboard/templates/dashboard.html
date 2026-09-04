@@ -19,7 +19,7 @@
         </title>
         <link rel="icon" href="/dashboard/static/favicon.ico" sizes="any">
         <link rel="shortcut icon" href="/dashboard/static/favicon.ico">
-        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260904-06">
+        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260904-07">
     </head>
     <body class="page-{{ active_page }}">
         {% macro confidence_light(field) -%}
@@ -2327,7 +2327,7 @@ Metadata:
                     {% set invoice_run = invoice_workspace.selected_run %}
                     <article class="panel panel--full invoicing-only invoicing-workspace" id="facturatie-workspace">
                         {% if request.query_params.get('saved') %}<div class="notice notice--success">De factuurinvoer is opgeslagen als conceptregel.</div>{% endif %}
-                        {% if request.query_params.get('agreement') %}<div class="notice notice--success">De overeenkomst is vastgelegd en kan bij status Getekend in de weekkoppeling worden gebruikt.</div>{% endif %}
+                        {% if request.query_params.get('agreement_saved') or request.query_params.get('agreement') %}<div class="notice notice--success">De overeenkomst en bijbehorende PDF zijn vastgelegd. Bij status Getekend is de overeenkomst direct te gebruiken in de weekkoppeling.</div>{% endif %}
                         {% if request.query_params.get('imported') %}<div class="notice notice--success">{{ request.query_params.get('imported') }} regel(s) uit gevalideerde projecturen toegevoegd. Vul de tarieven en factuurnummers aan.</div>{% endif %}
                         {% if request.query_params.get('generated') %}<div class="notice notice--success">{{ request.query_params.get('generated') }} factuurregel(s) zijn als PDF gegenereerd.</div>{% endif %}
                         {% if request.query_params.get('archived') %}<div class="notice notice--success">De factuurrun is naar het archief verplaatst; alle gekoppelde documenten blijven bewaard.</div>{% endif %}
@@ -2352,9 +2352,13 @@ Metadata:
                             </div>
                         </div>
 
-                        <section class="invoice-agreement-panel" id="overeenkomsten">
+                        {% set ready_agreements = invoice_workspace.agreements|selectattr('is_invoice_ready')|list %}
+                        <details class="invoice-flow-step invoice-agreement-panel" id="overeenkomsten" open>
+                            <summary class="invoice-flow-step__summary"><span><b>1</b><strong>Overeenkomst en opdracht</strong><small>{{ ready_agreements|length }} getekende overeenkomst{% if ready_agreements|length != 1 %}en{% endif %}</small></span><em class="{% if ready_agreements %}is-ready{% else %}is-pending{% endif %}">{% if ready_agreements %}Klaar{% else %}Actie nodig{% endif %}</em></summary>
+                            <div class="invoice-flow-step__body">
                             <div class="invoice-run-detail__header"><div><p class="section-label">Stap 1</p><h3>Overeenkomst en opdracht vastleggen</h3><p>Deze overeenkomst is de vaste bron voor zzp'er, opdrachtgever, project, regime en tarief in de weekkoppeling.</p></div></div>
-                            <form class="invoice-agreement-form" action="/api/invoicing/agreements" method="post" enctype="multipart/form-data">
+                            <form class="invoice-agreement-form invoice-agreement-layout" action="/api/invoicing/agreements" method="post" enctype="multipart/form-data">
+                                <div class="invoice-agreement-form__fields">
                                 <div class="invoice-form-grid invoice-form-grid--three">
                                     <label>Zzp'er <span class="required-mark" aria-label="verplicht">*</span><select name="relation_id" required><option value="">Kies zzp'er</option>{% for item in invoice_candidate_options %}<option value="{{ item.id }}">{{ item.name }}</option>{% endfor %}</select></label>
                                     <label>Opdrachtgever <span class="required-mark" aria-label="verplicht">*</span><select name="principal_id" required><option value="">Kies opdrachtgever</option>{% for item in principal_options %}<option value="{{ item.id }}">{{ item.name }}</option>{% endfor %}</select></label>
@@ -2369,14 +2373,23 @@ Metadata:
                                 </div>
                                 <details class="invoice-optional-fields"><summary>Ondertekend document en aanvullende afspraken</summary><div class="invoice-form-grid invoice-form-grid--three"><label>Ondertekende overeenkomst <input type="file" name="file" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"></label><label>Einddatum <input type="date" name="end_date"></label><label>Bijzonderheden <input type="text" name="notes" placeholder="Bijv. afwijkende betaalafspraak"></label></div></details>
                                 <div class="invoice-form-actions"><button class="ghost-button ghost-button--primary" type="submit">Overeenkomst vastleggen</button></div>
+                                </div>
+                                <aside class="invoice-agreement-preview" aria-label="Voorbeeld overeenkomst">
+                                    <div class="invoice-agreement-preview__header"><span><strong>PDF-voorbeeld</strong><small>Wordt opgebouwd met de ingevulde gegevens</small></span><span>PDF</span></div>
+                                    <div class="invoice-agreement-preview__document"><p data-agreement-preview-empty>Vul zzp'er, opdrachtgever, project, regime, tarief en ingangsdatum in om de overeenkomst hier te bekijken.</p><iframe title="Voorbeeld overeenkomst" data-agreement-preview hidden></iframe></div>
+                                </aside>
                             </form>
                             <div class="invoice-agreement-list">
-                                {% for agreement in invoice_workspace.agreements %}<div class="invoice-agreement-card {% if agreement.is_invoice_ready %}invoice-agreement-card--ready{% endif %}"><span><strong>{{ agreement.employee_name }} | {{ agreement.principal_name }}</strong><small>{{ agreement.project_name }}{% if agreement.project_reference %} - {{ agreement.project_reference }}{% endif %} | {{ agreement.regime }}{% if agreement.regime == 'regie' %} | {{ agreement.hourly_rate_text }}/u{% endif %}</small></span><span><em>{{ agreement.status_label }}</em><small>{{ agreement.document_count }} document{% if agreement.document_count != 1 %}en{% endif %}</small></span></div>{% else %}<p class="empty-state empty-state--compact"><strong>Nog geen overeenkomst vastgelegd</strong><span>Maak eerst een overeenkomst aan; die wordt daarna in de weekkoppeling gekozen.</span></p>{% endfor %}
+                                {% for agreement in invoice_workspace.agreements %}<div class="invoice-agreement-card {% if agreement.is_invoice_ready %}invoice-agreement-card--ready{% endif %}"><span><strong>{{ agreement.employee_name }} | {{ agreement.principal_name }}</strong><small>{{ agreement.project_name }}{% if agreement.project_reference %} - {{ agreement.project_reference }}{% endif %} | {{ agreement.regime }}{% if agreement.regime == 'regie' %} | {{ agreement.hourly_rate_text }}/u{% endif %}</small></span><span><em>{{ agreement.status_label }}</em><small>{{ agreement.document_count }} document{% if agreement.document_count != 1 %}en{% endif %}</small><button class="table-link" type="button" data-pdf-open="/api/invoicing/agreements/{{ agreement.id }}/pdf" data-pdf-title="Overeenkomst {{ agreement.employee_name }} - {{ agreement.principal_name }}">Bekijk PDF</button></span></div>{% else %}<p class="empty-state empty-state--compact"><strong>Nog geen overeenkomst vastgelegd</strong><span>Maak eerst een overeenkomst aan; die wordt daarna in de weekkoppeling gekozen.</span></p>{% endfor %}
                             </div>
-                        </section>
+                            </div>
+                        </details>
 
+                        <details class="invoice-flow-step" id="invoer" open>
+                            <summary class="invoice-flow-step__summary"><span><b>2</b><strong>Weekkoppeling</strong><small>{% if invoice_run %}Week {{ invoice_run.week_number }} {{ invoice_run.year }} | {{ invoice_run.input_count }} invoerregel{% if invoice_run.input_count != 1 %}s{% endif %}{% else %}Nog geen factuurrun gestart{% endif %}</small></span><em class="{% if invoice_run %}is-ready{% else %}is-pending{% endif %}">{% if invoice_run %}In uitvoering{% else %}Actie nodig{% endif %}</em></summary>
+                            <div class="invoice-flow-step__body">
                         <div class="invoice-workspace__grid">
-                            <section class="invoice-input-panel" id="invoer">
+                            <section class="invoice-input-panel">
                                 <div class="panel-header">
                                     <div>
                                         <p class="section-label">Input</p>
@@ -2467,9 +2480,13 @@ Metadata:
                                 </div>
                             </aside>
                         </div>
+                            </div>
+                        </details>
 
                         {% if invoice_run %}
-                        <section class="invoice-run-detail" id="controle">
+                        <details class="invoice-flow-step invoice-run-detail" id="controle" open>
+                            <summary class="invoice-flow-step__summary"><span><b>3</b><strong>Controle</strong><small>{{ invoice_workspace.totals.blockers }} open controle{% if invoice_workspace.totals.blockers != 1 %}s{% endif %}</small></span><em class="{% if invoice_workspace.totals.blockers %}is-pending{% else %}is-ready{% endif %}">{% if invoice_workspace.totals.blockers %}Controle nodig{% else %}Klaar{% endif %}</em></summary>
+                            <div class="invoice-flow-step__body">
                             <div class="invoice-run-detail__header">
                                 <div><p class="section-label">Week {{ invoice_run.week_number }} {{ invoice_run.year }}</p><h3>Invoer controleren</h3><p>{{ invoice_run.invoice_date_text }} | concept-factuurrun</p></div>
                                 <form action="/api/invoicing/runs/{{ invoice_run.id }}/import-hours" method="post"><button class="ghost-button" type="submit">Gevalideerde uren inladen</button></form>
@@ -2522,22 +2539,29 @@ Metadata:
                                 </details>
                                 {% else %}<div class="empty-state">Nog geen invoerregels. Voeg hierboven een regel toe of laad gevalideerde uren in.</div>{% endfor %}
                             </div>
-                        </section>
+                            </div>
+                        </details>
 
-                        <section class="invoice-output-panel" id="output">
+                        <details class="invoice-flow-step invoice-output-panel" id="output" open>
+                            <summary class="invoice-flow-step__summary"><span><b>4</b><strong>Facturen</strong><small>{{ invoice_workspace.outputs|length }} PDF{% if invoice_workspace.outputs|length != 1 %}'s{% endif %} gegenereerd</small></span><em class="{% if invoice_workspace.outputs %}is-ready{% else %}is-pending{% endif %}">{% if invoice_workspace.outputs %}Klaar{% else %}Wacht op controle{% endif %}</em></summary>
+                            <div class="invoice-flow-step__body">
                             <div class="invoice-run-detail__header"><div><p class="section-label">Stap 4</p><h3>Facturen maken</h3><p>Elke invoerregel levert een verkoopfactuur en een Olympus-factuur als PDF.</p></div><div class="invoice-output-actions"><form action="/api/invoicing/runs/{{ invoice_run.id }}/generate" method="post"><button class="ghost-button ghost-button--primary" type="submit" {% if not invoice_workspace.inputs or invoice_workspace.totals.blockers %}disabled{% endif %}>Genereer PDF-facturen</button></form><form action="/api/invoicing/runs/{{ invoice_run.id }}/archive" method="post" onsubmit="return confirm('Deze factuurrun met alle PDF-bestanden naar het archief verplaatsen?');"><button class="ghost-button" type="submit" {% if not invoice_workspace.outputs %}disabled{% endif %}>Archiveren</button></form><form action="/api/invoicing/runs/{{ invoice_run.id }}/delete" method="post" onsubmit="return confirm('Deze volledige factuurrun met alle documenten verwijderen?');"><button class="table-link danger-button" type="submit">Verwijderen</button></form></div></div>
                             <div class="invoice-output-list">
                                 {% for output in invoice_workspace.outputs %}<div class="invoice-output-row"><a class="invoice-output-card" href="/api/invoicing/output/{{ output.id }}" data-pdf-open="/api/invoicing/output/{{ output.id }}" data-pdf-title="{{ 'Verkoopfactuur' if output.stream == 'verkoop' else 'Olympus-factuur' }} {{ output.invoice_number }}"><span class="invoice-output-card__icon">PDF</span><span><strong>{{ 'Verkoopfactuur' if output.stream == 'verkoop' else 'Olympus-factuur' }} {{ output.invoice_number }}</strong><small>{{ output.employee_name }} | {{ output.filename }}</small></span><span class="invoice-output-card__download">Bekijken</span></a><form action="/api/invoicing/output/{{ output.id }}/delete" method="post" onsubmit="return confirm('Deze factuur-PDF verwijderen?');"><button class="table-link danger-button" type="submit">Verwijderen</button></form></div>{% else %}<p class="empty-state">Nog geen facturen gegenereerd. Los eerst alle controles op.</p>{% endfor %}
                             </div>
-                        </section>
+                            </div>
+                        </details>
                         {% endif %}
 
-                        <section class="invoice-archive-panel" id="archief">
+                        <details class="invoice-flow-step invoice-archive-panel" id="archief">
+                            <summary class="invoice-flow-step__summary"><span><b>5</b><strong>Archief</strong><small>{{ invoice_workspace.archive_runs|length }} afgeronde factuurrun{% if invoice_workspace.archive_runs|length != 1 %}s{% endif %}</small></span><em class="{% if invoice_workspace.archive_runs %}is-ready{% else %}is-pending{% endif %}">{% if invoice_workspace.archive_runs %}Beschikbaar{% else %}Leeg{% endif %}</em></summary>
+                            <div class="invoice-flow-step__body">
                             <div class="invoice-run-detail__header"><div><p class="section-label">Stap 5</p><h3>Archief</h3><p>Afgeronde factuurruns blijven met alle PDF-bestanden en dossierkoppelingen bewaard.</p></div></div>
                             <div class="invoice-run-list">
                                 {% for run in invoice_workspace.archive_runs %}<div class="invoice-run-card invoice-run-card--archived"><span><strong>Week {{ run.week_number }} {{ run.year }}</strong><small>{{ run.invoice_date_text }} | {{ run.input_count }} invoer | {{ run.output_count }} PDF's</small></span><form action="/api/invoicing/runs/{{ run.id }}/restore" method="post"><button class="table-link" type="submit">Herstellen</button></form></div>{% else %}<p class="empty-state empty-state--compact"><strong>Het archief is leeg</strong><span>Archiveer een afgeronde factuurrun zodra alle facturen zijn gecontroleerd.</span></p>{% endfor %}
                             </div>
-                        </section>
+                            </div>
+                        </details>
 
                         <section class="invoice-documents-panel" id="dossiers">
                             <div class="invoice-run-detail__header"><div><p class="section-label">Dossier op naam van de zzp'er</p><h3>Documenten en bijlagen</h3><p>Upload bewijsstukken en zoek facturen terug op zzp'er, opdrachtgever, project of bestandsnaam.</p></div><form class="invoice-brand-upload" action="/api/invoicing/olympus-logo" method="post" enctype="multipart/form-data"><label>Olympus-logo <input type="file" name="file" accept="image/png,image/jpeg" required></label><button class="ghost-button" type="submit">Logo uploaden</button></form></div>
@@ -3564,6 +3588,6 @@ Metadata:
                 </section>
             </main>
         </div>
-        <script src="/dashboard/static/dashboard.js?v=20260904-05"></script>
+        <script src="/dashboard/static/dashboard.js?v=20260904-06"></script>
     </body>
 </html>

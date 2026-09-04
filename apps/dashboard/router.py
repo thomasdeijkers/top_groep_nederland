@@ -2,7 +2,7 @@ from pathlib import Path
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, File, Form, Query, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
 
@@ -25,6 +25,7 @@ from apps.dashboard.invoicing import (
     delete_invoice_run,
     generate_invoice_run,
     get_invoice_output_path,
+    get_invoice_agreement_pdf_path,
     get_invoice_document_path,
     get_invoicing_workspace,
     import_project_bookings_into_run,
@@ -32,6 +33,8 @@ from apps.dashboard.invoicing import (
     list_relation_invoice_documents,
     restore_invoice_run,
     save_invoice_document,
+    save_invoice_agreement_pdf,
+    _agreement_pdf_bytes,
     update_invoice_input,
 )
 from apps.dashboard.payroll_excel import build_payroll_output_workbook
@@ -961,16 +964,51 @@ async def save_invoice_agreement(
 ):
     try:
         agreement_id = create_invoice_agreement(locals())
+        save_invoice_agreement_pdf(agreement_id)
         if file and file.filename:
             save_invoice_document(
                 await file.read(), file.filename, "overeenkomst", relation_id, principal_id, project_id,
                 agreement_id=agreement_id,
             )
         _audit("Overeenkomst vastgelegd", "invoice_agreement", agreement_id, f"Overeenkomst {agreement_id}", "Overeenkomst en opdrachtgegevens vastgelegd voor de facturatieflow.", "Facturatie")
-        return RedirectResponse("/dashboard/invoicing?agreement=saved#overeenkomsten", status_code=303)
+        return RedirectResponse(f"/dashboard/invoicing?agreement={agreement_id}&agreement_saved=1#overeenkomsten", status_code=303)
     except Exception as exc:
         print(f"INVOICE_AGREEMENT_ERROR {type(exc).__name__}: {_db_error_detail(exc)}")
         return RedirectResponse("/dashboard/invoicing?error=agreement#overeenkomsten", status_code=303)
+
+
+@router.get("/api/invoicing/agreements/preview")
+def preview_invoice_agreement(
+    relation_id: int = 0,
+    principal_id: int = 0,
+    project_id: int = 0,
+    regime: str = "regie",
+    hourly_rate: str = "",
+    start_date: str = "",
+    end_date: str = "",
+    status: str = "concept",
+    notes: str = "",
+):
+    try:
+        content = _agreement_pdf_bytes(locals())
+        return Response(content, media_type="application/pdf", headers={"Content-Disposition": "inline; filename=overeenkomst-voorbeeld.pdf"})
+    except Exception as exc:
+        print(f"INVOICE_AGREEMENT_PREVIEW_ERROR {type(exc).__name__}: {_db_error_detail(exc)}")
+        return Response(status_code=204)
+
+
+@router.get("/api/invoicing/agreements/{agreement_id}/pdf")
+def download_invoice_agreement_pdf(agreement_id: int):
+    path = get_invoice_agreement_pdf_path(agreement_id)
+    if not path:
+        try:
+            save_invoice_agreement_pdf(agreement_id)
+            path = get_invoice_agreement_pdf_path(agreement_id)
+        except Exception as exc:
+            print(f"INVOICE_AGREEMENT_PDF_ERROR {type(exc).__name__}: {_db_error_detail(exc)}")
+    if not path:
+        return RedirectResponse("/dashboard/invoicing?error=agreement#overeenkomsten", status_code=303)
+    return FileResponse(path, filename=path.name, media_type="application/pdf", content_disposition_type="inline")
 
 
 @router.post("/api/invoicing/runs/{run_id}/import-hours")
