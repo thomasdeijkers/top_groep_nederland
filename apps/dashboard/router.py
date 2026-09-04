@@ -33,6 +33,7 @@ from apps.dashboard.records import (
     get_payroll_period,
     get_timesheet_payroll_lock,
     get_project,
+    get_zzp_invoicing_overview,
     get_overview_data,
     get_payroll_flow_summary,
     get_payroll_period_defaults,
@@ -464,6 +465,7 @@ def _dashboard_context(
             "principal_options": [],
             "project_options": [],
             "projects": [],
+            "zzp_invoicing": {"line_count": 0, "total_hours": "0", "suggested_sales_total": "\u20ac 0,00", "suggested_purchase_total": "\u20ac 0,00", "suggested_margin_total": "\u20ac 0,00", "rows": []},
             "selected_project": None,
             "selected_payroll_period": None,
             "payroll_periods": [],
@@ -512,7 +514,7 @@ def _dashboard_context(
     timesheet_candidate_options = _context_value(data_page, "timesheet_candidate_options", [], lambda: list_relations(limit=200, relation_type="candidate")) if data_page == "timesheets" else []
     principal_relations = _context_value(data_page, "principal_relations", [], lambda: list_relations(query=query, relation_type="principal", status=active_status)) if data_page == "relations" else []
     principal_limit = 500 if data_page == "timesheets" else 100
-    principals = _context_value(data_page, "principal_options", [], lambda: list_principals(limit=principal_limit, query=query if data_page == "relations" else "")) if data_page in {"relations", "vacancies", "projects", "timesheets"} else []
+    principals = _context_value(data_page, "principal_options", [], lambda: list_principals(limit=principal_limit, query=query if data_page == "relations" else "")) if data_page in {"relations", "vacancies", "projects", "timesheets", "invoicing"} else []
     imported_candidates = _context_value(data_page, "imported_candidates", [], lambda: list_candidates(query=query)) if data_page == "relations" else []
     imported_tickets = _context_value(data_page, "tickets", [], list_tickets) if data_page == "tickets" else []
     imported_vacancies = _context_value(data_page, "vacancies", [], lambda: list_vacancies(query=query, status=active_status)) if data_page == "vacancies" else []
@@ -556,8 +558,9 @@ def _dashboard_context(
     audit_menu_groups = _audit_menu_groups(audit_events) if data_page == "audit" else []
     openai_api_audit_events = _context_value(data_page, "openai_api_audit_events", [], lambda: list_openai_api_audit_events(40)) if data_page == "audit" else []
     openai_usage = _context_value(data_page, "openai_usage", {"month_cost_usd": 0, "month_requests": 0, "month_tokens": 0, "requests": 0, "total_tokens": 0}, get_openai_usage_summary)
-    project_options = _context_value(data_page, "project_options", [], list_project_options) if data_page in {"timesheets", "projects", "periods"} else []
+    project_options = _context_value(data_page, "project_options", [], list_project_options) if data_page in {"timesheets", "projects", "periods", "invoicing"} else []
     projects = _context_value(data_page, "projects", [], lambda: list_projects(query=query)) if data_page == "projects" else []
+    zzp_invoicing = _context_value(data_page, "zzp_invoicing", {"line_count": 0, "total_hours": "0", "suggested_sales_total": "\u20ac 0,00", "suggested_purchase_total": "\u20ac 0,00", "suggested_margin_total": "\u20ac 0,00", "rows": []}, get_zzp_invoicing_overview) if data_page == "invoicing" else {"line_count": 0, "total_hours": "0", "suggested_sales_total": "\u20ac 0,00", "suggested_purchase_total": "\u20ac 0,00", "suggested_margin_total": "\u20ac 0,00", "rows": []}
     selected_project = _context_value(data_page, "selected_project", None, lambda: get_project(project_id)) if data_page == "projects" and project_id else None
     payroll_periods = _context_value(data_page, "payroll_periods", [], list_payroll_periods) if data_page in {"periods", "timesheets"} else []
     archived_payroll_periods = _context_value(data_page, "archived_payroll_periods", [], lambda: list_payroll_periods(archived=True)) if data_page in {"periods", "timesheets"} else []
@@ -679,6 +682,7 @@ def _dashboard_context(
         "principal_options": principals,
         "project_options": project_options,
         "projects": projects,
+        "zzp_invoicing": zzp_invoicing,
         "selected_project": selected_project,
         "selected_payroll_period": selected_payroll_period,
         "payroll_periods": payroll_periods,
@@ -843,6 +847,11 @@ def projects_page(request: Request, q: str = "", project: int | None = None):
 @router.get("/dashboard/periods", response_class=HTMLResponse)
 def periods_page(request: Request, period: int | None = None, flow: str = ""):
     return _render_dashboard(request, "periods", period_id=period, payroll_flow_filter=flow)
+
+
+@router.get("/dashboard/invoicing", response_class=HTMLResponse)
+def invoicing_page(request: Request):
+    return _render_dashboard(request, "invoicing")
 
 
 @router.get("/dashboard/tickets", response_class=HTMLResponse)

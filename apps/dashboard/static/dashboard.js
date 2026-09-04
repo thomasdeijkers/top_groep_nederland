@@ -1813,4 +1813,78 @@
             closeUploadModal();
         }
     });
+
+    document.querySelectorAll("[data-zzp-invoice]").forEach((calculator) => {
+        const body = calculator.querySelector("[data-zzp-invoice-body]");
+        const template = calculator.querySelector("[data-zzp-invoice-template]");
+        const addButton = document.querySelector("[data-zzp-invoice-add]");
+        const defaultSales = calculator.querySelector("[data-zzp-default-sales]");
+        const defaultPurchase = calculator.querySelector("[data-zzp-default-purchase]");
+        const vatRate = calculator.querySelector("[data-zzp-vat-rate]");
+        const parseNumber = (value) => {
+            const normalized = String(value || "").replace(/[^0-9,.-]/g, "").replace(/\./g, "").replace(",", ".");
+            const number = Number(normalized || "0");
+            return Number.isFinite(number) ? number : 0;
+        };
+        const formatNumber = (value) => new Intl.NumberFormat("nl-NL", { minimumFractionDigits: value % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 }).format(value || 0);
+        const formatMoney = (value) => new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR" }).format(value || 0);
+        const setText = (selector, value) => document.querySelectorAll(selector).forEach((target) => { target.textContent = value; });
+        const recalculate = () => {
+            let includedRows = 0;
+            let totalHours = 0;
+            let totalSales = 0;
+            let totalPurchase = 0;
+            calculator.querySelectorAll("[data-zzp-invoice-row]").forEach((row) => {
+                const include = row.querySelector("[data-zzp-include]")?.checked ?? true;
+                const hours = parseNumber(row.querySelector("[data-zzp-hours]")?.value);
+                const salesRate = parseNumber(row.querySelector("[data-zzp-sales-rate]")?.value);
+                const purchaseRate = parseNumber(row.querySelector("[data-zzp-purchase-rate]")?.value);
+                const salesAmount = hours * salesRate;
+                const purchaseAmount = hours * purchaseRate;
+                row.querySelector("[data-zzp-sales-amount]").textContent = formatMoney(salesAmount);
+                row.querySelector("[data-zzp-purchase-amount]").textContent = formatMoney(purchaseAmount);
+                row.querySelector("[data-zzp-margin-amount]").textContent = formatMoney(salesAmount - purchaseAmount);
+                row.classList.toggle("invoicing-row--excluded", !include);
+                if (include) {
+                    includedRows += 1;
+                    totalHours += hours;
+                    totalSales += salesAmount;
+                    totalPurchase += purchaseAmount;
+                }
+            });
+            const vat = totalSales * (parseNumber(vatRate?.value) / 100);
+            setText("[data-zzp-total-lines]", String(includedRows));
+            setText("[data-zzp-total-hours]", formatNumber(totalHours));
+            setText("[data-zzp-total-sales], [data-zzp-total-sales-bottom]", formatMoney(totalSales));
+            setText("[data-zzp-total-purchase]", formatMoney(totalPurchase));
+            setText("[data-zzp-total-margin], [data-zzp-total-margin-bottom]", formatMoney(totalSales - totalPurchase));
+            setText("[data-zzp-total-vat]", formatMoney(vat));
+            setText("[data-zzp-total-including-vat]", formatMoney(totalSales + vat));
+        };
+        const wireRow = (row) => row.querySelectorAll("input").forEach((input) => {
+            input.addEventListener("input", recalculate);
+            input.addEventListener("change", recalculate);
+        });
+        calculator.querySelectorAll("[data-zzp-invoice-row]").forEach(wireRow);
+        calculator.querySelector("[data-zzp-apply-defaults]")?.addEventListener("click", () => {
+            calculator.querySelectorAll("[data-zzp-invoice-row]").forEach((row) => {
+                row.querySelector("[data-zzp-sales-rate]").value = defaultSales?.value || "";
+                row.querySelector("[data-zzp-purchase-rate]").value = defaultPurchase?.value || "";
+            });
+            recalculate();
+        });
+        addButton?.addEventListener("click", () => {
+            const row = template?.content?.firstElementChild?.cloneNode(true);
+            if (!row || !body) return;
+            row.querySelector("[data-zzp-sales-rate]").value = defaultSales?.value || "";
+            row.querySelector("[data-zzp-purchase-rate]").value = defaultPurchase?.value || "";
+            body.appendChild(row);
+            wireRow(row);
+            row.querySelector("[data-zzp-principal]")?.focus();
+            recalculate();
+        });
+        vatRate?.addEventListener("input", recalculate);
+        recalculate();
+    });
+
 })();

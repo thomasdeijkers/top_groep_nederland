@@ -357,6 +357,95 @@ def get_payroll_flow_summary(period_id: int | None = None) -> dict:
         return _empty_payroll_flow_summary()
 
 
+def get_zzp_invoicing_overview(limit: int = 80) -> dict:
+    fallback = {
+        "line_count": 0,
+        "total_hours": "0",
+        "suggested_sales_total": _format_money(0),
+        "suggested_purchase_total": _format_money(0),
+        "suggested_margin_total": _format_money(0),
+        "rows": [],
+    }
+    try:
+        _ensure_dashboard_tables_for_read()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT COALESCE(p.name, w.principal_name, v.relation_name, 'Onbekende opdrachtgever') AS principal_name,
+                           COALESCE(v.title, w.project_name, 'Onbekend project') AS project_name,
+                           COALESCE(r.name, w.employee_name, w.matched_candidate_name, 'Onbekende zzp-er') AS employee_name,
+                           MIN(b.work_date) AS first_work_date,
+                           MAX(b.work_date) AS last_work_date,
+                           COUNT(b.id) AS booking_count,
+                           COALESCE(SUM(b.hours), 0) AS total_hours
+                    FROM project_time_bookings b
+                    LEFT JOIN relations r
+                        ON r.id = b.relation_id
+                    LEFT JOIN relations p
+                        ON p.id = b.principal_id
+                    LEFT JOIN vacancies v
+                        ON v.id = b.project_id
+                    LEFT JOIN whatsapp_timesheet_inbox w
+                        ON w.id = b.timesheet_inbox_id
+                    WHERE COALESCE(b.status, '') NOT IN ('verwijderd', 'deleted')
+                    GROUP BY 1, 2, 3
+                    ORDER BY MAX(b.work_date) DESC NULLS LAST, principal_name ASC, project_name ASC, employee_name ASC
+                    LIMIT %s;
+                    """,
+                    (limit,),
+                )
+                rows = []
+                sales_total = Decimal("0")
+                purchase_total = Decimal("0")
+                total_hours = Decimal("0")
+                for row in cursor.fetchall():
+                    hours = Decimal(str(row[6] or 0))
+                    sales_rate = Decimal("0")
+                    purchase_rate = Decimal("0")
+                    sales_amount = hours * sales_rate
+                    purchase_amount = hours * purchase_rate
+                    margin_amount = sales_amount - purchase_amount
+                    total_hours += hours
+                    sales_total += sales_amount
+                    purchase_total += purchase_amount
+                    rows.append(
+                        {
+                            "principal_name": row[0],
+                            "project_name": row[1],
+                            "employee_name": row[2],
+                            "period": _date_range_display(row[3], row[4]),
+                            "booking_count": row[5] or 0,
+                            "hours": _format_number(hours),
+                            "hours_value": str(hours),
+                            "sales_rate": _format_number(sales_rate),
+                            "purchase_rate": _format_number(purchase_rate),
+                            "sales_amount": _format_money(sales_amount),
+                            "purchase_amount": _format_money(purchase_amount),
+                            "margin_amount": _format_money(margin_amount),
+                        }
+                    )
+                return {
+                    "line_count": len(rows),
+                    "total_hours": _format_number(total_hours),
+                    "suggested_sales_total": _format_money(sales_total),
+                    "suggested_purchase_total": _format_money(purchase_total),
+                    "suggested_margin_total": _format_money(sales_total - purchase_total),
+                    "rows": rows,
+                }
+    except Exception:
+        return fallback
+
+
+def _date_range_display(start_value, end_value) -> str:
+    if not start_value and not end_value:
+        return "-"
+    if start_value == end_value:
+        return start_value.strftime("%d-%m-%Y") if start_value else "-"
+    start_text = start_value.strftime("%d-%m-%Y") if start_value else "-"
+    end_text = end_value.strftime("%d-%m-%Y") if end_value else "-"
+    return f"{start_text} t/m {end_text}"
+
 def _weekly_hours_yoy(cursor, weeks_back: int = 8) -> list[dict]:
     today = date.today()
     monday = today - timedelta(days=today.weekday())

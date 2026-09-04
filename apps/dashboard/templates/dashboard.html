@@ -9,6 +9,7 @@
             {% elif active_page == 'vacancies' %}Vacatures - Top Groep Nederland
             {% elif active_page == 'projects' %}Projecten - Top Groep Nederland
             {% elif active_page == 'periods' %}Periodes - Top Groep Nederland
+            {% elif active_page == 'invoicing' %}Facturatie - Top Groep Nederland
             {% elif active_page == 'tickets' %}Tickets - Top Groep Nederland
             {% elif active_page == 'audit' %}Auditspoor - Top Groep Nederland
             {% elif active_page == 'timesheets' %}Urenverwerking - Top Groep Nederland
@@ -18,7 +19,7 @@
         </title>
         <link rel="icon" href="/dashboard/static/favicon.ico" sizes="any">
         <link rel="shortcut icon" href="/dashboard/static/favicon.ico">
-        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260609-02">
+        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260609-03">
     </head>
     <body class="page-{{ active_page }}">
         {% macro confidence_light(field) -%}
@@ -79,6 +80,7 @@
                     <span class="side-nav__group">Uren en lonen</span>
                     <a class="side-nav__item {% if active_page == 'timesheets' %}side-nav__item--active{% endif %}" href="/dashboard/timesheets"><span class="side-nav__label">Urenverwerking</span><span class="module-status module-status--green" title="Compleet"></span></a>
                     <a class="side-nav__item {% if active_page == 'periods' %}side-nav__item--active{% endif %}" href="/dashboard/periods"><span class="side-nav__label">Loonperiodes</span><span class="module-status module-status--orange" title="Basis"></span></a>
+                    <a class="side-nav__item {% if active_page == 'invoicing' %}side-nav__item--active{% endif %}" href="/dashboard/invoicing"><span class="side-nav__label">Facturatie</span><span class="module-status module-status--orange" title="Basis"></span></a>
 
                     <span class="side-nav__group">Beheer</span>
                     <a class="side-nav__item {% if active_page == 'tickets' %}side-nav__item--active{% endif %}" href="/dashboard/tickets"><span class="side-nav__label">Tickets</span><span class="module-status module-status--red" title="Open"></span></a>
@@ -125,6 +127,7 @@
                             {% elif active_page == 'vacancies' %}Vacatures
                             {% elif active_page == 'projects' %}Projecten
                             {% elif active_page == 'periods' %}Periodes
+                            {% elif active_page == 'invoicing' %}Facturatie
                             {% elif active_page == 'tickets' %}Tickets
                             {% elif active_page == 'audit' %}Auditspoor
                             {% elif active_page == 'timesheets' %}Urenverwerking
@@ -138,6 +141,7 @@
                             {% elif active_page == 'vacancies' %}Beheer openstaande vacatures voor publicatie richting website, Indeed en matching met kandidaten.
                             {% elif active_page == 'projects' %}Maak projecten aan en gebruik ze direct bij de urenverwerking.
                             {% elif active_page == 'periods' %}Beheer vierwekelijkse loonperiodes voor bouwverloning en loonstrookvoorbereiding.
+                            {% elif active_page == 'invoicing' %}Maak een opdrachtgeververrekening voor door te factureren zzp-uren, met omzet, inkoop, marge en btw.
                             {% elif active_page == 'tickets' %}Verzamel opvolgwerk uit e-mail, WhatsApp en urencontrole in een centrale takenlijst.
                             {% elif active_page == 'audit' %}Bekijk het volledige trackrecord van acties in het dashboard.
                             {% elif active_page == 'timesheets' %}Verwerk urenbriefjes uit WhatsApp, e-mail, servermap of handmatige testupload.
@@ -2215,6 +2219,85 @@ Metadata:
                     </div>
                     {% endif %}
 
+
+                    <article class="panel panel--full invoicing-only" id="zzp-facturatie">
+                        <div class="panel-header">
+                            <div>
+                                <p class="section-label">Zzp facturatie</p>
+                                <h2>Doorfacturatie opdrachtgever</h2>
+                                <p>Maak een verrekening van gewerkte zzp-uren naar verkoopbedrag, inkoopkosten, marge en btw.</p>
+                            </div>
+                            <button class="ghost-button" type="button" data-zzp-invoice-add>Regel toevoegen</button>
+                        </div>
+
+                        <div class="project-detail-summary invoicing-summary" aria-label="Facturatie totalen">
+                            <div><span>Regels</span><strong data-zzp-total-lines>{{ zzp_invoicing.line_count }}</strong></div>
+                            <div><span>Uren</span><strong data-zzp-total-hours>{{ zzp_invoicing.total_hours }}</strong></div>
+                            <div><span>Excl. btw</span><strong data-zzp-total-sales>{{ zzp_invoicing.suggested_sales_total }}</strong></div>
+                            <div><span>Marge</span><strong data-zzp-total-margin>{{ zzp_invoicing.suggested_margin_total }}</strong></div>
+                        </div>
+
+                        <section class="invoicing-calculator" data-zzp-invoice>
+                            <div class="invoicing-controls">
+                                <label>Standaard verkoop uurtarief <input type="text" inputmode="decimal" value="" placeholder="0,00" data-zzp-default-sales></label>
+                                <label>Standaard inkoop uurtarief <input type="text" inputmode="decimal" value="" placeholder="0,00" data-zzp-default-purchase></label>
+                                <label>Btw <input type="text" inputmode="decimal" value="21" data-zzp-vat-rate></label>
+                                <button class="ghost-button" type="button" data-zzp-apply-defaults>Tarieven toepassen</button>
+                            </div>
+
+                            <div class="table-wrap invoicing-table">
+                                <table>
+                                    <thead><tr><th>Meenemen</th><th>Opdrachtgever</th><th>Project</th><th>Zzp'er</th><th>Periode</th><th>Uren</th><th>Verkoop/u</th><th>Inkoop/u</th><th>Omzet</th><th>Inkoop</th><th>Marge</th></tr></thead>
+                                    <tbody data-zzp-invoice-body>
+                                        {% for row in zzp_invoicing.rows|default([]) %}
+                                        <tr data-zzp-invoice-row>
+                                            <td><input type="checkbox" checked data-zzp-include aria-label="Regel meenemen"></td>
+                                            <td><input type="text" value="{{ row.principal_name }}" data-zzp-principal></td>
+                                            <td><input type="text" value="{{ row.project_name }}" data-zzp-project></td>
+                                            <td><input type="text" value="{{ row.employee_name }}" data-zzp-worker></td>
+                                            <td><input type="text" value="{{ row.period }}" data-zzp-period></td>
+                                            <td><input type="text" inputmode="decimal" value="{{ row.hours }}" data-zzp-hours></td>
+                                            <td><input type="text" inputmode="decimal" value="{{ row.sales_rate }}" data-zzp-sales-rate></td>
+                                            <td><input type="text" inputmode="decimal" value="{{ row.purchase_rate }}" data-zzp-purchase-rate></td>
+                                            <td data-zzp-sales-amount>{{ row.sales_amount }}</td>
+                                            <td data-zzp-purchase-amount>{{ row.purchase_amount }}</td>
+                                            <td data-zzp-margin-amount>{{ row.margin_amount }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <template data-zzp-invoice-template>
+                                <tr data-zzp-invoice-row>
+                                    <td><input type="checkbox" checked data-zzp-include aria-label="Regel meenemen"></td>
+                                    <td><input type="text" placeholder="Opdrachtgever" data-zzp-principal></td>
+                                    <td><input type="text" placeholder="Project" data-zzp-project></td>
+                                    <td><input type="text" placeholder="Zzp'er" data-zzp-worker></td>
+                                    <td><input type="text" placeholder="Week/periode" data-zzp-period></td>
+                                    <td><input type="text" inputmode="decimal" placeholder="0" data-zzp-hours></td>
+                                    <td><input type="text" inputmode="decimal" value="" placeholder="0,00" data-zzp-sales-rate></td>
+                                    <td><input type="text" inputmode="decimal" value="" placeholder="0,00" data-zzp-purchase-rate></td>
+                                    <td data-zzp-sales-amount>€ 0,00</td>
+                                    <td data-zzp-purchase-amount>€ 0,00</td>
+                                    <td data-zzp-margin-amount>€ 0,00</td>
+                                </tr>
+                            </template>
+
+                            {% if not zzp_invoicing.rows %}
+                            <div class="empty-state invoicing-empty"><strong>Nog geen projecturen gevonden</strong><span>Voeg handmatig een regel toe of verwerk eerst urenbriefjes met opdrachtgever en project.</span></div>
+                            {% endif %}
+
+                            <div class="invoicing-totals-bar">
+                                <div><span>Omzet excl. btw</span><strong data-zzp-total-sales-bottom>{{ zzp_invoicing.suggested_sales_total }}</strong></div>
+                                <div><span>Btw</span><strong data-zzp-total-vat>€ 0,00</strong></div>
+                                <div><span>Factuur incl. btw</span><strong data-zzp-total-including-vat>€ 0,00</strong></div>
+                                <div><span>Inkoop zzp</span><strong data-zzp-total-purchase>{{ zzp_invoicing.suggested_purchase_total }}</strong></div>
+                                <div><span>Brutomarge</span><strong data-zzp-total-margin-bottom>{{ zzp_invoicing.suggested_margin_total }}</strong></div>
+                            </div>
+                        </section>
+                    </article>
+
                     {% if not selected_project %}
                     <article class="panel panel--full projects-only" id="projecten">
                         <div class="panel-header">
@@ -3197,6 +3280,6 @@ Metadata:
                 </section>
             </main>
         </div>
-        <script src="/dashboard/static/dashboard.js?v=20260608-10"></script>
+        <script src="/dashboard/static/dashboard.js?v=20260608-11"></script>
     </body>
 </html>
