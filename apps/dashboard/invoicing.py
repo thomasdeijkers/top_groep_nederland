@@ -244,8 +244,37 @@ def update_invoice_input(input_id: int, data: dict) -> int:
         with conn.cursor() as cursor:
             cursor.execute(
                 """
+                SELECT project_id, project_name, project_reference, project_location
+                FROM invoice_inputs
+                WHERE id = %s;
+                """,
+                (input_id,),
+            )
+            existing = cursor.fetchone()
+            if not existing:
+                raise ValueError("Factuurregel niet gevonden.")
+
+            project_id, project_name, project_reference, project_location = existing
+            selected_project_id = str(data.get("project_id") or "").strip()
+            if selected_project_id:
+                cursor.execute(
+                    """
+                    SELECT id, title, COALESCE(reference_number, ''), COALESCE(location, '')
+                    FROM vacancies
+                    WHERE id = %s;
+                    """,
+                    (int(selected_project_id),),
+                )
+                project = cursor.fetchone()
+                if not project:
+                    raise ValueError("Project niet gevonden.")
+                project_id, project_name, project_reference, project_location = project
+
+            cursor.execute(
+                """
                 UPDATE invoice_inputs
                 SET regime = %s, hours = %s, hourly_rate = %s, agreed_amount = %s, labor_amount = %s,
+                    project_id = %s, project_name = %s, project_reference = %s, project_location = %s,
                     parking_costs = %s, material_costs = %s, other_sales_costs = %s,
                     olympus_costs = %s, olympus_cost_description = %s, sales_vat_rate = %s,
                     fee_percent = %s, services = %s, sepa_active = %s, factoring = %s,
@@ -258,6 +287,7 @@ def update_invoice_input(input_id: int, data: dict) -> int:
                 """,
                 (
                     regime, hours, hourly_rate, agreed_amount, labor_amount,
+                    project_id, project_name, project_reference, project_location,
                     _money(data.get("parking_costs")), _money(data.get("material_costs")), _money(data.get("other_sales_costs")),
                     _money(data.get("olympus_costs")), str(data.get("olympus_cost_description") or "Olympus-kosten").strip(),
                     _money(data.get("sales_vat_rate")), fee_percent, str(data.get("services") or ("a,b,c" if factoring else "a,b,c,d")),

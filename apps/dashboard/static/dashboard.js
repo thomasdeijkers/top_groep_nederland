@@ -1877,6 +1877,24 @@
         refreshPreview();
     });
 
+    const syncInvoiceRegime = (form) => {
+        const regime = form.querySelector("[data-invoice-regime]");
+        if (!regime) return;
+        form.querySelectorAll("[data-invoice-regime-field]").forEach((field) => {
+            const visible = field.dataset.invoiceRegimeField === regime.value;
+            field.hidden = !visible;
+            field.querySelectorAll("[data-required-when-regime]").forEach((input) => {
+                input.required = visible;
+            });
+        });
+    };
+
+    document.querySelectorAll(".invoice-input-form, .invoice-edit-form").forEach((form) => {
+        const regime = form.querySelector("[data-invoice-regime]");
+        regime?.addEventListener("change", () => syncInvoiceRegime(form));
+        syncInvoiceRegime(form);
+    });
+
     document.querySelectorAll("[data-zzp-invoice]").forEach((calculator) => {
         const body = calculator.querySelector("[data-zzp-invoice-body]");
         const template = calculator.querySelector("[data-zzp-invoice-template]");

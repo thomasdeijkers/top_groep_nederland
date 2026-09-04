@@ -7975,6 +7975,27 @@ body[data-theme="light"] .invoicing-totals-bar div {
     color: #99f0bf;
 }
 
+.invoice-optional-fields {
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-top: 10px;
+}
+
+.invoice-optional-fields summary {
+    cursor: pointer;
+    color: #b8c9d0;
+    font-weight: 700;
+}
+
+.invoice-optional-fields[open] summary {
+    margin-bottom: 12px;
+    color: #99f0bf;
+}
+
+.required-mark {
+    color: #ff9b4a;
+    font-weight: 800;
+}
+
 .invoice-form-actions {
     display: flex;
     justify-content: flex-end;
@@ -8229,6 +8250,7 @@ body[data-theme="light"] .invoice-edit-grid label,
 body[data-theme="light"] .invoice-notes-field,
 body[data-theme="light"] .invoice-checks,
 body[data-theme="light"] .invoice-advanced-fields summary,
+body[data-theme="light"] .invoice-optional-fields summary,
 body[data-theme="light"] .invoice-workspace__heading p:not(.section-label),
 body[data-theme="light"] .invoice-run-detail__header p:not(.section-label),
 body[data-theme="light"] .invoice-input-panel p:not(.section-label) {

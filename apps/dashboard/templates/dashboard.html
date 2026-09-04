@@ -19,7 +19,7 @@
         </title>
         <link rel="icon" href="/dashboard/static/favicon.ico" sizes="any">
         <link rel="shortcut icon" href="/dashboard/static/favicon.ico">
-        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260904-03">
+        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260904-04">
     </head>
     <body class="page-{{ active_page }}">
         {% macro confidence_light(field) -%}
@@ -2357,19 +2357,11 @@ Metadata:
                                 <form class="invoice-input-form" action="/api/invoicing/input" method="post">
                                     <input type="hidden" name="run_id" value="{{ invoice_run.id if invoice_run else '' }}">
                                     <div class="invoice-form-section">
-                                        <span class="invoice-form-section__title">Factuurrun</span>
-                                        <div class="invoice-form-grid invoice-form-grid--three">
-                                            <label>Jaar <input type="number" name="year" value="{{ invoice_run.year if invoice_run else invoice_workspace.default_year }}" min="2020" max="2100" required></label>
-                                            <label>Kalenderweek <input type="number" name="week_number" value="{{ invoice_run.week_number if invoice_run else invoice_workspace.default_week }}" min="1" max="53" required></label>
-                                            <label>Factuurdatum <input type="date" name="invoice_date" value="{{ invoice_run.invoice_date.strftime('%Y-%m-%d') if invoice_run else invoice_workspace.default_invoice_date }}" required></label>
-                                        </div>
-                                    </div>
-                                    <div class="invoice-form-section">
                                         <span class="invoice-form-section__title">Weekkoppeling</span>
                                         <div class="invoice-form-grid invoice-form-grid--three">
-                                            <label>Zzp'er <select name="relation_id" required data-invoice-relation-select><option value="">Kies zzp'er</option>{% for item in invoice_candidate_options %}<option value="{{ item.id }}" data-logo-url="/dashboard/relations/logo/{{ item.id }}" data-hourly-rate="{{ item.hourly_rate|default('', true) }}" data-payment-method="{{ item.invoice_payment_method|default('incasso', true) }}">{{ item.name }}{% if item.city and item.city != '-' %} - {{ item.city }}{% endif %}</option>{% endfor %}</select></label>
-                                            <label>Opdrachtgever <select name="principal_id" required><option value="">Kies opdrachtgever</option>{% for item in principal_options %}<option value="{{ item.id }}">{{ item.name }}</option>{% endfor %}</select></label>
-                                            <label>Project <select name="project_id"><option value="">Kies project</option>{% for item in project_options %}<option value="{{ item.id }}">{{ item.title }}{% if item.reference_number %} - {{ item.reference_number }}{% endif %}</option>{% endfor %}</select></label>
+                                            <label>Zzp'er <span class="required-mark" aria-label="verplicht">*</span><select name="relation_id" required data-invoice-relation-select><option value="">Kies zzp'er</option>{% for item in invoice_candidate_options %}<option value="{{ item.id }}" data-logo-url="/dashboard/relations/logo/{{ item.id }}" data-hourly-rate="{{ item.hourly_rate|default('', true) }}" data-payment-method="{{ item.invoice_payment_method|default('incasso', true) }}">{{ item.name }}{% if item.city and item.city != '-' %} - {{ item.city }}{% endif %}</option>{% endfor %}</select></label>
+                                            <label>Opdrachtgever <span class="required-mark" aria-label="verplicht">*</span><select name="principal_id" required><option value="">Kies opdrachtgever</option>{% for item in principal_options %}<option value="{{ item.id }}">{{ item.name }}</option>{% endfor %}</select></label>
+                                            <label>Project <span class="required-mark" aria-label="verplicht">*</span><select name="project_id" required><option value="">Kies project</option>{% for item in project_options %}<option value="{{ item.id }}">{{ item.title }}{% if item.reference_number %} - {{ item.reference_number }}{% endif %}</option>{% endfor %}</select></label>
                                         </div>
                                         <div class="invoice-relation-actions"><a class="table-link" href="/dashboard/relations?tab=candidates&new=1&return_to=%2Fdashboard%2Finvoicing%23invoer">Nieuwe zzp'er</a><a class="table-link" href="/dashboard/relations?tab=principals&new=1&return_to=%2Fdashboard%2Finvoicing%23invoer">Nieuwe opdrachtgever</a></div>
                                         <div class="invoice-logo-preview" data-invoice-logo-preview>
@@ -2377,28 +2369,28 @@ Metadata:
                                             <span data-invoice-logo-label>Nog geen zzp'er gekozen</span>
                                         </div>
                                         <div class="invoice-form-grid invoice-form-grid--three">
-                                            <label>Arbeidsregime <select name="regime"><option value="regie">Regie: uren x tarief</option><option value="aangenomen werk">Aangenomen werk: aanneemsom</option></select></label>
-                                            <label>Factuurnummer zzp'er <input type="text" name="supplier_invoice_number" placeholder="Bijv. 2638" required></label>
-                                            <label>Achtervoegsel <input type="text" name="supplier_invoice_suffix" placeholder="Bijv. MB"></label>
+                                            <label>Arbeidsregime <span class="required-mark" aria-label="verplicht">*</span><select name="regime" data-invoice-regime><option value="regie">Regie: uren x tarief</option><option value="aangenomen werk">Aangenomen werk: aanneemsom</option></select></label>
+                                            <label>Factuurnummer zzp'er <span class="required-mark" aria-label="verplicht">*</span><input type="text" name="supplier_invoice_number" placeholder="Bijv. 2638" required></label>
                                         </div>
                                     </div>
                                     <div class="invoice-form-section">
-                                        <span class="invoice-form-section__title">Bedragen verkoopfactuur</span>
-                                        <div class="invoice-form-grid invoice-form-grid--four">
-                                            <label>Uren <input type="text" name="hours" inputmode="decimal" placeholder="0,00"></label>
-                                            <label>Regietarief/u <input type="text" name="hourly_rate" inputmode="decimal" placeholder="0,00"></label>
-                                            <label>Aanneemsom <input type="text" name="agreed_amount" inputmode="decimal" placeholder="0,00"></label>
-                                            <label>Verkoop-btw <select name="sales_vat_rate"><option value="0">Verlegd</option><option value="21">21% btw</option></select></label>
+                                        <span class="invoice-form-section__title">Verkoopbedrag</span>
+                                        <div class="invoice-form-grid invoice-form-grid--three">
+                                            <label data-invoice-regime-field="regie">Uren <span class="required-mark" aria-label="verplicht">*</span><input type="text" name="hours" inputmode="decimal" placeholder="0,00" data-required-when-regime></label>
+                                            <label data-invoice-regime-field="regie">Regietarief/u <span class="required-mark" aria-label="verplicht">*</span><input type="text" name="hourly_rate" inputmode="decimal" placeholder="0,00" data-required-when-regime></label>
+                                            <label data-invoice-regime-field="aangenomen werk" hidden>Aanneemsom <span class="required-mark" aria-label="verplicht">*</span><input type="text" name="agreed_amount" inputmode="decimal" placeholder="0,00" data-required-when-regime></label>
                                         </div>
+                                    </div>
+                                    <details class="invoice-optional-fields">
+                                        <summary>Aanvullende gegevens</summary>
                                         <div class="invoice-form-grid invoice-form-grid--four">
+                                            <label>Achtervoegsel <input type="text" name="supplier_invoice_suffix" placeholder="Bijv. MB"></label>
+                                            <label>Verkoop-btw <select name="sales_vat_rate"><option value="0">Verlegd</option><option value="21">21% btw</option></select></label>
                                             <label>Parkeerkosten <input type="text" name="parking_costs" inputmode="decimal" placeholder="0,00"></label>
                                             <label>Materiaalkosten <input type="text" name="material_costs" inputmode="decimal" placeholder="0,00"></label>
                                             <label>Overige doorbelasting <input type="text" name="other_sales_costs" inputmode="decimal" placeholder="0,00"></label>
                                             <label>Betalingstermijn (dagen) <input type="number" name="payment_term_days" value="30" min="0"></label>
                                         </div>
-                                    </div>
-                                    <div class="invoice-form-section">
-                                        <span class="invoice-form-section__title">Olympus-factuur</span>
                                         <div class="invoice-form-grid invoice-form-grid--four">
                                             <label>Feepercentage <input type="text" name="fee_percent" value="13,5" inputmode="decimal"></label>
                                             <label>Diensten <select name="services"><option value="a,b,c,d">3.1 a, b, c en d</option><option value="a,b,c">3.1 a, b en c (factoring)</option></select></label>
@@ -2422,8 +2414,16 @@ Metadata:
                                                 <label>KvK factoring <input type="text" name="factoring_kvk"></label>
                                             </div>
                                         </details>
-                                    </div>
-                                    <label class="invoice-notes-field">Notitie <textarea name="notes" rows="2" placeholder="Bijzonderheden of validatienotitie"></textarea></label>
+                                        <label class="invoice-notes-field">Notitie <textarea name="notes" rows="2" placeholder="Bijzonderheden of validatienotitie"></textarea></label>
+                                    </details>
+                                    <details class="invoice-optional-fields">
+                                        <summary>Factuurrun aanpassen</summary>
+                                        <div class="invoice-form-grid invoice-form-grid--three">
+                                            <label>Jaar <input type="number" name="year" value="{{ invoice_run.year if invoice_run else invoice_workspace.default_year }}" min="2020" max="2100" required></label>
+                                            <label>Kalenderweek <input type="number" name="week_number" value="{{ invoice_run.week_number if invoice_run else invoice_workspace.default_week }}" min="1" max="53" required></label>
+                                            <label>Factuurdatum <input type="date" name="invoice_date" value="{{ invoice_run.invoice_date.strftime('%Y-%m-%d') if invoice_run else invoice_workspace.default_invoice_date }}" required></label>
+                                        </div>
+                                    </details>
                                     <div class="invoice-form-actions"><button class="ghost-button ghost-button--primary" type="submit">Invoer opslaan</button></div>
                                 </form>
                             </section>
@@ -2469,11 +2469,16 @@ Metadata:
                                         <input type="hidden" name="factoring_phone" value="{{ item.factoring_phone }}">
                                         <input type="hidden" name="factoring_kvk" value="{{ item.factoring_kvk }}">
                                         <div class="invoice-edit-grid">
-                                            <label>Regime <select name="regime"><option value="regie" {% if item.regime == 'regie' %}selected{% endif %}>Regie</option><option value="aangenomen werk" {% if item.regime == 'aangenomen werk' %}selected{% endif %}>Aangenomen werk</option></select></label>
-                                            <label>Uren <input type="text" name="hours" value="{{ item.hours_text }}"></label>
-                                            <label>Tarief/u <input type="text" name="hourly_rate" value="{{ item.hourly_rate_text }}"></label>
-                                            <label>Aanneemsom <input type="text" name="agreed_amount" value="{{ item.agreed_amount_text }}"></label>
-                                            <label>Factuurnummer zzp'er <input type="text" name="supplier_invoice_number" value="{{ item.supplier_invoice_number }}"></label>
+                                            <label>Regime <span class="required-mark" aria-label="verplicht">*</span><select name="regime" data-invoice-regime><option value="regie" {% if item.regime == 'regie' %}selected{% endif %}>Regie</option><option value="aangenomen werk" {% if item.regime == 'aangenomen werk' %}selected{% endif %}>Aangenomen werk</option></select></label>
+                                            {% if not item.project_id %}<label>Project <span class="required-mark" aria-label="verplicht">*</span><select name="project_id" required><option value="">Kies project</option>{% for project in project_options %}<option value="{{ project.id }}">{{ project.title }}{% if project.reference_number %} - {{ project.reference_number }}{% endif %}</option>{% endfor %}</select></label>{% endif %}
+                                            <label data-invoice-regime-field="regie">Uren <span class="required-mark" aria-label="verplicht">*</span><input type="text" name="hours" value="{{ item.hours_text }}" data-required-when-regime></label>
+                                            <label data-invoice-regime-field="regie">Tarief/u <span class="required-mark" aria-label="verplicht">*</span><input type="text" name="hourly_rate" value="{{ item.hourly_rate_text }}" data-required-when-regime></label>
+                                            <label data-invoice-regime-field="aangenomen werk" {% if item.regime != 'aangenomen werk' %}hidden{% endif %}>Aanneemsom <span class="required-mark" aria-label="verplicht">*</span><input type="text" name="agreed_amount" value="{{ item.agreed_amount_text }}" data-required-when-regime></label>
+                                            <label>Factuurnummer zzp'er <span class="required-mark" aria-label="verplicht">*</span><input type="text" name="supplier_invoice_number" value="{{ item.supplier_invoice_number }}" required></label>
+                                        </div>
+                                        <details class="invoice-optional-fields">
+                                            <summary>Aanvullende gegevens</summary>
+                                            <div class="invoice-edit-grid">
                                             <label>Achtervoegsel <input type="text" name="supplier_invoice_suffix" value="{{ item.supplier_invoice_suffix }}"></label>
                                             <label>Parkeren <input type="text" name="parking_costs" value="{{ item.parking_costs_text }}"></label>
                                             <label>Materialen <input type="text" name="material_costs" value="{{ item.material_costs_text }}"></label>
@@ -2481,8 +2486,9 @@ Metadata:
                                             <label>Verkoop-btw <select name="sales_vat_rate"><option value="0" {% if item.sales_vat_rate == 0 %}selected{% endif %}>Verlegd</option><option value="21" {% if item.sales_vat_rate == 21 %}selected{% endif %}>21%</option></select></label>
                                             <label>Feepercentage <input type="text" name="fee_percent" value="{{ item.fee_percent_text }}"></label>
                                             <label>Betalingstermijn <input type="number" name="payment_term_days" value="{{ item.payment_term_days }}"></label>
-                                        </div>
-                                        <div class="invoice-checks"><label><input type="checkbox" name="sepa_active" {% if item.sepa_active %}checked{% endif %}> SEPA-incasso actief</label><label><input type="checkbox" name="factoring" {% if item.factoring %}checked{% endif %}> Factoring actief</label></div>
+                                            </div>
+                                            <div class="invoice-checks"><label><input type="checkbox" name="sepa_active" {% if item.sepa_active %}checked{% endif %}> SEPA-incasso actief</label><label><input type="checkbox" name="factoring" {% if item.factoring %}checked{% endif %}> Factoring actief</label></div>
+                                        </details>
                                         {% if item.blockers %}<div class="invoice-blockers"><strong>Compleet maken voor output</strong><span>{{ item.blockers|join(' | ') }}</span></div>{% endif %}
                                         <button class="ghost-button" type="submit">Regel opslaan</button>
                                     </form>
@@ -3508,6 +3514,6 @@ Metadata:
                 </section>
             </main>
         </div>
-        <script src="/dashboard/static/dashboard.js?v=20260904-04"></script>
+        <script src="/dashboard/static/dashboard.js?v=20260904-05"></script>
     </body>
 </html>
