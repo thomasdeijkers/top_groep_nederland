@@ -16,6 +16,7 @@ python-dotenv==1.2.2
 python-multipart==0.0.29
 requests==2.32.5
 reportlab==4.4.9
+pypdf==6.10.0
 starlette==1.1.0
 typing-inspection==0.4.2
 typing_extensions==4.15.0

@@ -1814,6 +1814,48 @@
         }
     });
 
+    const pdfViewer = document.querySelector("[data-pdf-viewer]");
+    const pdfFrame = document.querySelector("[data-pdf-viewer-frame]");
+    const pdfTitle = document.querySelector("[data-pdf-viewer-title]");
+    let pdfUrl = "";
+    const closePdfViewer = () => {
+        if (pdfViewer) pdfViewer.hidden = true;
+        if (pdfFrame) pdfFrame.src = "about:blank";
+        pdfUrl = "";
+    };
+    document.addEventListener("click", (event) => {
+        const trigger = event.target.closest("[data-pdf-open]");
+        if (!trigger) return;
+        event.preventDefault();
+        pdfUrl = trigger.dataset.pdfOpen || trigger.getAttribute("href") || "";
+        if (!pdfUrl) return;
+        if (pdfTitle) pdfTitle.textContent = trigger.dataset.pdfTitle || "PDF-document";
+        if (pdfFrame) pdfFrame.src = pdfUrl;
+        if (pdfViewer) pdfViewer.hidden = false;
+    });
+    document.querySelector("[data-pdf-viewer-close]")?.addEventListener("click", closePdfViewer);
+    pdfViewer?.addEventListener("click", (event) => {
+        if (event.target === pdfViewer) closePdfViewer();
+    });
+    document.querySelector("[data-pdf-viewer-print]")?.addEventListener("click", () => {
+        if (pdfFrame?.contentWindow) {
+            pdfFrame.contentWindow.focus();
+            pdfFrame.contentWindow.print();
+        }
+    });
+    document.querySelector("[data-pdf-viewer-download]")?.addEventListener("click", () => {
+        if (!pdfUrl) return;
+        const link = document.createElement("a");
+        link.href = pdfUrl;
+        link.download = "document.pdf";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+    });
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") closePdfViewer();
+    });
+
     document.querySelectorAll("[data-zzp-invoice]").forEach((calculator) => {
         const body = calculator.querySelector("[data-zzp-invoice-body]");
         const template = calculator.querySelector("[data-zzp-invoice-template]");

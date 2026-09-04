@@ -2,13 +2,17 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from mimetypes import guess_type
 from pathlib import Path
+import re
+from uuid import uuid4
 
 from apps.dashboard.data_store import ensure_dashboard_tables
 from shared.db.connection import get_connection
 
 
 INVOICE_EXPORT_DIR = Path("runtime/exports/invoicing")
+INVOICE_DOCUMENT_DIR = Path("runtime/uploads/invoicing")
 DEFAULT_FEE_PERCENT = Decimal("13.25")
 FACTORING_FEE_PERCENT = Decimal("12.50")
 DEFAULT_ADMIN_FEE = Decimal("8.50")
@@ -363,6 +367,28 @@ def _input_row(cursor, input_id: int):
         "supplier_invoice_suffix", "payment_term_days", "source_type", "status", "notes",
     )
     item = dict(zip(keys, row))
+    item.update({
+        "employee": {},
+        "principal": {},
+    })
+    for target, relation_id in (("employee", item.get("relation_id")), ("principal", item.get("principal_id"))):
+        if relation_id:
+            cursor.execute(
+                """
+                SELECT name, first_name, last_name, contact_name, email, phone, street,
+                       house_number, house_number_addition, postal_code, city, country,
+                       kvk_number, vat_number, COALESCE(logo_path, photo_path, '')
+                FROM relations WHERE id = %s;
+                """,
+                (relation_id,),
+            )
+            relation = cursor.fetchone()
+            if relation:
+                item[target] = dict(zip((
+                    "name", "first_name", "last_name", "contact_name", "email", "phone", "street",
+                    "house_number", "house_number_addition", "postal_code", "city", "country", "kvk_number",
+                    "vat_number", "logo_path",
+                ), relation))
     for key in ("hours", "hourly_rate", "agreed_amount", "labor_amount", "parking_costs", "material_costs", "other_sales_costs", "olympus_costs", "sales_vat_rate", "fee_percent"):
         item[f"{key}_text"] = _number_text(item[key])
     item["sales_costs"] = _money(item["parking_costs"]) + _money(item["material_costs"]) + _money(item["other_sales_costs"])
@@ -378,6 +404,96 @@ def _input_row(cursor, input_id: int):
     item["blockers"] = _input_blockers(item)
     item["display_status"] = "Klaar voor concept" if not item["blockers"] else "Aanvullen"
     return item
+
+
+def _safe_document_path(path_value: str | Path) -> Path | None:
+    path = Path(path_value).resolve()
+    root = INVOICE_DOCUMENT_DIR.resolve()
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return None
+    return path if path.is_file() else None
+
+
+def get_invoice_document_path(document_id: int) -> Path | None:
+    _ensure()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT file_path FROM invoice_documents WHERE id = %s;", (document_id,))
+            row = cursor.fetchone()
+    return _safe_document_path(row[0]) if row else None
+
+
+def save_invoice_document(content: bytes, filename: str, document_type: str, relation_id=None, principal_id=None,
+                          project_id=None, run_id=None, input_id=None, output_id=None) -> int:
+    if not content or not filename:
+        raise ValueError("Kies een document om te uploaden.")
+    suffix = Path(filename).suffix.lower()
+    if suffix not in {".pdf", ".png", ".jpg", ".jpeg", ".doc", ".docx", ".xls", ".xlsx"}:
+        raise ValueError("Dit bestandstype wordt niet ondersteund.")
+    _ensure()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            employee_name = "onbekende_zzper"
+            if relation_id:
+                cursor.execute("SELECT name FROM relations WHERE id = %s;", (relation_id,))
+                relation = cursor.fetchone()
+                employee_name = relation[0] if relation else employee_name
+            dossier_dir = INVOICE_DOCUMENT_DIR / _dossier_name(employee_name)
+            dossier_dir.mkdir(parents=True, exist_ok=True)
+            safe_filename = f"{uuid4().hex}_{Path(filename).name}"
+            path = dossier_dir / safe_filename
+            path.write_bytes(content)
+            cursor.execute(
+                """
+                INSERT INTO invoice_documents
+                    (relation_id, principal_id, project_id, run_id, input_id, output_id,
+                     document_type, filename, file_path, content_type)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id;
+                """,
+                (relation_id or None, principal_id or None, project_id or None, run_id or None, input_id or None,
+                 output_id or None, str(document_type or "overig"), Path(filename).name, str(path),
+                 guess_type(filename)[0] or "application/octet-stream"),
+            )
+            document_id = cursor.fetchone()[0]
+        conn.commit()
+    return document_id
+
+
+def list_invoice_documents(query: str = "", relation_id: int | None = None) -> list[dict]:
+    _ensure()
+    search = f"%{str(query or '').strip().lower()}%"
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT d.id, d.relation_id, d.principal_id, d.project_id, d.run_id, d.input_id,
+                       d.output_id, d.document_type, d.filename, d.content_type, d.created_at,
+                       COALESCE(r.name, i.employee_name, '') AS employee_name,
+                       COALESCE(p.name, i.principal_name, '') AS principal_name,
+                       COALESCE(v.title, i.project_name, '') AS project_name
+                FROM invoice_documents d
+                LEFT JOIN relations r ON r.id = d.relation_id
+                LEFT JOIN relations p ON p.id = d.principal_id
+                LEFT JOIN invoice_inputs i ON i.id = d.input_id
+                LEFT JOIN vacancies v ON v.id = d.project_id
+                WHERE (%s = '%%' OR LOWER(CONCAT_WS(' ', d.filename, d.document_type, r.name, p.name,
+                       i.employee_name, i.principal_name, v.title, d.run_id::text)) LIKE %s)
+                  AND (%s IS NULL OR d.relation_id = %s)
+                ORDER BY d.created_at DESC, d.id DESC
+                LIMIT 200;
+                """,
+                (search, search, relation_id, relation_id),
+            )
+            rows = cursor.fetchall()
+    return [dict(zip(("id", "relation_id", "principal_id", "project_id", "run_id", "input_id", "output_id",
+                      "document_type", "filename", "content_type", "created_at", "employee_name", "principal_name", "project_name"), row)) for row in rows]
+
+
+def list_relation_invoice_documents(relation_id: int) -> list[dict]:
+    return list_invoice_documents(relation_id=relation_id)
 
 
 def _input_blockers(item: dict) -> list[str]:
@@ -439,126 +555,213 @@ def _supplier_invoice_number(item: dict) -> str:
     return f"ZZP-{item.get('relation_id') or 'onbekend'}-{item['id']}"
 
 
+def _dossier_name(value: str) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9À-ÿ]+", "_", str(value or "onbekende_zzper").strip()).strip("_")
+    return cleaned or "onbekende_zzper"
+
+
 def _services_text(item: dict) -> str:
     services = [part.strip().lower() for part in str(item.get("services") or "").split(",") if part.strip()]
     return f"3.1 {', '.join(services)}" if services and services != ["a", "b", "c", "d"] else "optionele diensten art. 3.1"
 
 
-def _address_block(c, x: float, y: float, title: str, lines: list[str]) -> None:
+def _relation_full_name(relation: dict, fallback: str) -> str:
+    name = " ".join(str(relation.get(key) or "").strip() for key in ("first_name", "last_name")).strip()
+    return name or str(relation.get("name") or fallback or "").strip()
+
+
+def _relation_address_lines(relation: dict) -> list[str]:
+    street = " ".join(str(relation.get(key) or "").strip() for key in ("street", "house_number", "house_number_addition")).strip()
+    city = " ".join(str(relation.get(key) or "").strip() for key in ("postal_code", "city")).strip()
+    return [line for line in (street, city) if line]
+
+
+def _draw_lines(c, x: float, y: float, lines: list[str], color="#111111", font="Helvetica", size=9, leading=12):
     colors, _, _ = _reportlab_dependencies()
-    c.setFillColor(colors.HexColor("#16372b"))
-    c.setFont("Helvetica-Bold", 9)
-    c.drawString(x, y, title.upper())
-    c.setFillColor(colors.HexColor("#27333a"))
-    c.setFont("Helvetica", 10)
-    cursor_y = y - 16
+    c.setFillColor(colors.HexColor(color))
+    c.setFont(font, size)
     for line in lines:
         if line:
-            c.drawString(x, cursor_y, str(line))
-            cursor_y -= 14
+            c.drawString(x, y, str(line))
+            y -= leading
+    return y
 
 
-def _invoice_header(c, title: str, subtitle: str, number: str) -> None:
-    colors, A4, _ = _reportlab_dependencies()
-    width, height = A4
-    c.setFillColor(colors.HexColor("#102b24"))
-    c.rect(0, height - 86, width, 86, fill=1, stroke=0)
-    c.setFillColor(colors.HexColor("#eaf6ef"))
-    c.setFont("Helvetica-Bold", 22)
-    c.drawString(42, height - 42, title)
-    c.setFont("Helvetica", 9)
-    c.drawString(44, height - 60, subtitle)
-    c.setFont("Helvetica-Bold", 11)
-    c.drawRightString(width - 42, height - 42, f"FACTUUR {number}")
+def _draw_logo(c, logo_path: str | None, x: float, y: float, max_width: float = 120, max_height: float = 62) -> None:
+    if not logo_path or not Path(logo_path).is_file():
+        return
+    try:
+        from reportlab.lib.utils import ImageReader
+        image = ImageReader(logo_path)
+        image_width, image_height = image.getSize()
+        scale = min(max_width / image_width, max_height / image_height)
+        c.drawImage(image, x, y - image_height * scale, image_width * scale, image_height * scale, mask="auto", preserveAspectRatio=True)
+    except Exception as exc:
+        print(f"INVOICE_LOGO_WARNING {type(exc).__name__}: {exc}")
 
 
-def _line(c, y: float, label: str, value: str, amount: str, width: float) -> float:
+def _brand_logo_path(cursor) -> str | None:
+    cursor.execute("SELECT file_path FROM invoice_brand_assets WHERE asset_key = 'olympus_logo';")
+    row = cursor.fetchone()
+    if row and Path(row[0]).is_file():
+        return row[0]
+    default_logo = Path("apps/dashboard/static/olympusbouw.png")
+    return str(default_logo) if default_logo.is_file() else None
+
+
+def _merge_pdf_documents(output_path: Path, invoice_path: Path, attachment_paths: list[Path]) -> None:
+    pdf_attachments = [path for path in attachment_paths if path.suffix.lower() == ".pdf" and path.is_file()]
+    if not pdf_attachments:
+        invoice_path.replace(output_path)
+        return
+    from pypdf import PdfWriter
+    writer = PdfWriter()
+    writer.append(str(invoice_path))
+    for attachment_path in pdf_attachments:
+        writer.append(str(attachment_path))
+    with output_path.open("wb") as handle:
+        writer.write(handle)
+    invoice_path.unlink(missing_ok=True)
+
+
+def _input_attachment_paths(cursor, input_id: int) -> list[Path]:
+    cursor.execute(
+        """
+        SELECT file_path FROM invoice_documents
+        WHERE input_id = %s AND output_id IS NULL
+        ORDER BY CASE document_type
+            WHEN 'weekstaat' THEN 1
+            WHEN 'parkeerdeclaratie' THEN 2
+            WHEN 'materiaaldeclaratie' THEN 3
+            WHEN 'overige_bijlage' THEN 4
+            WHEN 'overeenkomst' THEN 5
+            ELSE 6 END, id;
+        """,
+        (input_id,),
+    )
+    return [Path(row[0]) for row in cursor.fetchall() if _safe_document_path(row[0])]
+
+
+def _factuur_kader(c, x: float, y: float, width: float, height: float, rows: list[tuple[str, str, str, str]], accent="#111111") -> None:
     colors, _, _ = _reportlab_dependencies()
-    c.setStrokeColor(colors.HexColor("#d7e1dc"))
-    c.line(42, y - 5, width - 42, y - 5)
-    c.setFillColor(colors.HexColor("#27333a"))
-    c.setFont("Helvetica", 10)
-    c.drawString(48, y - 1, label)
-    if value:
+    c.setStrokeColor(colors.HexColor(accent))
+    c.setLineWidth(0.65)
+    c.rect(x, y, width, height, fill=0, stroke=1)
+    c.line(x + width * 0.52, y, x + width * 0.52, y + height)
+    row_height = height / len(rows)
+    for index, (left_label, left_value, right_label, right_value) in enumerate(rows):
+        if index:
+            c.line(x, y + height - row_height * index, x + width, y + height - row_height * index)
+        baseline = y + height - row_height * index - row_height * 0.67
+        c.setFillColor(colors.HexColor("#111111"))
+        c.setFont("Helvetica-Bold", 7.5)
+        c.drawString(x + 8, baseline, left_label)
         c.setFont("Helvetica", 8)
-        c.setFillColor(colors.HexColor("#6b777d"))
-        c.drawString(48, y - 14, value)
-    c.setFillColor(colors.HexColor("#27333a"))
-    c.setFont("Helvetica-Bold", 10)
-    c.drawRightString(width - 48, y - 1, amount)
-    return y - (30 if value else 22)
+        c.drawString(x + 62, baseline, str(left_value or "-"))
+        c.setFont("Helvetica-Bold", 7.5)
+        c.drawString(x + width * 0.52 + 8, baseline, right_label)
+        c.setFont("Helvetica", 8)
+        c.drawString(x + width * 0.52 + 62, baseline, str(right_value or "-"))
+
+
+def _amount_line(c, y: float, label: str, amount: str, detail: str = "", color="#111111") -> float:
+    colors, _, _ = _reportlab_dependencies()
+    c.setFillColor(colors.HexColor(color))
+    c.setFont("Helvetica", 9)
+    c.drawString(48, y, label)
+    if detail:
+        c.setFont("Helvetica", 7.5)
+        c.drawString(48, y - 11, detail)
+    c.setFont("Helvetica", 9)
+    c.drawRightString(548, y, amount)
+    return y - (25 if detail else 17)
 
 
 def _sale_pdf(path: Path, run: dict, item: dict, invoice_number: str) -> None:
     colors, A4, canvas = _reportlab_dependencies()
     c = canvas.Canvas(str(path), pagesize=A4)
     width, height = A4
-    _invoice_header(c, "FACTUUR", "Verkoopfactuur namens de zzp'er", invoice_number)
-    _address_block(c, 42, height - 122, "Aan opdrachtgever", [item["principal_name"], "Per factuur-e-mail", item["project_location"]])
-    _address_block(c, 320, height - 122, "Afzender", [item["employee_name"], "Zzp'er / opdrachtnemer", "OBS-code wordt aan de overeenkomst ontleend"])
-    c.setFillColor(colors.HexColor("#eef4f0"))
-    c.roundRect(42, height - 274, width - 84, 74, 6, fill=1, stroke=0)
-    c.setFillColor(colors.HexColor("#27333a"))
+    employee = item.get("employee") or {}
+    principal = item.get("principal") or {}
+    principal_name = principal.get("name") or item["principal_name"]
+    employee_name = _relation_full_name(employee, item["employee_name"])
+    left_lines = [principal_name, f"T.a.v. {principal.get('contact_name') or 'De financiële administratie'}"] + _relation_address_lines(principal)
+    if principal.get("email"):
+        left_lines.append(f"Per e-mail: {principal['email']}")
+    _draw_lines(c, 42, height - 52, left_lines, size=9, leading=12)
+    _draw_logo(c, employee.get("logo_path"), 405, height - 35, 105, 55)
+    right_lines = [employee_name] + _relation_address_lines(employee)
+    if employee.get("kvk_number"):
+        right_lines.append(f"KvK {employee['kvk_number']}")
+    if employee.get("vat_number"):
+        right_lines.append(f"BTW {employee['vat_number']}")
+    if employee.get("phone"):
+        right_lines.append(employee["phone"])
+    if employee.get("email"):
+        right_lines.append(employee["email"])
+    _draw_lines(c, 405, height - 108, right_lines, size=8.5, leading=11)
+    c.setFillColor(colors.HexColor("#111111"))
+    c.setFont("Helvetica-Bold", 25)
+    c.drawString(42, height - 225, "FACTUUR")
+    _factuur_kader(c, 42, height - 310, width - 84, 68, [
+        ("Factuur", invoice_number, "Project", item["project_name"]),
+        ("Datum", _date_text(run["invoice_date"]), "Nummer", f"Werk: {item['project_reference'] or '-'}"),
+        ("Plaats", employee.get("city") or "-", "Bon", "Factureren met weekstaat"),
+        ("Week", f"{run['week_number']} {run['year']}", "BTW nr", principal.get("vat_number") or "-"),
+    ])
+    y = height - 345
     c.setFont("Helvetica", 9)
-    meta = [
-        ("Factuur", invoice_number), ("Datum", _date_text(run["invoice_date"])),
-        ("Week", f"{run['week_number']} {run['year']}"), ("Project", item["project_name"]),
-        ("Werk", item["project_reference"] or "-"), ("Regime", item["regime"]),
-    ]
-    for index, (label, value) in enumerate(meta):
-        x = 52 + (index % 2) * 265
-        y = height - 222 - (index // 2) * 22
-        c.setFont("Helvetica-Bold", 8)
-        c.drawString(x, y, f"{label}:")
-        c.setFont("Helvetica", 9)
-        c.drawString(x + 54, y, str(value)[:44])
-    y = height - 314
-    c.setFillColor(colors.HexColor("#16372b"))
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(48, y, "Werkzaamheden en doorbelastingen")
-    y -= 28
+    c.setFillColor(colors.HexColor("#111111"))
+    c.drawString(48, y, "Betreft voor uw bedrijf uitgevoerde werkzaamheden conform overeenkomst")
+    y -= 17
     obs_code = f"ZZP OBS {item.get('relation_id') or '-'} {item.get('principal_id') or '-'}"
-    y = _line(c, y, "Uitgevoerde werkzaamheden conform overeenkomst", obs_code, _money_text(item["labor_amount"]), width)
-    y = _line(c, y, "Doorbelaste parkeerkosten", "Declaratiebedrag exclusief btw", _money_text(item["parking_costs"]), width)
-    y = _line(c, y, "Doorbelaste materiaalkosten", "Declaratiebedrag exclusief btw", _money_text(item["material_costs"]), width)
+    c.setFont("Helvetica", 8)
+    c.drawString(48, y, obs_code)
+    c.drawRightString(548, y, _money_text(item["labor_amount"]))
+    y -= 28
+    y = _amount_line(c, y, "Doorbelaste parkeerkosten", _money_text(item["parking_costs"]), "")
+    y = _amount_line(c, y, "Doorbelaste materiaalkosten", _money_text(item["material_costs"]), "")
     if _money(item["other_sales_costs"]):
-        y = _line(c, y, "Overige eenmalige doorbelasting", "Aanvullende kostenregel", _money_text(item["other_sales_costs"]), width)
-    c.setFillColor(colors.HexColor("#102b24"))
-    c.rect(42, y - 32, width - 84, 32, fill=1, stroke=0)
-    c.setFillColor(colors.white)
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(52, y - 20, "Totaal door u te voldoen")
-    c.drawRightString(width - 52, y - 20, _money_text(item["sales_total_including_vat"]))
-    y -= 58
+        y = _amount_line(c, y, "Overige doorbelaste kosten", _money_text(item["other_sales_costs"]), "")
+    c.setStrokeColor(colors.black)
+    c.line(42, y + 5, 550, y + 5)
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(48, y - 10, "Totaal door u te voldoen")
+    c.drawRightString(548, y - 10, _money_text(item["sales_total_including_vat"]))
+    y -= 37
     c.setFillColor(colors.HexColor("#27333a"))
     c.setFont("Helvetica", 9)
     if _decimal(item["sales_vat_rate"]) == 0:
-        c.drawString(48, y, "De btw-verleggingsregeling is van toepassing.")
+        c.drawString(48, y, "De BTW verleggingsregeling is van toepassing")
     else:
-        c.drawString(48, y, f"Btw 21%: {_money_text(item['sales_vat'])} over {_money_text(item['sales_total'])}.")
-    y -= 28
+        c.drawString(48, y, f"BTW 21%: {_money_text(item['sales_vat'])} over {_money_text(item['sales_total'])}")
+    y -= 32
     payment_date = run["invoice_date"] + timedelta(days=int(item["payment_term_days"] or 30))
     if item["factoring"]:
-        c.setFillColor(colors.HexColor("#7b1e1e"))
+        c.setFillColor(colors.HexColor("#4d9b67"))
         c.setFont("Helvetica-Bold", 10)
-        c.drawString(48, y, f"Betaling van deze vordering uiterlijk {_date_text(payment_date)} op rekening van {item['factoring_company']}.")
+        c.drawString(48, y, "Betaling van deze vordering dient plaats te vinden voor:")
         y -= 15
+        c.drawString(48, y, _date_text(payment_date))
+        y -= 17
+        c.setFillColor(colors.HexColor("#111111"))
         c.setFont("Helvetica", 9)
-        c.drawString(48, y, f"IBAN: {item['factoring_iban'] or '-'} | onder vermelding van factuurnummer {invoice_number}")
-        y -= 40
-        c.setFillColor(colors.HexColor("#fff0f0"))
-        c.roundRect(42, y - 70, width - 84, 70, 6, fill=1, stroke=0)
+        c.drawString(48, y, f"Op rekening {item['factoring_iban'] or '-'} ten name van {item['factoring_company']}")
+        y -= 15
+        c.drawString(48, y, "onder vermelding van het factuurnummer")
+        y -= 35
         c.setFillColor(colors.HexColor("#7b1e1e"))
         c.setFont("Helvetica-Bold", 12)
-        c.drawString(54, y - 22, "FACTORING")
+        c.drawString(48, y, "FACTORING")
+        y -= 17
         c.setFont("Helvetica", 9)
-        c.drawString(54, y - 39, f"{item['employee_name']} maakt gebruik van factoring.")
-        c.drawString(54, y - 54, f"De vordering is overgedragen aan {item['factoring_company']}.")
+        c.drawString(48, y, f"{employee_name} maakt gebruik van factoring")
+        c.drawString(48, y - 14, f"Het eigendom van de hierbij gefactureerde vordering is overgedragen aan {item['factoring_company']}")
     else:
-        c.drawString(48, y, f"Betaling uiterlijk {_date_text(payment_date)} op de rekening van de zzp'er.")
+        c.drawString(48, y, f"Betaling van deze vordering dient plaats te vinden voor: {_date_text(payment_date)}")
     c.setFillColor(colors.HexColor("#6b777d"))
     c.setFont("Helvetica", 8)
-    c.drawString(42, 34, "Factuur opgesteld namens de zzp'er. Doorbelaste bedragen zijn exclusief btw opgenomen.")
+    c.drawString(42, 34, "Factuur opgesteld namens de zzp'er")
     c.save()
 
 
@@ -566,50 +769,52 @@ def _olympus_pdf(path: Path, run: dict, item: dict, invoice_number: str, sale_in
     colors, A4, canvas = _reportlab_dependencies()
     c = canvas.Canvas(str(path), pagesize=A4)
     width, height = A4
-    _invoice_header(c, "OLYMPUS", "Factuur dienstverlening Olympus Bouw B.V.", invoice_number)
-    _address_block(c, 42, height - 122, "Aan zzp'er", [item["employee_name"], "Debiteurnummer: " + str(item.get("relation_id") or "-"), "Factuur voor dienstverlening"])
-    _address_block(c, 320, height - 122, "Olympus Bouw B.V.", ["Hoofdweg 242/244", "2908 LC Capelle aan den IJssel", "info@olympusbouw.nl"])
-    c.setFillColor(colors.HexColor("#eef4f0"))
-    c.roundRect(42, height - 254, width - 84, 54, 6, fill=1, stroke=0)
-    c.setFillColor(colors.HexColor("#27333a"))
-    c.setFont("Helvetica", 9)
-    c.drawString(52, height - 222, f"Project: {item['project_name'] or '-'}")
-    c.drawString(320, height - 222, f"Week: {run['week_number']} {run['year']} | Datum: {_date_text(run['invoice_date'])}")
-    y = height - 292
+    employee = item.get("employee") or {}
+    _draw_lines(c, 42, height - 52, [f"De heer {employee.get('first_name') or item['employee_name']} {employee.get('last_name') or ''}".strip(), item["employee_name"]] + _relation_address_lines(employee), size=9, leading=12)
+    _draw_logo(c, item.get("olympus_logo_path"), 405, height - 35, 112, 58)
+    _draw_lines(c, 405, height - 108, ["Olympus Bouw B.V.", "Hoofdweg 244", "2908 LC Capelle aan den IJssel", "Telefoon 0888 - 111 222", "info@olympusbouw.nl", "Handelsregister 32146718", "BTW NL.8204.26.003.B.01", "IBAN NL33 RABO 0148 7700 10"], color="#24559c", size=8, leading=10)
+    c.setFillColor(colors.HexColor("#24559c"))
+    c.setFont("Helvetica-Bold", 25)
+    c.drawString(42, height - 225, "FACTUUR")
+    _factuur_kader(c, 42, height - 310, width - 84, 68, [
+        ("Factuur", invoice_number, "Project", item["project_name"]),
+        ("Datum", f"{run['invoice_date'].day}-{run['invoice_date'].month}-{run['invoice_date'].year}", "Debiteurnr", item.get("relation_id") or "-"),
+        ("Plaats", "Capelle aan den IJssel", "BTW nr", employee.get("vat_number") or "-"),
+        ("Week", f"{run['week_number']} {run['year']}", "Werk", item["project_reference"] or "-"),
+    ], accent="#24559c")
+    y = height - 345
     c.setFillColor(colors.HexColor("#27333a"))
     c.setFont("Helvetica", 10)
-    c.drawString(48, y, "Hierbij brengen wij u in rekening de aan u geleverde optionele dienstverlening")
-    c.drawString(48, y - 15, "op basis van onze goedgekeurde bemiddelingsovereenkomst.")
+    c.drawString(48, y, "Hierbij brengen wij u in rekening de aan u geleverde optionele dienstverlening op basis")
+    c.drawString(48, y - 15, "van onze goedgekeurde bemiddelingsovereenkomst.")
     y -= 54
-    c.setFillColor(colors.HexColor("#16372b"))
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(48, y, "Dienstverlening")
-    y -= 28
-    y = _line(c, y, f"Door u reeds gefactureerd met factuurnummer {sale_invoice_number}", f"Week {run['week_number']} {run['year']}", _money_text(item["sales_total_including_vat"]), width)
-    y = _line(c, y, f"Aan u geleverde {_services_text(item)}", "Fee over alleen de arbeidsomzet", _money_text(item["fee_amount"]), width)
-    y = _line(c, y, "Berekend over de omzet onder aftrek van e.v.t. door u doorbelaste kosten", "Arbeidsomzet", _money_text(item["labor_amount"]), width)
+    y = _amount_line(c, y, f"Door u is aan uw opdrachtgever reeds gefactureerd met factuurnummer {sale_invoice_number}", _money_text(item["sales_total_including_vat"]), f"op basis van de door u te realiseren opdracht op het bovenvermelde project in week {run['week_number']} {run['year']}")
+    y = _amount_line(c, y, f"Aan u geleverde optionele diensten {_services_text(item)}", _money_text(item["fee_amount"]), "")
+    y = _amount_line(c, y, "Berekend over de omzet onder aftrek van e.v.t. door u doorbelaste kosten:", _money_text(item["labor_amount"]), "")
     if item["admin_fee"]:
-        y = _line(c, y, "Administratievergoeding wegens geen SEPA-incasso", "Exclusief btw", _money_text(item["admin_fee"]), width)
+        y = _amount_line(c, y, "Administratievergoeding wegens geen SEPA-incasso", _money_text(item["admin_fee"]), "")
     if _money(item["olympus_costs"]):
-        y = _line(c, y, item["olympus_cost_description"] or "Door ons aan u doorbelaste kosten", "Btw 0%", _money_text(item["olympus_costs"]), width)
+        y = _amount_line(c, y, item["olympus_cost_description"] or "Door ons aan u doorbelaste kosten", _money_text(item["olympus_costs"]), "")
     y -= 8
-    y = _line(c, y, "Verschuldigde 21% btw", "Over fee en administratievergoeding", _money_text(item["olympus_vat"]), width)
-    c.setFillColor(colors.HexColor("#102b24"))
-    c.rect(42, y - 32, width - 84, 32, fill=1, stroke=0)
-    c.setFillColor(colors.white)
+    y = _amount_line(c, y, "Verschuldigde 21% BTW", _money_text(item["olympus_vat"]), "Over fee en administratievergoeding")
+    c.setStrokeColor(colors.black)
+    c.line(42, y + 5, 550, y + 5)
+    c.setFillColor(colors.HexColor("#111111"))
     c.setFont("Helvetica-Bold", 11)
-    c.drawString(52, y - 20, "Totaal te voldoen")
-    c.drawRightString(width - 52, y - 20, _money_text(item["olympus_total"]))
-    y -= 62
+    c.drawString(48, y - 10, "Totaal te voldoen")
+    c.drawRightString(548, y - 10, _money_text(item["olympus_total"]))
+    y -= 48
     debit_days = 8 if item["factoring"] else 30
     debit_date = run["invoice_date"] + timedelta(days=debit_days)
     c.setFillColor(colors.HexColor("#27333a"))
     c.setFont("Helvetica", 9)
-    c.drawString(48, y, f"Het totaalbedrag wordt afgeschreven op {_date_text(debit_date)} van uw rekening.")
-    c.drawString(48, y - 15, "SEPA-incasso: " + ("actief" if item["sepa_active"] else "niet actief; betaal de factuur zelf"))
+    c.setFillColor(colors.HexColor("#4d9b67"))
+    c.drawString(48, y, f"Het totaalbedrag wordt afgeschreven op: {_date_text(debit_date)}")
+    c.setFillColor(colors.HexColor("#111111"))
+    c.drawString(48, y - 15, "van uw rekening: " + (employee.get("iban") or "NL67 ABNA 0846 7711 36"))
     c.setFillColor(colors.HexColor("#6b777d"))
     c.setFont("Helvetica", 8)
-    c.drawString(42, 34, "Olympus Bouw B.V. | Factuurreeks doorlopend beheerd | Alle bedragen in euro's")
+    c.drawString(42, 34, "Olympus Bouw B.V. | Hoofdweg 244 | 2908 LC Capelle aan den IJssel")
     c.save()
 
 
@@ -634,12 +839,21 @@ def generate_invoice_run(run_id: int) -> dict:
                 items.append(item)
             output_ids = []
             for item in items:
+                item["olympus_logo_path"] = _brand_logo_path(cursor)
                 sale_number = _output_number(cursor, run_id, item["id"], "verkoop") or _supplier_invoice_number(item)
                 olympus_number = _output_number(cursor, run_id, item["id"], "olympus") or _next_olympus_number(cursor)
-                sale_path = INVOICE_EXPORT_DIR / f"verkoopfactuur_{run_id}_{item['id']}_{sale_number.replace('/', '-')}.pdf"
-                olympus_path = INVOICE_EXPORT_DIR / f"olympusfactuur_{run_id}_{item['id']}_{olympus_number}.pdf"
-                _sale_pdf(sale_path, run, item, sale_number)
-                _olympus_pdf(olympus_path, run, item, olympus_number, sale_number)
+                dossier_dir = INVOICE_EXPORT_DIR / _dossier_name(item["employee_name"])
+                dossier_dir.mkdir(parents=True, exist_ok=True)
+                sale_filename_number = re.sub(r"[^A-Za-z0-9._-]+", "-", sale_number).strip(".-") or "factuur"
+                sale_path = dossier_dir / f"verkoopfactuur_{run_id}_{item['id']}_{sale_filename_number}.pdf"
+                olympus_path = dossier_dir / f"olympusfactuur_{run_id}_{item['id']}_{olympus_number}.pdf"
+                sale_base = dossier_dir / f".verkoopfactuur_{run_id}_{item['id']}.pdf"
+                olympus_base = dossier_dir / f".olympusfactuur_{run_id}_{item['id']}.pdf"
+                _sale_pdf(sale_base, run, item, sale_number)
+                _olympus_pdf(olympus_base, run, item, olympus_number, sale_number)
+                attachment_paths = _input_attachment_paths(cursor, item["id"])
+                _merge_pdf_documents(sale_path, sale_base, attachment_paths)
+                _merge_pdf_documents(olympus_path, olympus_base, attachment_paths)
                 for stream, number, path in (("verkoop", sale_number, sale_path), ("olympus", olympus_number, olympus_path)):
                     cursor.execute(
                         """
@@ -651,7 +865,20 @@ def generate_invoice_run(run_id: int) -> dict:
                         """,
                         (run_id, item["id"], stream, number, str(path),),
                     )
-                    output_ids.append(cursor.fetchone()[0])
+                    output_id = cursor.fetchone()[0]
+                    output_ids.append(output_id)
+                    cursor.execute(
+                        """
+                        INSERT INTO invoice_documents
+                            (relation_id, principal_id, project_id, run_id, input_id, output_id,
+                             document_type, filename, file_path, content_type)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'application/pdf')
+                        ON CONFLICT DO NOTHING;
+                        """,
+                        (item.get("relation_id"), item.get("principal_id"), item.get("project_id"), run_id,
+                         item["id"], output_id, "verkoopfactuur" if stream == "verkoop" else "olympusfactuur",
+                         path.name, str(path)),
+                    )
             cursor.execute("UPDATE invoice_runs SET status = 'concept', updated_at = NOW() WHERE id = %s;", (run_id,))
         conn.commit()
     return {"run_id": run_id, "output_ids": output_ids, "count": len(items)}

@@ -20,8 +20,12 @@ from apps.dashboard.invoicing import (
     create_invoice_input,
     generate_invoice_run,
     get_invoice_output_path,
+    get_invoice_document_path,
     get_invoicing_workspace,
     import_project_bookings_into_run,
+    list_invoice_documents,
+    list_relation_invoice_documents,
+    save_invoice_document,
     update_invoice_input,
 )
 from apps.dashboard.payroll_excel import build_payroll_output_workbook
@@ -476,7 +480,8 @@ def _dashboard_context(
             "project_options": [],
             "projects": [],
             "zzp_invoicing": {"line_count": 0, "total_hours": "0", "suggested_sales_total": "\u20ac 0,00", "suggested_purchase_total": "\u20ac 0,00", "suggested_margin_total": "\u20ac 0,00", "rows": []},
-            "invoice_workspace": {"runs": [], "selected_run": None, "inputs": [], "outputs": [], "totals": {"sales": "\u20ac 0,00", "olympus": "\u20ac 0,00", "hours": "0", "blockers": 0}},
+            "invoice_workspace": {"runs": [], "selected_run": None, "inputs": [], "outputs": [], "totals": {"sales": "\u20ac 0,00", "olympus": "\u20ac 0,00", "hours": "0", "blockers": 0}, "documents": []},
+            "invoice_documents": [],
             "selected_project": None,
             "selected_payroll_period": None,
             "payroll_periods": [],
@@ -573,7 +578,8 @@ def _dashboard_context(
     project_options = _context_value(data_page, "project_options", [], list_project_options) if data_page in {"timesheets", "projects", "periods", "invoicing"} else []
     projects = _context_value(data_page, "projects", [], lambda: list_projects(query=query)) if data_page == "projects" else []
     zzp_invoicing = _context_value(data_page, "zzp_invoicing", {"line_count": 0, "total_hours": "0", "suggested_sales_total": "\u20ac 0,00", "suggested_purchase_total": "\u20ac 0,00", "suggested_margin_total": "\u20ac 0,00", "rows": []}, get_zzp_invoicing_overview) if data_page == "invoicing" else {"line_count": 0, "total_hours": "0", "suggested_sales_total": "\u20ac 0,00", "suggested_purchase_total": "\u20ac 0,00", "suggested_margin_total": "\u20ac 0,00", "rows": []}
-    invoice_workspace = _context_value(data_page, "invoice_workspace", {"runs": [], "selected_run": None, "inputs": [], "outputs": [], "totals": {"sales": "\u20ac 0,00", "olympus": "\u20ac 0,00", "hours": "0", "blockers": 0}}, lambda: get_invoicing_workspace(invoice_run_id)) if data_page == "invoicing" else {"runs": [], "selected_run": None, "inputs": [], "outputs": [], "totals": {"sales": "\u20ac 0,00", "olympus": "\u20ac 0,00", "hours": "0", "blockers": 0}}
+    invoice_workspace = _context_value(data_page, "invoice_workspace", {"runs": [], "selected_run": None, "inputs": [], "outputs": [], "totals": {"sales": "\u20ac 0,00", "olympus": "\u20ac 0,00", "hours": "0", "blockers": 0}, "documents": []}, lambda: get_invoicing_workspace(invoice_run_id)) if data_page == "invoicing" else {"runs": [], "selected_run": None, "inputs": [], "outputs": [], "totals": {"sales": "\u20ac 0,00", "olympus": "\u20ac 0,00", "hours": "0", "blockers": 0}, "documents": []}
+    invoice_documents = _context_value(data_page, "invoice_documents", [], lambda: list_invoice_documents(query=query)) if data_page == "invoicing" else []
     selected_project = _context_value(data_page, "selected_project", None, lambda: get_project(project_id)) if data_page == "projects" and project_id else None
     payroll_periods = _context_value(data_page, "payroll_periods", [], list_payroll_periods) if data_page in {"periods", "timesheets"} else []
     archived_payroll_periods = _context_value(data_page, "archived_payroll_periods", [], lambda: list_payroll_periods(archived=True)) if data_page in {"periods", "timesheets"} else []
@@ -593,6 +599,7 @@ def _dashboard_context(
     cao_settings = _context_value(data_page, "cao_settings", [], list_cao_settings) if data_page in {"settings", "periods"} else []
     selected_cao_setting = _context_value(data_page, "selected_cao_setting", None, lambda: get_cao_setting(cao_id)) if data_page == "settings" and cao_id else None
     selected_relation = _context_value(data_page, "selected_relation", None, lambda: get_relation(edit_id)) if data_page == "relations" and edit_id else None
+    selected_relation_documents = _context_value(data_page, "selected_relation_documents", [], lambda: list_relation_invoice_documents(edit_id)) if data_page == "relations" and edit_id else []
     selected_relation_payroll = None
     if selected_relation and selected_relation.get("relation_type") == "candidate":
         selected_relation_payroll = _context_value(data_page, "selected_relation_payroll", None, lambda: get_relation_payroll_context(selected_relation.get("id")))
@@ -686,6 +693,7 @@ def _dashboard_context(
         "tickets": imported_tickets,
         "vacancies": imported_vacancies,
         "selected_relation": selected_relation,
+        "selected_relation_documents": selected_relation_documents,
         "selected_relation_payroll": selected_relation_payroll,
         "selected_relation_audit_events": selected_relation_audit_events,
         "relation_return_url": relation_return_url,
@@ -698,6 +706,7 @@ def _dashboard_context(
         "projects": projects,
         "zzp_invoicing": zzp_invoicing,
         "invoice_workspace": invoice_workspace,
+        "invoice_documents": invoice_documents,
         "selected_project": selected_project,
         "selected_payroll_period": selected_payroll_period,
         "payroll_periods": payroll_periods,
@@ -866,8 +875,8 @@ def periods_page(request: Request, period: int | None = None, flow: str = ""):
 
 
 @router.get("/dashboard/invoicing", response_class=HTMLResponse)
-def invoicing_page(request: Request, run: int | None = None):
-    return _render_dashboard(request, "invoicing", invoice_run_id=run)
+def invoicing_page(request: Request, run: int | None = None, q: str = ""):
+    return _render_dashboard(request, "invoicing", query=q, invoice_run_id=run)
 
 
 @router.post("/api/invoicing/input")
@@ -959,6 +968,68 @@ def download_invoice_output(output_id: int):
     if not path:
         return RedirectResponse("/dashboard/invoicing?error=output", status_code=303)
     return FileResponse(path, filename=path.name, media_type="application/pdf")
+
+
+@router.get("/api/invoicing/document/{document_id}")
+def download_invoice_document(document_id: int):
+    path = get_invoice_document_path(document_id)
+    if not path:
+        return RedirectResponse("/dashboard/invoicing?error=document", status_code=303)
+    media_type = "application/pdf" if path.suffix.lower() == ".pdf" else None
+    return FileResponse(path, filename=path.name, media_type=media_type)
+
+
+@router.post("/api/invoicing/documents")
+async def upload_invoice_document(
+    file: UploadFile = File(...),
+    document_type: str = Form("overig"),
+    relation_id: int | None = Form(None),
+    principal_id: int | None = Form(None),
+    project_id: int | None = Form(None),
+    run_id: int | None = Form(None),
+    input_id: int | None = Form(None),
+):
+    try:
+        document_id = save_invoice_document(
+            await file.read(), file.filename or "document",
+            document_type, relation_id, principal_id, project_id, run_id, input_id,
+        )
+        _audit("Facturatiedocument opgeslagen", "invoice_document", document_id, file.filename or "Document", "Document aan het zzp-dossier toegevoegd.", "Facturatie")
+        return RedirectResponse("/dashboard/invoicing?uploaded=document#dossiers", status_code=303)
+    except Exception as exc:
+        print(f"INVOICE_DOCUMENT_ERROR {type(exc).__name__}: {_db_error_detail(exc)}")
+        return RedirectResponse("/dashboard/invoicing?error=document#dossiers", status_code=303)
+
+
+@router.post("/api/invoicing/olympus-logo")
+async def upload_olympus_logo(file: UploadFile = File(...)):
+    try:
+        content = await file.read()
+        suffix = Path(file.filename or "").suffix.lower()
+        if suffix not in {".png", ".jpg", ".jpeg"} or not content:
+            raise ValueError("Gebruik een PNG- of JPG-logo.")
+        folder = Path("runtime/uploads/invoicing")
+        folder.mkdir(parents=True, exist_ok=True)
+        path = folder / f"olympus_logo{suffix}"
+        path.write_bytes(content)
+        from apps.dashboard.data_store import ensure_dashboard_tables
+        from shared.db.connection import get_connection
+        ensure_dashboard_tables()
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO invoice_brand_assets (asset_key, filename, file_path)
+                    VALUES ('olympus_logo', %s, %s)
+                    ON CONFLICT (asset_key) DO UPDATE SET filename = EXCLUDED.filename, file_path = EXCLUDED.file_path, updated_at = NOW();
+                    """,
+                    (file.filename or path.name, str(path)),
+                )
+            conn.commit()
+        return RedirectResponse("/dashboard/invoicing?uploaded=logo#dossiers", status_code=303)
+    except Exception as exc:
+        print(f"INVOICE_LOGO_ERROR {type(exc).__name__}: {_db_error_detail(exc)}")
+        return RedirectResponse("/dashboard/invoicing?error=logo#dossiers", status_code=303)
 
 
 @router.get("/dashboard/tickets", response_class=HTMLResponse)

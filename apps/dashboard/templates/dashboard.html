@@ -1077,6 +1077,26 @@
                             {% endif %}
 
                             {% if selected_relation %}
+                            <section class="relation-documents-panel" id="relatie-documenten">
+                                <div class="panel-header panel-header--compact">
+                                    <div>
+                                        <p class="section-label">Documentdossier</p>
+                                        <h3>Facturen en documenten</h3>
+                                        <p>Alle facturatiebestanden die aan {{ selected_relation.name }} zijn gekoppeld.</p>
+                                    </div>
+                                    <a class="ghost-button" href="/dashboard/invoicing?q={{ selected_relation.name|urlencode }}#dossiers">Openen in facturatie</a>
+                                </div>
+                                <div class="invoice-document-list">
+                                    {% for document in selected_relation_documents %}
+                                    <div class="invoice-document-row"><span><strong>{{ document.filename }}</strong><small>{{ document.document_type }}{% if document.principal_name %} | {{ document.principal_name }}{% endif %}{% if document.project_name %} | {{ document.project_name }}{% endif %}</small></span><button class="table-link" type="button" data-pdf-open="/api/invoicing/document/{{ document.id }}" data-pdf-title="{{ document.filename }}">Openen</button></div>
+                                    {% else %}
+                                    <div class="empty-state empty-state--compact"><strong>Nog geen facturen of bewijsstukken</strong><span>Upload documenten in het facturatiemenu; ze worden hier automatisch aan deze relatie gekoppeld.</span></div>
+                                    {% endfor %}
+                                </div>
+                            </section>
+                            {% endif %}
+
+                            {% if selected_relation %}
                             <section class="relation-audit-panel">
                                 <div class="panel-header panel-header--compact">
                                     <div>
@@ -2463,10 +2483,26 @@ Metadata:
                         <section class="invoice-output-panel" id="output">
                             <div class="invoice-run-detail__header"><div><p class="section-label">Output</p><h3>Facturen maken</h3><p>Elke invoerregel levert een verkoopfactuur en een Olympus-factuur als PDF.</p></div><form action="/api/invoicing/runs/{{ invoice_run.id }}/generate" method="post"><button class="ghost-button ghost-button--primary" type="submit" {% if not invoice_workspace.inputs or invoice_workspace.totals.blockers %}disabled{% endif %}>Genereer PDF-facturen</button></form></div>
                             <div class="invoice-output-list">
-                                {% for output in invoice_workspace.outputs %}<a class="invoice-output-card" href="/api/invoicing/output/{{ output.id }}"><span class="invoice-output-card__icon">PDF</span><span><strong>{{ 'Verkoopfactuur' if output.stream == 'verkoop' else 'Olympus-factuur' }} {{ output.invoice_number }}</strong><small>{{ output.filename }}</small></span><span class="invoice-output-card__download">Download</span></a>{% else %}<p class="empty-state">Nog geen facturen gegenereerd. Los eerst alle controles op.</p>{% endfor %}
+                                {% for output in invoice_workspace.outputs %}<a class="invoice-output-card" href="/api/invoicing/output/{{ output.id }}" data-pdf-open="/api/invoicing/output/{{ output.id }}" data-pdf-title="{{ 'Verkoopfactuur' if output.stream == 'verkoop' else 'Olympus-factuur' }} {{ output.invoice_number }}"><span class="invoice-output-card__icon">PDF</span><span><strong>{{ 'Verkoopfactuur' if output.stream == 'verkoop' else 'Olympus-factuur' }} {{ output.invoice_number }}</strong><small>{{ output.filename }}</small></span><span class="invoice-output-card__download">Bekijken / opslaan</span></a>{% else %}<p class="empty-state">Nog geen facturen gegenereerd. Los eerst alle controles op.</p>{% endfor %}
                             </div>
                         </section>
                         {% endif %}
+
+                        <section class="invoice-documents-panel" id="dossiers">
+                            <div class="invoice-run-detail__header"><div><p class="section-label">Dossier op naam van de zzp'er</p><h3>Documenten en bijlagen</h3><p>Upload bewijsstukken en zoek facturen terug op zzp'er, opdrachtgever, project of bestandsnaam.</p></div><form class="invoice-brand-upload" action="/api/invoicing/olympus-logo" method="post" enctype="multipart/form-data"><label>Olympus-logo <input type="file" name="file" accept="image/png,image/jpeg" required></label><button class="ghost-button" type="submit">Logo uploaden</button></form></div>
+                            <form class="invoice-document-upload" action="/api/invoicing/documents" method="post" enctype="multipart/form-data">
+                                <input type="hidden" name="run_id" value="{{ invoice_run.id if invoice_run else '' }}">
+                                <div class="invoice-form-grid invoice-form-grid--four">
+                                    <label>Bestand <input type="file" name="file" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx" required></label>
+                                    <label>Documenttype <select name="document_type"><option value="weekstaat">Weekstaat</option><option value="parkeerdeclaratie">Parkeerdeclaratie</option><option value="materiaaldeclaratie">Materiaaldeclaratie</option><option value="overige_bijlage">Overige bijlage</option><option value="overeenkomst">Overeenkomst</option><option value="overig">Overig</option></select></label>
+                                    <label>Zzp'er <select name="relation_id" required><option value="">Kies zzp'er</option>{% for item in invoice_candidate_options %}<option value="{{ item.id }}">{{ item.name }}</option>{% endfor %}</select></label>
+                                    <label>Opdrachtgever <select name="principal_id"><option value="">Niet koppelen</option>{% for item in principal_options %}<option value="{{ item.id }}">{{ item.name }}</option>{% endfor %}</select></label>
+                                </div>
+                                <div class="invoice-form-grid invoice-form-grid--three"><label>Project <select name="project_id"><option value="">Niet koppelen</option>{% for item in project_options %}<option value="{{ item.id }}">{{ item.title }}</option>{% endfor %}</select></label><label>Factuurinvoer <input type="number" name="input_id" placeholder="Optioneel"></label><button class="ghost-button ghost-button--primary" type="submit">Aan dossier toevoegen</button></div>
+                            </form>
+                            <form class="single-search invoice-document-search" action="/dashboard/invoicing" method="get"><input type="search" name="q" value="{{ query }}" placeholder="Zoek dossier, zzp'er, opdrachtgever, project of bestand"><button class="ghost-button" type="submit">Zoeken</button>{% if query %}<a class="ghost-button" href="/dashboard/invoicing#dossiers">Wissen</a>{% endif %}</form>
+                            <div class="invoice-document-list">{% for document in invoice_documents %}<div class="invoice-document-row"><span><strong>{{ document.employee_name or 'Onbekende zzp\'er' }} | {{ document.filename }}</strong><small>{{ document.document_type }}{% if document.principal_name %} | {{ document.principal_name }}{% endif %}{% if document.project_name %} | {{ document.project_name }}{% endif %}</small></span><button class="table-link" type="button" data-pdf-open="/api/invoicing/document/{{ document.id }}" data-pdf-title="{{ document.filename }}">Openen</button></div>{% else %}<div class="empty-state empty-state--compact"><strong>Nog geen documenten in de dossiers</strong><span>Een gegenereerde factuur of upload verschijnt hier op naam van de zzp'er.</span></div>{% endfor %}</div>
+                        </section>
                     </article>
 
                     {% if not selected_project %}
@@ -3270,6 +3306,16 @@ Metadata:
                         </div>
                     </article>
 
+                    <div class="pdf-viewer-backdrop" data-pdf-viewer hidden>
+                        <section class="pdf-viewer-modal" role="dialog" aria-modal="true" aria-labelledby="pdf-viewer-title">
+                            <header class="pdf-viewer-modal__header">
+                                <div><p class="section-label">Document bekijken</p><h2 data-pdf-viewer-title>PDF-document</h2></div>
+                                <div class="pdf-viewer-modal__actions"><button class="ghost-button" type="button" data-pdf-viewer-print>Printen</button><button class="ghost-button" type="button" data-pdf-viewer-download>Opslaan</button><button class="modal-close" type="button" data-pdf-viewer-close aria-label="Sluiten">x</button></div>
+                            </header>
+                            <iframe class="pdf-viewer-frame" data-pdf-viewer-frame title="PDF-document"></iframe>
+                        </section>
+                    </div>
+
                     <div class="document-zoom-backdrop" data-document-zoom-modal hidden>
                         <div class="document-zoom-modal" role="dialog" aria-modal="true" aria-label="Urenbriefje vergroten">
                             <button class="modal-close document-zoom-close" type="button" data-document-zoom-close aria-label="Sluiten">x</button>
@@ -3451,6 +3497,6 @@ Metadata:
                 </section>
             </main>
         </div>
-        <script src="/dashboard/static/dashboard.js?v=20260608-11"></script>
+        <script src="/dashboard/static/dashboard.js?v=20260904-02"></script>
     </body>
 </html>

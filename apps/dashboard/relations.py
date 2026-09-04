@@ -64,6 +64,7 @@ def create_relation(data: dict, photo: dict | None = None) -> int:
                     house_number_addition, postal_code, city, country,
                     status, source, owner, availability, hourly_rate, kvk_number,
                     vat_number, notes, photo_filename, photo_path, archived_at,
+                    logo_filename, logo_path,
                     payroll_license_plate, payroll_choice_budget, payroll_phase,
                     payroll_pension, payroll_cao_hours, payroll_days_right,
                     payroll_scale, payroll_function, payroll_hourly_wage,
@@ -77,6 +78,7 @@ def create_relation(data: dict, photo: dict | None = None) -> int:
                     %(status)s, %(source)s, %(owner)s, %(availability)s,
                     %(hourly_rate)s, %(kvk_number)s, %(vat_number)s, %(notes)s,
                     %(photo_filename)s, %(photo_path)s, %(archived_at)s,
+                    %(logo_filename)s, %(logo_path)s,
                     %(payroll_license_plate)s, %(payroll_choice_budget)s,
                     %(payroll_phase)s, %(payroll_pension)s, %(payroll_cao_hours)s,
                     %(payroll_days_right)s, %(payroll_scale)s, %(payroll_function)s,
@@ -104,6 +106,8 @@ def update_relation(relation_id: int, data: dict, photo: dict | None = None) -> 
     payload["id"] = relation_id
     payload["photo_filename"] = existing.get("photo_filename")
     payload["photo_path"] = existing.get("photo_path")
+    payload["logo_filename"] = existing.get("logo_filename")
+    payload["logo_path"] = existing.get("logo_path")
     if photo:
         payload.update(photo)
 
@@ -138,6 +142,8 @@ def update_relation(relation_id: int, data: dict, photo: dict | None = None) -> 
                     notes = %(notes)s,
                     photo_filename = %(photo_filename)s,
                     photo_path = %(photo_path)s,
+                    logo_filename = %(logo_filename)s,
+                    logo_path = %(logo_path)s,
                     archived_at = %(archived_at)s,
                     payroll_license_plate = %(payroll_license_plate)s,
                     payroll_choice_budget = %(payroll_choice_budget)s,
@@ -366,7 +372,12 @@ def save_relation_photo(content: bytes, filename: str) -> dict | None:
     safe_name = f"{uuid4().hex}_{Path(filename).name}"
     file_path = RELATION_PHOTO_DIR / safe_name
     file_path.write_bytes(content)
-    return {"photo_filename": filename, "photo_path": str(file_path)}
+    return {
+        "photo_filename": filename,
+        "photo_path": str(file_path),
+        "logo_filename": filename,
+        "logo_path": str(file_path),
+    }
 
 
 def create_vacancy(data: dict) -> int:
@@ -554,6 +565,8 @@ def _relation_payload(data: dict, relation_type: str) -> dict:
         "notes": data.get("notes"),
         "photo_filename": data.get("photo_filename"),
         "photo_path": data.get("photo_path"),
+        "logo_filename": data.get("logo_filename"),
+        "logo_path": data.get("logo_path"),
         "archived_at": datetime.now() if _relation_status(data) == "Archief" else None,
     }
 
