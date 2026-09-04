@@ -1925,6 +1925,24 @@
         });
     });
 
+    document.querySelectorAll("[data-mediation-preview-open]").forEach((button) => {
+        button.addEventListener("click", () => {
+            const form = button.closest("form");
+            if (!form || !form.reportValidity()) return;
+            const params = new URLSearchParams({
+                relation_id: form.querySelector('[name="relation_id"]')?.value || "",
+                start_date: form.querySelector('[name="start_date"]')?.value || "",
+                status: form.querySelector('[name="status"]')?.value || "getekend",
+                services: form.querySelector('[name="services"]')?.value || "a,b,c,d",
+                notes: form.querySelector('[name="notes"]')?.value || "",
+            });
+            pdfUrl = `/api/invoicing/mediation-agreements/preview?${params.toString()}`;
+            if (pdfTitle) pdfTitle.textContent = "Bemiddelingsovereenkomst controleren";
+            if (pdfFrame) pdfFrame.src = pdfUrl;
+            if (pdfViewer) pdfViewer.hidden = false;
+        });
+    });
+
     document.querySelectorAll("[data-invoice-agreement-select]").forEach((select) => {
         const form = select.closest("form");
         const preview = form?.querySelector("[data-invoice-logo-preview]");

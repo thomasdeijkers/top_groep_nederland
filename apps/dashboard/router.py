@@ -18,6 +18,7 @@ from apps.dashboard.organizations import create_organization, list_organizations
 from apps.dashboard.openai_usage import get_openai_usage_summary, list_openai_api_audit_events
 from apps.dashboard.invoicing import (
     archive_invoice_run,
+    create_mediation_agreement,
     create_invoice_agreement,
     create_invoice_input,
     delete_invoice_document,
@@ -26,6 +27,7 @@ from apps.dashboard.invoicing import (
     generate_invoice_run,
     get_invoice_output_path,
     get_invoice_agreement_pdf_path,
+    get_mediation_agreement_pdf_path,
     get_invoice_document_path,
     get_invoicing_workspace,
     import_project_bookings_into_run,
@@ -34,7 +36,9 @@ from apps.dashboard.invoicing import (
     restore_invoice_run,
     save_invoice_document,
     save_invoice_agreement_pdf,
+    save_mediation_agreement_pdf,
     _agreement_pdf_bytes,
+    _mediation_pdf_bytes,
     update_invoice_input,
 )
 from apps.dashboard.payroll_excel import build_payroll_output_workbook
@@ -489,7 +493,7 @@ def _dashboard_context(
             "project_options": [],
             "projects": [],
             "zzp_invoicing": {"line_count": 0, "total_hours": "0", "suggested_sales_total": "\u20ac 0,00", "suggested_purchase_total": "\u20ac 0,00", "suggested_margin_total": "\u20ac 0,00", "rows": []},
-            "invoice_workspace": {"runs": [], "selected_run": None, "inputs": [], "outputs": [], "totals": {"sales": "\u20ac 0,00", "olympus": "\u20ac 0,00", "hours": "0", "blockers": 0}, "documents": []},
+            "invoice_workspace": {"runs": [], "archive_runs": [], "agreements": [], "mediation_agreements": [], "selected_run": None, "inputs": [], "outputs": [], "totals": {"sales": "\u20ac 0,00", "olympus": "\u20ac 0,00", "hours": "0", "blockers": 0}, "documents": []},
             "invoice_documents": [],
             "selected_project": None,
             "selected_payroll_period": None,
@@ -587,7 +591,7 @@ def _dashboard_context(
     project_options = _context_value(data_page, "project_options", [], list_project_options) if data_page in {"timesheets", "projects", "periods", "invoicing"} else []
     projects = _context_value(data_page, "projects", [], lambda: list_projects(query=query)) if data_page == "projects" else []
     zzp_invoicing = _context_value(data_page, "zzp_invoicing", {"line_count": 0, "total_hours": "0", "suggested_sales_total": "\u20ac 0,00", "suggested_purchase_total": "\u20ac 0,00", "suggested_margin_total": "\u20ac 0,00", "rows": []}, get_zzp_invoicing_overview) if data_page == "invoicing" else {"line_count": 0, "total_hours": "0", "suggested_sales_total": "\u20ac 0,00", "suggested_purchase_total": "\u20ac 0,00", "suggested_margin_total": "\u20ac 0,00", "rows": []}
-    invoice_workspace = _context_value(data_page, "invoice_workspace", {"runs": [], "selected_run": None, "inputs": [], "outputs": [], "totals": {"sales": "\u20ac 0,00", "olympus": "\u20ac 0,00", "hours": "0", "blockers": 0}, "documents": []}, lambda: get_invoicing_workspace(invoice_run_id)) if data_page == "invoicing" else {"runs": [], "selected_run": None, "inputs": [], "outputs": [], "totals": {"sales": "\u20ac 0,00", "olympus": "\u20ac 0,00", "hours": "0", "blockers": 0}, "documents": []}
+    invoice_workspace = _context_value(data_page, "invoice_workspace", {"runs": [], "archive_runs": [], "agreements": [], "mediation_agreements": [], "selected_run": None, "inputs": [], "outputs": [], "totals": {"sales": "\u20ac 0,00", "olympus": "\u20ac 0,00", "hours": "0", "blockers": 0}, "documents": []}, lambda: get_invoicing_workspace(invoice_run_id)) if data_page == "invoicing" else {"runs": [], "archive_runs": [], "agreements": [], "mediation_agreements": [], "selected_run": None, "inputs": [], "outputs": [], "totals": {"sales": "\u20ac 0,00", "olympus": "\u20ac 0,00", "hours": "0", "blockers": 0}, "documents": []}
     invoice_documents = _context_value(data_page, "invoice_documents", [], lambda: list_invoice_documents(query=query)) if data_page == "invoicing" else []
     selected_project = _context_value(data_page, "selected_project", None, lambda: get_project(project_id)) if data_page == "projects" and project_id else None
     payroll_periods = _context_value(data_page, "payroll_periods", [], list_payroll_periods) if data_page in {"periods", "timesheets"} else []
@@ -978,6 +982,54 @@ async def save_invoice_agreement(
     except Exception as exc:
         print(f"INVOICE_AGREEMENT_ERROR {type(exc).__name__}: {_db_error_detail(exc)}")
         return RedirectResponse("/dashboard/invoicing?error=agreement#overeenkomsten", status_code=303)
+
+
+@router.post("/api/invoicing/mediation-agreements")
+async def save_mediation_agreement(
+    relation_id: int = Form(...),
+    start_date: str = Form(""),
+    status: str = Form("getekend"),
+    services: str = Form("a,b,c,d"),
+    notes: str = Form(""),
+):
+    try:
+        agreement_id = create_mediation_agreement(locals())
+        save_mediation_agreement_pdf(agreement_id)
+        _audit("Bemiddelingsovereenkomst vastgelegd", "mediation_agreement", agreement_id, f"Bemiddelingsovereenkomst {agreement_id}", "Bemiddelingsovereenkomst en PDF vastgelegd in het zzp-dossier.", "Facturatie")
+        return RedirectResponse(f"/dashboard/invoicing?mediation={agreement_id}&saved=1#bemiddeling", status_code=303)
+    except Exception as exc:
+        print(f"MEDIATION_AGREEMENT_ERROR {type(exc).__name__}: {_db_error_detail(exc)}")
+        return RedirectResponse("/dashboard/invoicing?error=mediation#bemiddeling", status_code=303)
+
+
+@router.get("/api/invoicing/mediation-agreements/preview")
+def preview_mediation_agreement(
+    relation_id: int = 0,
+    start_date: str = "",
+    status: str = "getekend",
+    services: str = "a,b,c,d",
+    notes: str = "",
+):
+    try:
+        content = _mediation_pdf_bytes(locals())
+        return Response(content, media_type="application/pdf", headers={"Content-Disposition": "inline; filename=bemiddelingsovereenkomst-voorbeeld.pdf"})
+    except Exception as exc:
+        print(f"MEDIATION_AGREEMENT_PREVIEW_ERROR {type(exc).__name__}: {_db_error_detail(exc)}")
+        return Response(status_code=204)
+
+
+@router.get("/api/invoicing/mediation-agreements/{agreement_id}/pdf")
+def download_mediation_agreement_pdf(agreement_id: int):
+    path = get_mediation_agreement_pdf_path(agreement_id)
+    if not path:
+        try:
+            save_mediation_agreement_pdf(agreement_id)
+            path = get_mediation_agreement_pdf_path(agreement_id)
+        except Exception as exc:
+            print(f"MEDIATION_AGREEMENT_PDF_ERROR {type(exc).__name__}: {_db_error_detail(exc)}")
+    if not path:
+        return RedirectResponse("/dashboard/invoicing?error=mediation#bemiddeling", status_code=303)
+    return FileResponse(path, filename=path.name, media_type="application/pdf", content_disposition_type="inline")
 
 
 @router.get("/api/invoicing/agreements/preview")

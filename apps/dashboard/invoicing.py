@@ -211,6 +211,72 @@ def list_invoice_agreements() -> list[dict]:
     return agreements
 
 
+def create_mediation_agreement(data: dict) -> int:
+    relation_id = int(data.get("relation_id") or 0)
+    if not relation_id:
+        raise ValueError("Kies een zzp'er voor de bemiddelingsovereenkomst.")
+    status = str(data.get("status") or "getekend").strip().lower()
+    if status not in {"concept", "verzonden", "getekend", "beeindigd"}:
+        status = "getekend"
+    _ensure()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO mediation_agreements (relation_id, start_date, status, services, notes)
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING id;
+                """,
+                (relation_id, _parse_date(data.get("start_date")), status,
+                 str(data.get("services") or "a,b,c,d").strip(), str(data.get("notes") or "").strip()),
+            )
+            agreement_id = cursor.fetchone()[0]
+        conn.commit()
+    return agreement_id
+
+
+def _mediation_agreement_row(cursor, agreement_id: int | str | None) -> dict | None:
+    if not agreement_id:
+        return None
+    cursor.execute(
+        """
+        SELECT id, relation_id, start_date, status, services, notes
+        FROM mediation_agreements
+        WHERE id = %s;
+        """,
+        (int(agreement_id),),
+    )
+    row = cursor.fetchone()
+    if not row:
+        return None
+    return dict(zip(("id", "relation_id", "start_date", "status", "services", "notes"), row))
+
+
+def list_mediation_agreements() -> list[dict]:
+    _ensure()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT a.id, a.relation_id, a.start_date, a.status, a.services, a.notes,
+                       COALESCE(r.name, ''), COUNT(d.id)
+                FROM mediation_agreements a
+                LEFT JOIN relations r ON r.id = a.relation_id
+                LEFT JOIN invoice_documents d ON d.mediation_agreement_id = a.id
+                GROUP BY a.id, r.name
+                ORDER BY a.start_date DESC, a.id DESC;
+                """
+            )
+            rows = cursor.fetchall()
+    results = []
+    for row in rows:
+        item = dict(zip(("id", "relation_id", "start_date", "status", "services", "notes", "employee_name", "document_count"), row))
+        item["start_date_text"] = _date_text(item["start_date"])
+        item["status_label"] = {"concept": "Concept", "verzonden": "Verzonden", "getekend": "Getekend", "beeindigd": "Beeindigd"}.get(item["status"], item["status"])
+        results.append(item)
+    return results
+
+
 def archive_invoice_run(run_id: int) -> None:
     _ensure()
     with get_connection() as conn:
@@ -1204,6 +1270,185 @@ def get_invoice_agreement_pdf_path(agreement_id: int) -> Path | None:
     return _safe_document_path(row[0]) if row else None
 
 
+def _mediation_pdf_context(data: dict) -> dict:
+    relation_id = int(data.get("relation_id") or 0)
+    if not relation_id:
+        raise ValueError("Kies een zzp'er voor de bemiddelingsovereenkomst.")
+    _ensure()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT name, first_name, last_name, contact_name, email, phone, street, house_number,
+                       house_number_addition, postal_code, city, kvk_number, vat_number,
+                       COALESCE(invoice_obs_number, '')
+                FROM relations WHERE id = %s;
+                """,
+                (relation_id,),
+            )
+            row = cursor.fetchone()
+    if not row:
+        raise ValueError("Zzp'er niet gevonden.")
+    employee = dict(zip((
+        "name", "first_name", "last_name", "contact_name", "email", "phone", "street", "house_number",
+        "house_number_addition", "postal_code", "city", "kvk_number", "vat_number", "obs_number",
+    ), row))
+    return {
+        "relation_id": relation_id,
+        "employee": employee,
+        "employee_name": _relation_full_name(employee, employee.get("name") or "Zzp'er"),
+        "start_date": _parse_date(data.get("start_date")),
+        "status": str(data.get("status") or "getekend").strip(),
+        "services": str(data.get("services") or "a,b,c,d").strip(),
+        "notes": str(data.get("notes") or "").strip(),
+    }
+
+
+def _mediation_pdf_bytes(data: dict) -> bytes:
+    context = _mediation_pdf_context(data)
+    colors, A4, canvas = _reportlab_dependencies()
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+    employee = context["employee"]
+    employee_name = context["employee_name"]
+    safe_employee = escape(employee_name)
+    safe_company = escape(employee.get("name") or employee_name)
+    address = "<br/>".join(escape(str(line)) for line in _relation_address_lines(employee))
+    services = "3.1 " + (context["services"] or "a, b, c en d").replace(",", ", ")
+    logo = None
+    _ensure()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            logo = _brand_logo_path(cursor)
+
+    def header(page: int) -> float:
+        _draw_logo(c, logo, 412, height - 43, 116, 56)
+        c.setFillColor(colors.HexColor("#24559c"))
+        c.setFont("Helvetica-Bold", 16)
+        c.drawString(42, height - 58, "BEMIDDELINGSOVEREENKOMST")
+        c.setFont("Helvetica", 8)
+        c.setFillColor(colors.HexColor("#5d6a70"))
+        c.drawString(42, height - 74, "Tussen bemiddelaar en zelfstandige - versie 2025")
+        c.drawRightString(395, height - 74, f"Pagina {page} van 4")
+        c.setStrokeColor(colors.HexColor("#24559c"))
+        c.line(42, height - 84, 538, height - 84)
+        return height - 108
+
+    y = header(1)
+    c.setFillColor(colors.HexColor("#24559c"))
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(42, y, "Bemiddelaar")
+    y = _draw_agreement_paragraph(c, "<b>Olympus Bouw B.V.</b><br/>Handelsnaam: Olympus Bouwbemiddeling<br/>Hoofdweg 242, 2908 LC Capelle aan den IJssel<br/>Tel. 0888 - 111 222 | info@olympusbouw.nl<br/>KvK / BTW: 32146718 / NL820426003.B.01", 42, y - 8, width - 84, font_size=8.7, leading=11) - 16
+    c.setFont("Helvetica-Bold", 10)
+    c.setFillColor(colors.HexColor("#24559c"))
+    c.drawString(42, y, "Zelfstandig ondernemer zonder personeel")
+    y = _draw_agreement_paragraph(c, f"Bedrijfsnaam: <b>{safe_company}</b><br/>Naam: <b>{safe_employee}</b><br/>{address}<br/>Telefoon: <b>{escape(employee.get('phone') or '-')}</b> | E-mail: <b>{escape(employee.get('email') or '-')}</b><br/>KvK / BTW: <b>{escape(employee.get('kvk_number') or '-')} / {escape(employee.get('vat_number') or '-')}</b>", 42, y - 8, width - 84, font_size=8.7, leading=11) - 16
+    paragraphs = [
+        "Hierna te noemen Partijen, zijn het volgende overeengekomen. Deze bemiddelingsovereenkomst vervangt na ondertekening eventuele eerdere bemiddelingsovereenkomsten tussen Partijen en is van toepassing op de uitvoeringsovereenkomsten die via Olympus Bouw tot stand komen.",
+        "<b>Artikel 1. Definities</b><br/>Bemiddelaar verricht administratieve dienstverlening en brengt zelfstandigen in contact met opdrachtgevers. Factuurbedrag is het bedrag dat de Zelfstandige aan de opdrachtgever in rekening brengt voor werkzaamheden, exclusief doorbelasting van kosten en materialen.",
+        "<b>Artikel 2. Aard van de overeenkomst</b><br/>Partijen komen een overeenkomst van bemiddeling overeen. Olympus Bouw is geen partij bij de uitvoeringsovereenkomst voor de feitelijke werkzaamheden. De Zelfstandige blijft vrij opdrachten te aanvaarden of te weigeren.",
+    ]
+    for paragraph in paragraphs:
+        y = _draw_agreement_paragraph(c, paragraph, 42, y, width - 84) - 13
+
+    c.showPage()
+    y = header(2)
+    paragraphs = [
+        "<b>Artikel 3. Dienstverlening van Bemiddelaar</b><br/>Olympus Bouw biedt als bemiddelend en faciliterend dienstverlener optionele diensten aan. Voor deze overeenkomst zijn de volgende diensten vastgelegd: <b>" + escape(services) + "</b>.",
+        "a. Olympus Bouw brengt Zelfstandige en Opdrachtgever met elkaar in contact, zodat zij een overeenkomst van opdracht of aanneming van werk kunnen aangaan. Zelfstandige beslist zelfstandig of de opdracht wordt aanvaard.",
+        "b. Olympus Bouw faciliteert namens Zelfstandige de schriftelijke vastlegging van de uitvoeringsovereenkomst op basis van de opgegeven opdrachtgegevens.",
+        "c. Olympus Bouw faciliteert namens Zelfstandige de facturatie aan de opdrachtgever, op naam en voor rekening van Zelfstandige, op basis van de aangeleverde weekstaat of andere overeengekomen documentatie.",
+        "d. Olympus Bouw kan namens Zelfstandige debiteurenbeheer verzorgen, waaronder het opvolgen van verstreken betalingstermijnen.",
+        "Voor de verrichte diensten stuurt Olympus Bouw een factuur aan Zelfstandige. De betalingstermijn is 30 dagen na factuurdatum en kan via SEPA-incasso worden geincasseerd. Zonder SEPA-incasso geldt de overeengekomen administratievergoeding.",
+        "<b>Artikel 4. Duur en reikwijdte</b><br/>De bemiddelingsovereenkomst vangt aan op <b>" + escape(_date_text(context["start_date"])) + "</b> en wordt aangegaan voor onbepaalde tijd. De overeenkomst ziet op opdrachten die Zelfstandige sluit met opdrachtgevers uit het netwerk van Olympus Bouw.",
+    ]
+    for paragraph in paragraphs:
+        y = _draw_agreement_paragraph(c, paragraph, 42, y, width - 84) - 13
+
+    c.showPage()
+    y = header(3)
+    paragraphs = [
+        "<b>Artikel 5. Status Zelfstandige en dossierstukken</b><br/>Zelfstandige verstrekt voor ondertekening alle benodigde bedrijfsinformatie, waaronder een actueel uittreksel van de Kamer van Koophandel, VCA-VOL-certificaat, verzekering, btw-nummer, ondernemerscheck en zakelijke bankrekening. Wijzigingen worden binnen vijf werkdagen doorgegeven.",
+        "Zelfstandige verklaart geen personeel ter beschikking te stellen, zelfstandig te werken en geen werkzaamheden te aanvaarden onder werkgeversgezag. Zelfstandige identificeert zich met een geldig legitimatiebewijs en werkt mee aan controles die nodig zijn voor de dienstverlening.",
+        "<b>Artikel 6. Andere werkzaamheden en vergoeding</b><br/>Zelfstandige kan zonder beperking opdrachten van anderen aannemen en uitvoeren. De overeengekomen vergoeding voor de afgenomen diensten blijft verschuldigd voor uitvoeringsovereenkomsten die door bemiddeling van Olympus Bouw tot stand zijn gekomen.",
+        "<b>Artikel 7. Overtreding</b><br/>Bij overtreding van de afspraken kan Olympus Bouw nakoming en vergoeding van schade verlangen, onverminderd het recht op de in de bemiddelingsovereenkomst opgenomen boete en kosten.",
+        "<b>Artikel 8 en 9. Inzage en aansprakelijkheid</b><br/>Wanneer daarvoor aanleiding bestaat verschaft Zelfstandige inzage in relevante facturen en correspondentie. Zelfstandige vrijwaart Olympus Bouw voor aanspraken die voortvloeien uit de eigen uitvoering van werkzaamheden.",
+    ]
+    for paragraph in paragraphs:
+        y = _draw_agreement_paragraph(c, paragraph, 42, y, width - 84) - 13
+
+    c.showPage()
+    y = header(4)
+    paragraphs = [
+        "<b>Artikel 10. Vergoeding gemaakte kosten</b><br/>Redelijke kosten die Olympus Bouw maakt om nakoming van deze overeenkomst te verkrijgen, komen voor rekening van Zelfstandige voor zover de overeenkomst daarin voorziet.",
+        "<b>Artikel 11. Toepasselijk recht en bevoegde rechter</b><br/>Op deze bemiddelingsovereenkomst is Nederlands recht van toepassing. Geschillen worden voorgelegd aan de bevoegde rechter te Rotterdam.",
+        "<b>Artikel 12. Doorlopende SEPA-machtiging</b><br/>Naam incassant: <b>Olympus Bouw B.V.</b><br/>Incassant-ID: <b>NL48ZZZ321467180000</b><br/>Kenmerk machtiging: <b>10" + escape(employee.get("obs_number") or str(context["relation_id"])) + "</b><br/>Betreft: vergoeding dienstverlening conform bemiddelingsovereenkomst.",
+        "Door ondertekening geeft Zelfstandige toestemming aan Olympus Bouw B.V. om doorlopende incasso-opdrachten te sturen aan de bank voor afgenomen dienstverlening en aan de bank om deze bedragen af te schrijven overeenkomstig de opdracht.",
+    ]
+    for paragraph in paragraphs:
+        y = _draw_agreement_paragraph(c, paragraph, 42, y, width - 84) - 13
+    if context["notes"]:
+        y = _draw_agreement_paragraph(c, "Bijzonderheden: <b>" + escape(context["notes"]) + "</b>", 42, y, width - 84) - 13
+    c.setStrokeColor(colors.HexColor("#24559c"))
+    c.line(42, 178, 250, 178)
+    c.line(330, 178, 538, 178)
+    c.setFillColor(colors.HexColor("#27333a"))
+    c.setFont("Helvetica", 8)
+    c.drawString(42, 165, "Olympus Bouw B.V., namens deze")
+    c.drawString(330, 165, "Zelfstandige, namens deze")
+    c.drawString(42, 36, "Bemiddelingsovereenkomst 2025 | Olympus Bouw B.V.")
+    c.save()
+    return buffer.getvalue()
+
+
+def save_mediation_agreement_pdf(agreement_id: int) -> int:
+    _ensure()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            agreement = _mediation_agreement_row(cursor, agreement_id)
+            if not agreement:
+                raise ValueError("Bemiddelingsovereenkomst niet gevonden.")
+    context = _mediation_pdf_context(agreement)
+    content = _mediation_pdf_bytes(agreement)
+    filename = "Bemiddelingsovereenkomst 2025 - " + _document_filename_part(context["employee_name"], "zzper") + ".pdf"
+    dossier_dir = INVOICE_EXPORT_DIR / _dossier_name(context["employee_name"])
+    dossier_dir.mkdir(parents=True, exist_ok=True)
+    path = dossier_dir / filename
+    path.write_bytes(content)
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("DELETE FROM invoice_documents WHERE mediation_agreement_id = %s AND document_type = 'bemiddelingsovereenkomst';", (agreement_id,))
+            cursor.execute(
+                """
+                INSERT INTO invoice_documents
+                    (relation_id, mediation_agreement_id, document_type, filename, file_path, content_type)
+                VALUES (%s, %s, 'bemiddelingsovereenkomst', %s, %s, 'application/pdf')
+                RETURNING id;
+                """,
+                (context["relation_id"], agreement_id, filename, str(path)),
+            )
+            document_id = cursor.fetchone()[0]
+        conn.commit()
+    return document_id
+
+
+def get_mediation_agreement_pdf_path(agreement_id: int) -> Path | None:
+    _ensure()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT file_path FROM invoice_documents
+                WHERE mediation_agreement_id = %s AND document_type = 'bemiddelingsovereenkomst'
+                ORDER BY id DESC LIMIT 1;
+                """,
+                (agreement_id,),
+            )
+            row = cursor.fetchone()
+    return _safe_document_path(row[0]) if row else None
+
+
 def _amount_line(c, y: float, label: str, amount: str, detail: str = "", color="#111111") -> float:
     colors, _, _ = _reportlab_dependencies()
     c.setFillColor(colors.HexColor(color))
@@ -1374,8 +1619,6 @@ def generate_invoice_run(run_id: int) -> dict:
             items = []
             for input_id in input_ids:
                 item = _input_row(cursor, input_id)
-                if item["blockers"]:
-                    raise ValueError(f"Regel {input_id}: " + ", ".join(item["blockers"]))
                 items.append(item)
             output_ids = []
             for item in items:
@@ -1425,7 +1668,7 @@ def generate_invoice_run(run_id: int) -> dict:
 
 def get_invoicing_workspace(run_id: int | None = None) -> dict:
     today = date.today()
-    fallback = {"runs": [], "selected_run": None, "inputs": [], "outputs": [], "totals": {"sales": "€ 0,00", "olympus": "€ 0,00", "hours": "0", "blockers": 0}, "default_year": today.year, "default_week": today.isocalendar().week, "default_invoice_date": today.isoformat()}
+    fallback = {"runs": [], "archive_runs": [], "agreements": [], "mediation_agreements": [], "selected_run": None, "inputs": [], "outputs": [], "totals": {"sales": "€ 0,00", "olympus": "€ 0,00", "hours": "0", "blockers": 0}, "default_year": today.year, "default_week": today.isocalendar().week, "default_invoice_date": today.isoformat()}
     try:
         _ensure()
         with get_connection() as conn:
@@ -1462,6 +1705,21 @@ def get_invoicing_workspace(run_id: int | None = None) -> dict:
                      "invoice_date_text": _date_text(row[3]), "input_count": row[4], "output_count": row[5]}
                     for row in cursor.fetchall()
                 ]
+                for run in archive_runs:
+                    cursor.execute(
+                        """
+                        SELECT o.id, o.stream, o.invoice_number, o.file_path, COALESCE(i.employee_name, '')
+                        FROM invoice_outputs o
+                        LEFT JOIN invoice_inputs i ON i.id = o.input_id
+                        WHERE o.run_id = %s
+                        ORDER BY i.employee_name, o.input_id, o.stream;
+                        """,
+                        (run["id"],),
+                    )
+                    run["outputs"] = [
+                        {"id": row[0], "stream": row[1], "invoice_number": row[2], "filename": Path(row[3]).name, "employee_name": row[4]}
+                        for row in cursor.fetchall()
+                    ]
                 agreements = list_invoice_agreements()
                 selected_id = run_id or (runs[0]["id"] if runs else None)
                 selected_run = next((item for item in runs if item["id"] == selected_id), None)
@@ -1489,8 +1747,8 @@ def get_invoicing_workspace(run_id: int | None = None) -> dict:
                 total_sales = sum((_money(item["sales_total_including_vat"]) for item in inputs), Decimal("0"))
                 total_olympus = sum((_money(item["olympus_total"]) for item in inputs), Decimal("0"))
                 total_hours = sum((_decimal(item["hours"]) for item in inputs), Decimal("0"))
-                return {"runs": runs, "archive_runs": archive_runs, "agreements": agreements, "selected_run": selected_run, "inputs": inputs, "outputs": outputs, "totals": {"sales": _money_text(total_sales), "olympus": _money_text(total_olympus), "hours": _number_text(total_hours), "blockers": sum(len(item["blockers"]) for item in inputs)}, "default_year": today.year, "default_week": today.isocalendar().week, "default_invoice_date": today.isoformat()}
+                return {"runs": runs, "archive_runs": archive_runs, "agreements": agreements, "mediation_agreements": list_mediation_agreements(), "selected_run": selected_run, "inputs": inputs, "outputs": outputs, "totals": {"sales": _money_text(total_sales), "olympus": _money_text(total_olympus), "hours": _number_text(total_hours), "blockers": sum(len(item["blockers"]) for item in inputs)}, "default_year": today.year, "default_week": today.isocalendar().week, "default_invoice_date": today.isoformat()}
     except Exception as exc:
         print(f"INVOICING_CONTEXT_ERROR {type(exc).__name__}: {exc}")
-        fallback.update({"archive_runs": [], "agreements": []})
+        fallback.update({"archive_runs": [], "agreements": [], "mediation_agreements": []})
         return fallback
