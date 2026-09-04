@@ -695,6 +695,22 @@ def _dossier_name(value: str) -> str:
     return cleaned or "onbekende_zzper"
 
 
+def _document_filename_part(value: str, fallback: str) -> str:
+    cleaned = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', " ", str(value or ""))
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(". ")
+    return cleaned or fallback
+
+
+def _output_filename(stream: str, item: dict, run: dict, invoice_number: str) -> str:
+    employee_name = _document_filename_part(item.get("employee_name"), "Onbekende zzp'er")
+    safe_number = _document_filename_part(invoice_number, "concept")
+    week_label = f"week {run['week_number']} {run['year']}"
+    if stream == "verkoop":
+        number_label = safe_number if re.search(r"\bOBS\b", safe_number, flags=re.IGNORECASE) else f"{safe_number} OBS"
+        return f"Factuur {number_label} - {employee_name} {week_label}.pdf"
+    return f"Olympus-factuur {safe_number} - {employee_name} {week_label}.pdf"
+
+
 def _services_text(item: dict) -> str:
     services = [part.strip().lower() for part in str(item.get("services") or "").split(",") if part.strip()]
     return f"3.1 {', '.join(services)}" if services and services != ["a", "b", "c", "d"] else "optionele diensten art. 3.1"
@@ -979,9 +995,8 @@ def generate_invoice_run(run_id: int) -> dict:
                 olympus_number = _output_number(cursor, run_id, item["id"], "olympus") or _next_olympus_number(cursor)
                 dossier_dir = INVOICE_EXPORT_DIR / _dossier_name(item["employee_name"])
                 dossier_dir.mkdir(parents=True, exist_ok=True)
-                sale_filename_number = re.sub(r"[^A-Za-z0-9._-]+", "-", sale_number).strip(".-") or "factuur"
-                sale_path = dossier_dir / f"verkoopfactuur_{run_id}_{item['id']}_{sale_filename_number}.pdf"
-                olympus_path = dossier_dir / f"olympusfactuur_{run_id}_{item['id']}_{olympus_number}.pdf"
+                sale_path = dossier_dir / _output_filename("verkoop", item, run, sale_number)
+                olympus_path = dossier_dir / _output_filename("olympus", item, run, olympus_number)
                 sale_base = dossier_dir / f".verkoopfactuur_{run_id}_{item['id']}.pdf"
                 olympus_base = dossier_dir / f".olympusfactuur_{run_id}_{item['id']}.pdf"
                 _sale_pdf(sale_base, run, item, sale_number)
@@ -1047,8 +1062,22 @@ def get_invoicing_workspace(run_id: int | None = None) -> dict:
                 if selected_run:
                     cursor.execute("SELECT id FROM invoice_inputs WHERE run_id = %s ORDER BY id;", (selected_id,))
                     inputs = [_input_row(cursor, row[0]) for row in cursor.fetchall()]
-                    cursor.execute("SELECT id, input_id, stream, invoice_number, status, file_path FROM invoice_outputs WHERE run_id = %s ORDER BY input_id, stream;", (selected_id,))
-                    outputs = [{"id": row[0], "input_id": row[1], "stream": row[2], "invoice_number": row[3], "status": row[4], "filename": Path(row[5]).name} for row in cursor.fetchall()]
+                    cursor.execute(
+                        """
+                        SELECT o.id, o.input_id, o.stream, o.invoice_number, o.status, o.file_path,
+                               COALESCE(i.employee_name, '')
+                        FROM invoice_outputs o
+                        LEFT JOIN invoice_inputs i ON i.id = o.input_id
+                        WHERE o.run_id = %s
+                        ORDER BY i.employee_name, o.input_id, o.stream;
+                        """,
+                        (selected_id,),
+                    )
+                    outputs = [
+                        {"id": row[0], "input_id": row[1], "stream": row[2], "invoice_number": row[3],
+                         "status": row[4], "filename": Path(row[5]).name, "employee_name": row[6]}
+                        for row in cursor.fetchall()
+                    ]
                 total_sales = sum((_money(item["sales_total_including_vat"]) for item in inputs), Decimal("0"))
                 total_olympus = sum((_money(item["olympus_total"]) for item in inputs), Decimal("0"))
                 total_hours = sum((_decimal(item["hours"]) for item in inputs), Decimal("0"))
