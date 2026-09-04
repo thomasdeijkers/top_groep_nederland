@@ -859,6 +859,16 @@ def relation_photo(relation_id: int):
     return RedirectResponse("/dashboard/static/top-groep-nederland.png", status_code=303)
 
 
+@router.get("/dashboard/relations/logo/{relation_id}")
+def relation_logo(relation_id: int):
+    relation = get_relation(relation_id)
+    if relation:
+        logo_path = relation.get("logo_path") or relation.get("photo_path")
+        if logo_path and Path(logo_path).is_file():
+            return FileResponse(logo_path)
+    return FileResponse("apps/dashboard/static/olympusbouw.png")
+
+
 @router.get("/dashboard/vacancies", response_class=HTMLResponse)
 def vacancies_page(request: Request, edit: int | None = None, q: str = "", status: str = ""):
     return _render_dashboard(request, "vacancies", edit, q, status_filter=status)
@@ -967,7 +977,7 @@ def download_invoice_output(output_id: int):
     path = get_invoice_output_path(output_id)
     if not path:
         return RedirectResponse("/dashboard/invoicing?error=output", status_code=303)
-    return FileResponse(path, filename=path.name, media_type="application/pdf")
+    return FileResponse(path, filename=path.name, media_type="application/pdf", content_disposition_type="inline")
 
 
 @router.get("/api/invoicing/document/{document_id}")
@@ -976,7 +986,8 @@ def download_invoice_document(document_id: int):
     if not path:
         return RedirectResponse("/dashboard/invoicing?error=document", status_code=303)
     media_type = "application/pdf" if path.suffix.lower() == ".pdf" else None
-    return FileResponse(path, filename=path.name, media_type=media_type)
+    disposition = "inline" if media_type == "application/pdf" else "attachment"
+    return FileResponse(path, filename=path.name, media_type=media_type, content_disposition_type=disposition)
 
 
 @router.post("/api/invoicing/documents")

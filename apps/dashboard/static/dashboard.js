@@ -1856,6 +1856,19 @@
         if (event.key === "Escape") closePdfViewer();
     });
 
+    document.querySelectorAll("[data-invoice-relation-select]").forEach((select) => {
+        const preview = select.closest(".invoice-form-section")?.querySelector("[data-invoice-logo-preview]");
+        const image = preview?.querySelector("[data-invoice-logo-image]");
+        const label = preview?.querySelector("[data-invoice-logo-label]");
+        const refreshPreview = () => {
+            const option = select.options[select.selectedIndex];
+            if (image) image.src = option?.dataset.logoUrl || "/dashboard/static/olympusbouw.png";
+            if (label) label.textContent = option?.value ? option.textContent.trim() : "Nog geen zzp'er gekozen";
+        };
+        select.addEventListener("change", refreshPreview);
+        refreshPreview();
+    });
+
     document.querySelectorAll("[data-zzp-invoice]").forEach((calculator) => {
         const body = calculator.querySelector("[data-zzp-invoice-body]");
         const template = calculator.querySelector("[data-zzp-invoice-template]");

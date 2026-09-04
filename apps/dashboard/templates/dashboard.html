@@ -19,7 +19,7 @@
         </title>
         <link rel="icon" href="/dashboard/static/favicon.ico" sizes="any">
         <link rel="shortcut icon" href="/dashboard/static/favicon.ico">
-        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260904-01">
+        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260904-02">
     </head>
     <body class="page-{{ active_page }}">
         {% macro confidence_light(field) -%}
@@ -803,13 +803,9 @@
                                         <tr>
                                             <td>{{ result.type }}</td>
                                             <td>
-                                                {% if result.has_photo %}
                                                 <span class="relation-thumb">
-                                                    <img src="/dashboard/relations/photo/{{ result.id }}" alt="">
+                                                    <img src="/dashboard/relations/logo/{{ result.id }}" alt="Logo {{ result.name }}">
                                                 </span>
-                                                {% else %}
-                                                <span class="relation-thumb relation-thumb--empty">{{ result.initials }}</span>
-                                                {% endif %}
                                             </td>
                                             <td>{{ result.name }}</td>
                                             <td>{{ result.contact }}</td>
@@ -886,10 +882,10 @@
                                         {% if selected_relation and selected_relation.photo_path %}
                                         <img src="/dashboard/relations/photo/{{ selected_relation.id }}" alt="Relatie foto">
                                         {% else %}
-                                        <span>{{ (selected_relation.name[:2] if selected_relation else 'OB')|upper }}</span>
+                                        <img src="/dashboard/static/olympusbouw.png" alt="Tijdelijk Olympus Bouw logo">
                                         {% endif %}
                                     </div>
-                                    <label class="form-span-2">Foto of logo <input type="file" name="photo" accept="image/*"></label>
+                                    <label class="form-span-2">Logo relatie <input type="file" name="photo" accept="image/*"></label>
                                 </div>
 
                                 <label class="relation-type-field">Type
@@ -2361,9 +2357,13 @@ Metadata:
                                     <div class="invoice-form-section">
                                         <span class="invoice-form-section__title">Weekkoppeling</span>
                                         <div class="invoice-form-grid invoice-form-grid--three">
-                                            <label>Zzp'er <select name="relation_id" required><option value="">Kies zzp'er</option>{% for item in invoice_candidate_options %}<option value="{{ item.id }}">{{ item.name }}{% if item.city and item.city != '-' %} - {{ item.city }}{% endif %}</option>{% endfor %}</select></label>
+                                            <label>Zzp'er <select name="relation_id" required data-invoice-relation-select><option value="">Kies zzp'er</option>{% for item in invoice_candidate_options %}<option value="{{ item.id }}" data-logo-url="/dashboard/relations/logo/{{ item.id }}">{{ item.name }}{% if item.city and item.city != '-' %} - {{ item.city }}{% endif %}</option>{% endfor %}</select></label>
                                             <label>Opdrachtgever <select name="principal_id" required><option value="">Kies opdrachtgever</option>{% for item in principal_options %}<option value="{{ item.id }}">{{ item.name }}</option>{% endfor %}</select></label>
                                             <label>Project <select name="project_id"><option value="">Kies project</option>{% for item in project_options %}<option value="{{ item.id }}">{{ item.title }}{% if item.reference_number %} - {{ item.reference_number }}{% endif %}</option>{% endfor %}</select></label>
+                                        </div>
+                                        <div class="invoice-logo-preview" data-invoice-logo-preview>
+                                            <img src="/dashboard/static/olympusbouw.png" alt="Logo geselecteerde zzp'er" data-invoice-logo-image>
+                                            <span data-invoice-logo-label>Nog geen zzp'er gekozen</span>
                                         </div>
                                         <div class="invoice-form-grid invoice-form-grid--three">
                                             <label>Arbeidsregime <select name="regime"><option value="regie">Regie: uren x tarief</option><option value="aangenomen werk">Aangenomen werk: aanneemsom</option></select></label>
@@ -2389,7 +2389,7 @@ Metadata:
                                     <div class="invoice-form-section">
                                         <span class="invoice-form-section__title">Olympus-factuur</span>
                                         <div class="invoice-form-grid invoice-form-grid--four">
-                                            <label>Feepercentage <input type="text" name="fee_percent" placeholder="Automatisch" inputmode="decimal"></label>
+                                            <label>Feepercentage <input type="text" name="fee_percent" value="13,5" inputmode="decimal"></label>
                                             <label>Diensten <select name="services"><option value="a,b,c,d">3.1 a, b, c en d</option><option value="a,b,c">3.1 a, b en c (factoring)</option></select></label>
                                             <label>Olympus-kosten <input type="text" name="olympus_costs" inputmode="decimal" placeholder="0,00"></label>
                                             <label>Omschrijving Olympus-kosten <input type="text" name="olympus_cost_description" placeholder="Bijv. KvK-uittreksel"></label>
@@ -3497,6 +3497,6 @@ Metadata:
                 </section>
             </main>
         </div>
-        <script src="/dashboard/static/dashboard.js?v=20260904-02"></script>
+        <script src="/dashboard/static/dashboard.js?v=20260904-03"></script>
     </body>
 </html>

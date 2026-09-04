@@ -13,8 +13,8 @@ from shared.db.connection import get_connection
 
 INVOICE_EXPORT_DIR = Path("runtime/exports/invoicing")
 INVOICE_DOCUMENT_DIR = Path("runtime/uploads/invoicing")
-DEFAULT_FEE_PERCENT = Decimal("13.25")
-FACTORING_FEE_PERCENT = Decimal("12.50")
+DEFAULT_FEE_PERCENT = Decimal("13.50")
+FACTORING_FEE_PERCENT = Decimal("13.50")
 DEFAULT_ADMIN_FEE = Decimal("8.50")
 OLYMPUS_VAT_RATE = Decimal("21")
 MONTHS_NL = (

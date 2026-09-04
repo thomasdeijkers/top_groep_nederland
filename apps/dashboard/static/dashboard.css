@@ -7980,6 +7980,28 @@ body[data-theme="light"] .invoicing-totals-bar div {
     justify-content: flex-end;
 }
 
+.invoice-logo-preview {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 54px;
+    padding: 8px 10px;
+    border: 1px solid rgba(127, 209, 160, 0.18);
+    border-radius: 7px;
+    background: rgba(7, 18, 24, 0.38);
+    color: #b8c9d0;
+    font-size: 0.76rem;
+    font-weight: 800;
+}
+
+.invoice-logo-preview img {
+    width: 76px;
+    height: 36px;
+    object-fit: contain;
+    border-radius: 4px;
+    background: #fff;
+}
+
 .invoice-run-list,
 .invoice-input-list,
 .invoice-output-list {
@@ -8181,6 +8203,12 @@ body[data-theme="light"] .invoice-advanced-fields summary,
 body[data-theme="light"] .invoice-workspace__heading p:not(.section-label),
 body[data-theme="light"] .invoice-run-detail__header p:not(.section-label),
 body[data-theme="light"] .invoice-input-panel p:not(.section-label) {
+    color: #60717d;
+}
+
+body[data-theme="light"] .invoice-logo-preview {
+    border-color: rgba(28, 42, 50, 0.12);
+    background: #f7fbf8;
     color: #60717d;
 }
 
