@@ -18,6 +18,9 @@ from apps.dashboard.organizations import create_organization, list_organizations
 from apps.dashboard.openai_usage import get_openai_usage_summary, list_openai_api_audit_events
 from apps.dashboard.invoicing import (
     create_invoice_input,
+    delete_invoice_document,
+    delete_invoice_output,
+    delete_invoice_run,
     generate_invoice_run,
     get_invoice_output_path,
     get_invoice_document_path,
@@ -972,12 +975,34 @@ def generate_invoice_run_route(run_id: int):
         return RedirectResponse(f"/dashboard/invoicing?run={run_id}&error=generate#output", status_code=303)
 
 
+@router.post("/api/invoicing/runs/{run_id}/delete")
+def remove_invoice_run(run_id: int):
+    try:
+        result = delete_invoice_run(run_id)
+        _audit("Factuurrun verwijderd", "invoice_run", run_id, f"Factuurrun {run_id}", f"Volledig factuurdossier verwijderd, inclusief {result['file_count']} bestand(en).", "Facturatie")
+        return RedirectResponse("/dashboard/invoicing?deleted=run#facturatie-workspace", status_code=303)
+    except Exception as exc:
+        print(f"INVOICE_RUN_DELETE_ERROR {type(exc).__name__}: {_db_error_detail(exc)}")
+        return RedirectResponse(f"/dashboard/invoicing?run={run_id}&error=delete#output", status_code=303)
+
+
 @router.get("/api/invoicing/output/{output_id}")
 def download_invoice_output(output_id: int):
     path = get_invoice_output_path(output_id)
     if not path:
         return RedirectResponse("/dashboard/invoicing?error=output", status_code=303)
     return FileResponse(path, filename=path.name, media_type="application/pdf", content_disposition_type="inline")
+
+
+@router.post("/api/invoicing/output/{output_id}/delete")
+def remove_invoice_output(output_id: int):
+    try:
+        delete_invoice_output(output_id)
+        _audit("Factuur verwijderd", "invoice_output", output_id, f"Factuur {output_id}", "PDF-output verwijderd; de conceptinvoer blijft beschikbaar.", "Facturatie")
+        return RedirectResponse("/dashboard/invoicing?deleted=output#output", status_code=303)
+    except Exception as exc:
+        print(f"INVOICE_OUTPUT_DELETE_ERROR {type(exc).__name__}: {_db_error_detail(exc)}")
+        return RedirectResponse("/dashboard/invoicing?error=delete#output", status_code=303)
 
 
 @router.get("/api/invoicing/document/{document_id}")
@@ -988,6 +1013,17 @@ def download_invoice_document(document_id: int):
     media_type = "application/pdf" if path.suffix.lower() == ".pdf" else None
     disposition = "inline" if media_type == "application/pdf" else "attachment"
     return FileResponse(path, filename=path.name, media_type=media_type, content_disposition_type=disposition)
+
+
+@router.post("/api/invoicing/document/{document_id}/delete")
+def remove_invoice_document(document_id: int, return_to: str = Form("")):
+    try:
+        delete_invoice_document(document_id)
+        _audit("Facturatiedocument verwijderd", "invoice_document", document_id, f"Document {document_id}", "Document uit het zzp-dossier verwijderd.", "Facturatie")
+        return RedirectResponse(_safe_dashboard_return_url(return_to) or "/dashboard/invoicing?deleted=document#dossiers", status_code=303)
+    except Exception as exc:
+        print(f"INVOICE_DOCUMENT_DELETE_ERROR {type(exc).__name__}: {_db_error_detail(exc)}")
+        return RedirectResponse(_safe_dashboard_return_url(return_to) or "/dashboard/invoicing?error=delete#dossiers", status_code=303)
 
 
 @router.post("/api/invoicing/documents")
@@ -1741,6 +1777,9 @@ async def save_relation(
     owner: str = Form(""),
     availability: str = Form(""),
     hourly_rate: str = Form(""),
+    invoice_obs_number: str = Form(""),
+    invoice_payment_method: str = Form("incasso"),
+    invoice_customer_number: str = Form(""),
     payroll_license_plate: str = Form(""),
     payroll_choice_budget: str = Form(""),
     payroll_phase: str = Form(""),
@@ -1788,6 +1827,9 @@ async def edit_relation(
     owner: str = Form(""),
     availability: str = Form(""),
     hourly_rate: str = Form(""),
+    invoice_obs_number: str = Form(""),
+    invoice_payment_method: str = Form("incasso"),
+    invoice_customer_number: str = Form(""),
     payroll_license_plate: str = Form(""),
     payroll_choice_budget: str = Form(""),
     payroll_phase: str = Form(""),

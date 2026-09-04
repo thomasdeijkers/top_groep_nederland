@@ -1133,7 +1133,7 @@ def list_relations(limit: int = 15, query: str = "", relation_type: str = "", st
                     SELECT id, relation_type, name, first_name, last_name, contact_name, email, phone,
                            city, status, COALESCE(source, ''), photo_path,
                            street, house_number, house_number_addition, postal_code, country,
-                           external_id, updated_at
+                           external_id, updated_at, hourly_rate, invoice_payment_method
                     FROM relations
                     {where_clause}
                     ORDER BY updated_at DESC, id DESC
@@ -1203,6 +1203,8 @@ def list_relations(limit: int = 15, query: str = "", relation_type: str = "", st
                         "country": row[16] or "",
                         "external_id": row[17] or "",
                         "updated_at": row[18].strftime("%d-%m-%Y %H:%M") if row[18] else "",
+                        "hourly_rate": row[19] or "",
+                        "invoice_payment_method": row[20] or "incasso",
                         "completion_percent": completion_percent,
                         "completion_label": f"{completion_percent}%",
                         "completion_status": completion_status,

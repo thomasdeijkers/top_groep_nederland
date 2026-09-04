@@ -118,12 +118,23 @@ def create_invoice_run(year: int, week_number: int, invoice_date: str | date) ->
 
 
 def _lookup_names(cursor, relation_id, principal_id, project_id) -> dict:
-    names = {"employee_name": "", "principal_name": "", "project_name": "", "project_reference": ""}
+    names = {
+        "employee_name": "", "principal_name": "", "project_name": "", "project_reference": "",
+        "employee_hourly_rate": "", "employee_payment_method": "",
+    }
     if relation_id:
-        cursor.execute("SELECT name, COALESCE(external_id, '') FROM relations WHERE id = %s AND relation_type = 'candidate';", (relation_id,))
+        cursor.execute(
+            """
+            SELECT name, COALESCE(hourly_rate, ''), COALESCE(invoice_payment_method, '')
+            FROM relations WHERE id = %s AND relation_type = 'candidate';
+            """,
+            (relation_id,),
+        )
         row = cursor.fetchone()
         if row:
             names["employee_name"] = row[0] or ""
+            names["employee_hourly_rate"] = row[1] or ""
+            names["employee_payment_method"] = row[2] or ""
     if principal_id:
         cursor.execute("SELECT name, COALESCE(external_id, '') FROM relations WHERE id = %s AND relation_type = 'principal';", (principal_id,))
         row = cursor.fetchone()
@@ -152,19 +163,21 @@ def create_invoice_input(data: dict) -> tuple[int, int]:
     regime = str(data.get("regime") or "regie").strip().lower()
     regime = "aangenomen werk" if regime in {"aangenomen", "aangenomen werk"} else "regie"
     hours = _decimal(data.get("hours"))
-    hourly_rate = _money(data.get("hourly_rate"))
+    hourly_rate = Decimal("0")
     agreed_amount = _money(data.get("agreed_amount"))
-    labor_amount = _effective_amount(regime, hours, hourly_rate, agreed_amount)
-    factoring = bool(data.get("factoring"))
     supplied_fee = str(data.get("fee_percent") or "").strip()
-    services = str(data.get("services") or ("a,b,c" if factoring else "a,b,c,d"))
-    if factoring and not supplied_fee and services == "a,b,c,d":
-        services = "a,b,c"
-    fee_percent = _money(supplied_fee or (FACTORING_FEE_PERCENT if factoring else DEFAULT_FEE_PERCENT))
     _ensure()
     with get_connection() as conn:
         with conn.cursor() as cursor:
             names = _lookup_names(cursor, data.get("relation_id"), data.get("principal_id"), data.get("project_id"))
+            hourly_rate = _money(data.get("hourly_rate") or names.get("employee_hourly_rate"))
+            labor_amount = _effective_amount(regime, hours, hourly_rate, agreed_amount)
+            factoring = bool(data.get("factoring")) or names.get("employee_payment_method") == "factoring"
+            sepa_active = bool(data.get("sepa_active")) or names.get("employee_payment_method") != "geen_incasso"
+            services = str(data.get("services") or ("a,b,c" if factoring else "a,b,c,d"))
+            if factoring and not supplied_fee and services == "a,b,c,d":
+                services = "a,b,c"
+            fee_percent = _money(supplied_fee or (FACTORING_FEE_PERCENT if factoring else DEFAULT_FEE_PERCENT))
             cursor.execute(
                 """
                 INSERT INTO invoice_inputs (
@@ -204,7 +217,7 @@ def create_invoice_input(data: dict) -> tuple[int, int]:
                     _money(data.get("parking_costs")), _money(data.get("material_costs")), _money(data.get("other_sales_costs")),
                     _money(data.get("olympus_costs")), str(data.get("olympus_cost_description") or "Olympus-kosten").strip(),
                     _money(data.get("sales_vat_rate")), fee_percent, services,
-                    bool(data.get("sepa_active")), factoring, str(data.get("factoring_company") or "Pronkert Factoring B.V.").strip(),
+                    sepa_active, factoring, str(data.get("factoring_company") or "Pronkert Factoring B.V.").strip(),
                     str(data.get("factoring_iban") or "").strip(), str(data.get("factoring_address") or "").strip(),
                     str(data.get("factoring_city") or "").strip(), str(data.get("factoring_email") or "").strip(),
                     str(data.get("factoring_phone") or "").strip(), str(data.get("factoring_kvk") or "").strip(),
@@ -377,7 +390,9 @@ def _input_row(cursor, input_id: int):
                 """
                 SELECT name, first_name, last_name, contact_name, email, phone, street,
                        house_number, house_number_addition, postal_code, city, country,
-                       kvk_number, vat_number, COALESCE(logo_path, photo_path, '')
+                       kvk_number, vat_number, COALESCE(logo_path, photo_path, ''),
+                       COALESCE(invoice_obs_number, ''), COALESCE(invoice_payment_method, ''),
+                       COALESCE(invoice_customer_number, '')
                 FROM relations WHERE id = %s;
                 """,
                 (relation_id,),
@@ -387,7 +402,8 @@ def _input_row(cursor, input_id: int):
                 item[target] = dict(zip((
                     "name", "first_name", "last_name", "contact_name", "email", "phone", "street",
                     "house_number", "house_number_addition", "postal_code", "city", "country", "kvk_number",
-                    "vat_number", "logo_path",
+                    "vat_number", "logo_path", "invoice_obs_number", "invoice_payment_method",
+                    "invoice_customer_number",
                 ), relation))
     for key in ("hours", "hourly_rate", "agreed_amount", "labor_amount", "parking_costs", "material_costs", "other_sales_costs", "olympus_costs", "sales_vat_rate", "fee_percent"):
         item[f"{key}_text"] = _number_text(item[key])
@@ -423,6 +439,95 @@ def get_invoice_document_path(document_id: int) -> Path | None:
             cursor.execute("SELECT file_path FROM invoice_documents WHERE id = %s;", (document_id,))
             row = cursor.fetchone()
     return _safe_document_path(row[0]) if row else None
+
+
+def _remove_managed_file(path_value: str | Path) -> None:
+    path = Path(path_value).resolve()
+    for root in (INVOICE_DOCUMENT_DIR.resolve(), INVOICE_EXPORT_DIR.resolve()):
+        try:
+            path.relative_to(root)
+        except ValueError:
+            continue
+        if path.is_file():
+            path.unlink()
+        return
+
+
+def delete_invoice_output(output_id: int) -> int:
+    _ensure()
+    paths = []
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT file_path FROM invoice_outputs WHERE id = %s;", (output_id,))
+            output = cursor.fetchone()
+            if not output:
+                raise ValueError("Factuur niet gevonden.")
+            paths.append(output[0])
+            cursor.execute("SELECT file_path FROM invoice_documents WHERE output_id = %s;", (output_id,))
+            paths.extend(row[0] for row in cursor.fetchall())
+            cursor.execute("DELETE FROM invoice_documents WHERE output_id = %s;", (output_id,))
+            cursor.execute("DELETE FROM invoice_outputs WHERE id = %s;", (output_id,))
+        conn.commit()
+    for path in set(paths):
+        _remove_managed_file(path)
+    return output_id
+
+
+def delete_invoice_document(document_id: int) -> int:
+    _ensure()
+    output_id = None
+    path = ""
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT output_id, file_path FROM invoice_documents WHERE id = %s;", (document_id,))
+            row = cursor.fetchone()
+            if not row:
+                raise ValueError("Document niet gevonden.")
+            output_id, path = row
+            if not output_id:
+                cursor.execute("DELETE FROM invoice_documents WHERE id = %s;", (document_id,))
+        if not output_id:
+            conn.commit()
+    if output_id:
+        return delete_invoice_output(output_id)
+    _remove_managed_file(path)
+    return document_id
+
+
+def delete_invoice_run(run_id: int) -> dict:
+    _ensure()
+    paths = []
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            run = _run_row(cursor, run_id)
+            if not run:
+                raise ValueError("Factuurrun niet gevonden.")
+            cursor.execute(
+                """
+                SELECT DISTINCT file_path FROM invoice_documents
+                WHERE run_id = %s
+                   OR input_id IN (SELECT id FROM invoice_inputs WHERE run_id = %s)
+                   OR output_id IN (SELECT id FROM invoice_outputs WHERE run_id = %s);
+                """,
+                (run_id, run_id, run_id),
+            )
+            paths.extend(row[0] for row in cursor.fetchall())
+            cursor.execute("SELECT file_path FROM invoice_outputs WHERE run_id = %s;", (run_id,))
+            paths.extend(row[0] for row in cursor.fetchall())
+            cursor.execute(
+                """
+                DELETE FROM invoice_documents
+                WHERE run_id = %s
+                   OR input_id IN (SELECT id FROM invoice_inputs WHERE run_id = %s)
+                   OR output_id IN (SELECT id FROM invoice_outputs WHERE run_id = %s);
+                """,
+                (run_id, run_id, run_id),
+            )
+            cursor.execute("DELETE FROM invoice_runs WHERE id = %s;", (run_id,))
+        conn.commit()
+    for path in set(paths):
+        _remove_managed_file(path)
+    return {"run_id": run_id, "file_count": len(set(paths))}
 
 
 def save_invoice_document(content: bytes, filename: str, document_type: str, relation_id=None, principal_id=None,
@@ -714,7 +819,7 @@ def _sale_pdf(path: Path, run: dict, item: dict, invoice_number: str) -> None:
     c.setFillColor(colors.HexColor("#111111"))
     c.drawString(48, y, "Betreft voor uw bedrijf uitgevoerde werkzaamheden conform overeenkomst")
     y -= 17
-    obs_code = f"ZZP OBS {item.get('relation_id') or '-'} {item.get('principal_id') or '-'}"
+    obs_code = f"ZZP OBS {employee.get('invoice_obs_number') or item.get('relation_id') or '-'} {principal.get('invoice_customer_number') or item.get('principal_id') or '-'}"
     c.setFont("Helvetica", 8)
     c.drawString(48, y, obs_code)
     c.drawRightString(548, y, _money_text(item["labor_amount"]))

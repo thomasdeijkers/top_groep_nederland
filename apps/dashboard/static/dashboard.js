@@ -1864,6 +1864,14 @@
             const option = select.options[select.selectedIndex];
             if (image) image.src = option?.dataset.logoUrl || "/dashboard/static/olympusbouw.png";
             if (label) label.textContent = option?.value ? option.textContent.trim() : "Nog geen zzp'er gekozen";
+            const form = select.closest("form");
+            const rate = form?.querySelector('[name="hourly_rate"]');
+            const sepa = form?.querySelector('[name="sepa_active"]');
+            const factoring = form?.querySelector('[name="factoring"]');
+            const paymentMethod = option?.dataset.paymentMethod || "incasso";
+            if (rate && option?.dataset.hourlyRate) rate.value = option.dataset.hourlyRate;
+            if (sepa) sepa.checked = paymentMethod !== "geen_incasso";
+            if (factoring) factoring.checked = paymentMethod === "factoring";
         };
         select.addEventListener("change", refreshPreview);
         refreshPreview();

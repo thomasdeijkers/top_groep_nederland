@@ -19,7 +19,7 @@
         </title>
         <link rel="icon" href="/dashboard/static/favicon.ico" sizes="any">
         <link rel="shortcut icon" href="/dashboard/static/favicon.ico">
-        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260904-02">
+        <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=20260904-03">
     </head>
     <body class="page-{{ active_page }}">
         {% macro confidence_light(field) -%}
@@ -939,6 +939,16 @@
                                         <input type="number" step="0.01" name="hourly_rate" value="{{ selected_relation.hourly_rate|default('', true) if selected_relation else '' }}" placeholder="0,00">
                                     </span>
                                 </label>
+                                <label data-candidate-field>OBS-nummer <input type="text" name="invoice_obs_number" value="{{ selected_relation.invoice_obs_number|default('', true) if selected_relation else '' }}" placeholder="Bijv. 26007"></label>
+                                <label data-candidate-field>Facturering
+                                    {% set selected_payment_method = selected_relation.invoice_payment_method|default('incasso', true) if selected_relation else 'incasso' %}
+                                    <select name="invoice_payment_method">
+                                        <option value="incasso" {% if selected_payment_method == 'incasso' %}selected{% endif %}>Incasso</option>
+                                        <option value="factoring" {% if selected_payment_method == 'factoring' %}selected{% endif %}>Pronkert Factoring</option>
+                                        <option value="geen_incasso" {% if selected_payment_method == 'geen_incasso' %}selected{% endif %}>Geen incasso</option>
+                                    </select>
+                                </label>
+                                <label data-principal-field>Klantnummer <input type="text" name="invoice_customer_number" value="{{ selected_relation.invoice_customer_number|default('', true) if selected_relation else '' }}" placeholder="Bijv. 10016"></label>
                                 <section class="relation-payroll-settings form-span-3" data-candidate-field>
                                     <div class="relation-payroll-settings__head">
                                         <div>
@@ -1084,7 +1094,7 @@
                                 </div>
                                 <div class="invoice-document-list">
                                     {% for document in selected_relation_documents %}
-                                    <div class="invoice-document-row"><span><strong>{{ document.filename }}</strong><small>{{ document.document_type }}{% if document.principal_name %} | {{ document.principal_name }}{% endif %}{% if document.project_name %} | {{ document.project_name }}{% endif %}</small></span><button class="table-link" type="button" data-pdf-open="/api/invoicing/document/{{ document.id }}" data-pdf-title="{{ document.filename }}">Openen</button></div>
+                                    <div class="invoice-document-row"><span><strong>{{ document.filename }}</strong><small>{{ document.document_type }}{% if document.principal_name %} | {{ document.principal_name }}{% endif %}{% if document.project_name %} | {{ document.project_name }}{% endif %}</small></span><div class="invoice-document-row__actions"><button class="table-link" type="button" data-pdf-open="/api/invoicing/document/{{ document.id }}" data-pdf-title="{{ document.filename }}">Openen</button><form action="/api/invoicing/document/{{ document.id }}/delete" method="post" onsubmit="return confirm('Document definitief verwijderen?');"><input type="hidden" name="return_to" value="/dashboard/relations?tab={{ active_relation_tab }}&edit={{ selected_relation.id }}#relatie-documenten"><button class="table-link danger-button" type="submit">Verwijderen</button></form></div></div>
                                     {% else %}
                                     <div class="empty-state empty-state--compact"><strong>Nog geen facturen of bewijsstukken</strong><span>Upload documenten in het facturatiemenu; ze worden hier automatisch aan deze relatie gekoppeld.</span></div>
                                     {% endfor %}
@@ -2357,10 +2367,11 @@ Metadata:
                                     <div class="invoice-form-section">
                                         <span class="invoice-form-section__title">Weekkoppeling</span>
                                         <div class="invoice-form-grid invoice-form-grid--three">
-                                            <label>Zzp'er <select name="relation_id" required data-invoice-relation-select><option value="">Kies zzp'er</option>{% for item in invoice_candidate_options %}<option value="{{ item.id }}" data-logo-url="/dashboard/relations/logo/{{ item.id }}">{{ item.name }}{% if item.city and item.city != '-' %} - {{ item.city }}{% endif %}</option>{% endfor %}</select></label>
+                                            <label>Zzp'er <select name="relation_id" required data-invoice-relation-select><option value="">Kies zzp'er</option>{% for item in invoice_candidate_options %}<option value="{{ item.id }}" data-logo-url="/dashboard/relations/logo/{{ item.id }}" data-hourly-rate="{{ item.hourly_rate|default('', true) }}" data-payment-method="{{ item.invoice_payment_method|default('incasso', true) }}">{{ item.name }}{% if item.city and item.city != '-' %} - {{ item.city }}{% endif %}</option>{% endfor %}</select></label>
                                             <label>Opdrachtgever <select name="principal_id" required><option value="">Kies opdrachtgever</option>{% for item in principal_options %}<option value="{{ item.id }}">{{ item.name }}</option>{% endfor %}</select></label>
                                             <label>Project <select name="project_id"><option value="">Kies project</option>{% for item in project_options %}<option value="{{ item.id }}">{{ item.title }}{% if item.reference_number %} - {{ item.reference_number }}{% endif %}</option>{% endfor %}</select></label>
                                         </div>
+                                        <div class="invoice-relation-actions"><a class="table-link" href="/dashboard/relations?tab=candidates&new=1&return_to=%2Fdashboard%2Finvoicing%23invoer">Nieuwe zzp'er</a><a class="table-link" href="/dashboard/relations?tab=principals&new=1&return_to=%2Fdashboard%2Finvoicing%23invoer">Nieuwe opdrachtgever</a></div>
                                         <div class="invoice-logo-preview" data-invoice-logo-preview>
                                             <img src="/dashboard/static/olympusbouw.png" alt="Logo geselecteerde zzp'er" data-invoice-logo-image>
                                             <span data-invoice-logo-label>Nog geen zzp'er gekozen</span>
@@ -2481,9 +2492,9 @@ Metadata:
                         </section>
 
                         <section class="invoice-output-panel" id="output">
-                            <div class="invoice-run-detail__header"><div><p class="section-label">Output</p><h3>Facturen maken</h3><p>Elke invoerregel levert een verkoopfactuur en een Olympus-factuur als PDF.</p></div><form action="/api/invoicing/runs/{{ invoice_run.id }}/generate" method="post"><button class="ghost-button ghost-button--primary" type="submit" {% if not invoice_workspace.inputs or invoice_workspace.totals.blockers %}disabled{% endif %}>Genereer PDF-facturen</button></form></div>
+                            <div class="invoice-run-detail__header"><div><p class="section-label">Output</p><h3>Facturen maken</h3><p>Elke invoerregel levert een verkoopfactuur en een Olympus-factuur als PDF.</p></div><div class="invoice-output-actions"><form action="/api/invoicing/runs/{{ invoice_run.id }}/generate" method="post"><button class="ghost-button ghost-button--primary" type="submit" {% if not invoice_workspace.inputs or invoice_workspace.totals.blockers %}disabled{% endif %}>Genereer PDF-facturen</button></form><form action="/api/invoicing/runs/{{ invoice_run.id }}/delete" method="post" onsubmit="return confirm('Deze volledige factuurrun met alle documenten verwijderen?');"><button class="ghost-button danger-button" type="submit">Factuurrun verwijderen</button></form></div></div>
                             <div class="invoice-output-list">
-                                {% for output in invoice_workspace.outputs %}<a class="invoice-output-card" href="/api/invoicing/output/{{ output.id }}" data-pdf-open="/api/invoicing/output/{{ output.id }}" data-pdf-title="{{ 'Verkoopfactuur' if output.stream == 'verkoop' else 'Olympus-factuur' }} {{ output.invoice_number }}"><span class="invoice-output-card__icon">PDF</span><span><strong>{{ 'Verkoopfactuur' if output.stream == 'verkoop' else 'Olympus-factuur' }} {{ output.invoice_number }}</strong><small>{{ output.filename }}</small></span><span class="invoice-output-card__download">Bekijken / opslaan</span></a>{% else %}<p class="empty-state">Nog geen facturen gegenereerd. Los eerst alle controles op.</p>{% endfor %}
+                                {% for output in invoice_workspace.outputs %}<div class="invoice-output-row"><a class="invoice-output-card" href="/api/invoicing/output/{{ output.id }}" data-pdf-open="/api/invoicing/output/{{ output.id }}" data-pdf-title="{{ 'Verkoopfactuur' if output.stream == 'verkoop' else 'Olympus-factuur' }} {{ output.invoice_number }}"><span class="invoice-output-card__icon">PDF</span><span><strong>{{ 'Verkoopfactuur' if output.stream == 'verkoop' else 'Olympus-factuur' }} {{ output.invoice_number }}</strong><small>{{ output.filename }}</small></span><span class="invoice-output-card__download">Bekijken / opslaan</span></a><form action="/api/invoicing/output/{{ output.id }}/delete" method="post" onsubmit="return confirm('Deze factuur-PDF verwijderen?');"><button class="table-link danger-button" type="submit">Verwijderen</button></form></div>{% else %}<p class="empty-state">Nog geen facturen gegenereerd. Los eerst alle controles op.</p>{% endfor %}
                             </div>
                         </section>
                         {% endif %}
@@ -2501,7 +2512,7 @@ Metadata:
                                 <div class="invoice-form-grid invoice-form-grid--three"><label>Project <select name="project_id"><option value="">Niet koppelen</option>{% for item in project_options %}<option value="{{ item.id }}">{{ item.title }}</option>{% endfor %}</select></label><label>Factuurinvoer <input type="number" name="input_id" placeholder="Optioneel"></label><button class="ghost-button ghost-button--primary" type="submit">Aan dossier toevoegen</button></div>
                             </form>
                             <form class="single-search invoice-document-search" action="/dashboard/invoicing" method="get"><input type="search" name="q" value="{{ query }}" placeholder="Zoek dossier, zzp'er, opdrachtgever, project of bestand"><button class="ghost-button" type="submit">Zoeken</button>{% if query %}<a class="ghost-button" href="/dashboard/invoicing#dossiers">Wissen</a>{% endif %}</form>
-                            <div class="invoice-document-list">{% for document in invoice_documents %}<div class="invoice-document-row"><span><strong>{{ document.employee_name or 'Onbekende zzp\'er' }} | {{ document.filename }}</strong><small>{{ document.document_type }}{% if document.principal_name %} | {{ document.principal_name }}{% endif %}{% if document.project_name %} | {{ document.project_name }}{% endif %}</small></span><button class="table-link" type="button" data-pdf-open="/api/invoicing/document/{{ document.id }}" data-pdf-title="{{ document.filename }}">Openen</button></div>{% else %}<div class="empty-state empty-state--compact"><strong>Nog geen documenten in de dossiers</strong><span>Een gegenereerde factuur of upload verschijnt hier op naam van de zzp'er.</span></div>{% endfor %}</div>
+                            <div class="invoice-document-list">{% for document in invoice_documents %}<div class="invoice-document-row"><span><strong>{{ document.employee_name or 'Onbekende zzp\'er' }} | {{ document.filename }}</strong><small>{{ document.document_type }}{% if document.principal_name %} | {{ document.principal_name }}{% endif %}{% if document.project_name %} | {{ document.project_name }}{% endif %}</small></span><div class="invoice-document-row__actions"><button class="table-link" type="button" data-pdf-open="/api/invoicing/document/{{ document.id }}" data-pdf-title="{{ document.filename }}">Openen</button><form action="/api/invoicing/document/{{ document.id }}/delete" method="post" onsubmit="return confirm('Document definitief verwijderen?');"><button class="table-link danger-button" type="submit">Verwijderen</button></form></div></div>{% else %}<div class="empty-state empty-state--compact"><strong>Nog geen documenten in de dossiers</strong><span>Een gegenereerde factuur of upload verschijnt hier op naam van de zzp'er.</span></div>{% endfor %}</div>
                         </section>
                     </article>
 
@@ -3497,6 +3508,6 @@ Metadata:
                 </section>
             </main>
         </div>
-        <script src="/dashboard/static/dashboard.js?v=20260904-03"></script>
+        <script src="/dashboard/static/dashboard.js?v=20260904-04"></script>
     </body>
 </html>

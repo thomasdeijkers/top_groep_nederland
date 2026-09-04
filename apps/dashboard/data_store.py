@@ -79,6 +79,7 @@ def ensure_dashboard_tables():
         Path("migrations/052_invoice_dossiers.sql"),
         Path("migrations/053_invoice_fee_default.sql"),
         Path("migrations/054_normalize_concept_invoice_fee.sql"),
+        Path("migrations/055_invoice_relation_defaults.sql"),
     ]
 
     optional_migrations = set()
