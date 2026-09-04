@@ -16,6 +16,14 @@ from apps.dashboard.placeholders import (
 )
 from apps.dashboard.organizations import create_organization, list_organizations
 from apps.dashboard.openai_usage import get_openai_usage_summary, list_openai_api_audit_events
+from apps.dashboard.invoicing import (
+    create_invoice_input,
+    generate_invoice_run,
+    get_invoice_output_path,
+    get_invoicing_workspace,
+    import_project_bookings_into_run,
+    update_invoice_input,
+)
 from apps.dashboard.payroll_excel import build_payroll_output_workbook
 from apps.dashboard.records import (
     archive_payroll_period,
@@ -401,6 +409,7 @@ def _dashboard_context(
     show_relation_form: bool = False,
     project_id: int | None = None,
     period_id: int | None = None,
+    invoice_run_id: int | None = None,
     cao_id: int | None = None,
     parameter_version_id: int | None = None,
     show_cao_form: bool = False,
@@ -463,9 +472,11 @@ def _dashboard_context(
             },
             "openai_usage": {"month_cost_usd": 0, "month_requests": 0, "month_tokens": 0, "requests": 0, "total_tokens": 0},
             "principal_options": [],
+            "invoice_candidate_options": [],
             "project_options": [],
             "projects": [],
             "zzp_invoicing": {"line_count": 0, "total_hours": "0", "suggested_sales_total": "\u20ac 0,00", "suggested_purchase_total": "\u20ac 0,00", "suggested_margin_total": "\u20ac 0,00", "rows": []},
+            "invoice_workspace": {"runs": [], "selected_run": None, "inputs": [], "outputs": [], "totals": {"sales": "\u20ac 0,00", "olympus": "\u20ac 0,00", "hours": "0", "blockers": 0}},
             "selected_project": None,
             "selected_payroll_period": None,
             "payroll_periods": [],
@@ -512,6 +523,7 @@ def _dashboard_context(
     relations = _context_value(data_page, "relations", [], lambda: list_relations(query=query, status=active_status)) if data_page == "relations" else []
     candidate_relations = _context_value(data_page, "candidate_relations", [], lambda: list_relations(query=query, relation_type="candidate", status=active_status)) if data_page == "relations" else []
     timesheet_candidate_options = _context_value(data_page, "timesheet_candidate_options", [], lambda: list_relations(limit=200, relation_type="candidate")) if data_page == "timesheets" else []
+    invoice_candidate_options = _context_value(data_page, "invoice_candidate_options", [], lambda: list_relations(limit=500, relation_type="candidate")) if data_page == "invoicing" else []
     principal_relations = _context_value(data_page, "principal_relations", [], lambda: list_relations(query=query, relation_type="principal", status=active_status)) if data_page == "relations" else []
     principal_limit = 500 if data_page == "timesheets" else 100
     principals = _context_value(data_page, "principal_options", [], lambda: list_principals(limit=principal_limit, query=query if data_page == "relations" else "")) if data_page in {"relations", "vacancies", "projects", "timesheets", "invoicing"} else []
@@ -561,6 +573,7 @@ def _dashboard_context(
     project_options = _context_value(data_page, "project_options", [], list_project_options) if data_page in {"timesheets", "projects", "periods", "invoicing"} else []
     projects = _context_value(data_page, "projects", [], lambda: list_projects(query=query)) if data_page == "projects" else []
     zzp_invoicing = _context_value(data_page, "zzp_invoicing", {"line_count": 0, "total_hours": "0", "suggested_sales_total": "\u20ac 0,00", "suggested_purchase_total": "\u20ac 0,00", "suggested_margin_total": "\u20ac 0,00", "rows": []}, get_zzp_invoicing_overview) if data_page == "invoicing" else {"line_count": 0, "total_hours": "0", "suggested_sales_total": "\u20ac 0,00", "suggested_purchase_total": "\u20ac 0,00", "suggested_margin_total": "\u20ac 0,00", "rows": []}
+    invoice_workspace = _context_value(data_page, "invoice_workspace", {"runs": [], "selected_run": None, "inputs": [], "outputs": [], "totals": {"sales": "\u20ac 0,00", "olympus": "\u20ac 0,00", "hours": "0", "blockers": 0}}, lambda: get_invoicing_workspace(invoice_run_id)) if data_page == "invoicing" else {"runs": [], "selected_run": None, "inputs": [], "outputs": [], "totals": {"sales": "\u20ac 0,00", "olympus": "\u20ac 0,00", "hours": "0", "blockers": 0}}
     selected_project = _context_value(data_page, "selected_project", None, lambda: get_project(project_id)) if data_page == "projects" and project_id else None
     payroll_periods = _context_value(data_page, "payroll_periods", [], list_payroll_periods) if data_page in {"periods", "timesheets"} else []
     archived_payroll_periods = _context_value(data_page, "archived_payroll_periods", [], lambda: list_payroll_periods(archived=True)) if data_page in {"periods", "timesheets"} else []
@@ -667,6 +680,7 @@ def _dashboard_context(
         "show_relation_form": show_relation_form,
         "candidate_relations": candidate_relations,
         "timesheet_candidate_options": timesheet_candidate_options,
+        "invoice_candidate_options": invoice_candidate_options,
         "principal_relations": principal_relations,
         "candidates": imported_candidates,
         "tickets": imported_tickets,
@@ -683,6 +697,7 @@ def _dashboard_context(
         "project_options": project_options,
         "projects": projects,
         "zzp_invoicing": zzp_invoicing,
+        "invoice_workspace": invoice_workspace,
         "selected_project": selected_project,
         "selected_payroll_period": selected_payroll_period,
         "payroll_periods": payroll_periods,
@@ -762,6 +777,7 @@ def _render_dashboard(
     show_relation_form: bool = False,
     project_id: int | None = None,
     period_id: int | None = None,
+    invoice_run_id: int | None = None,
     cao_id: int | None = None,
     parameter_version_id: int | None = None,
     show_cao_form: bool = False,
@@ -769,7 +785,7 @@ def _render_dashboard(
     payroll_flow_filter: str = "",
 ):
     try:
-        context = _dashboard_context(active_page, edit_id, query, timesheet_id, workflow_stage, timesheet_tab, relation_tab, status_filter, show_relation_form, project_id, period_id, cao_id, parameter_version_id, show_cao_form, return_to, payroll_flow_filter)
+        context = _dashboard_context(active_page, edit_id, query, timesheet_id, workflow_stage, timesheet_tab, relation_tab, status_filter, show_relation_form, project_id, period_id, invoice_run_id, cao_id, parameter_version_id, show_cao_form, return_to, payroll_flow_filter)
     except Exception as exc:
         print(f"DASHBOARD_CONTEXT_ERROR {active_page}: {type(exc).__name__}: {exc}")
         return HTMLResponse(
@@ -850,8 +866,99 @@ def periods_page(request: Request, period: int | None = None, flow: str = ""):
 
 
 @router.get("/dashboard/invoicing", response_class=HTMLResponse)
-def invoicing_page(request: Request):
-    return _render_dashboard(request, "invoicing")
+def invoicing_page(request: Request, run: int | None = None):
+    return _render_dashboard(request, "invoicing", invoice_run_id=run)
+
+
+@router.post("/api/invoicing/input")
+def save_invoice_input(
+    run_id: int | None = Form(None),
+    year: int = Form(...),
+    week_number: int = Form(...),
+    invoice_date: str = Form(...),
+    relation_id: int | None = Form(None),
+    principal_id: int | None = Form(None),
+    project_id: int | None = Form(None),
+    employee_name: str = Form(""),
+    principal_name: str = Form(""),
+    project_name: str = Form(""),
+    project_reference: str = Form(""),
+    project_location: str = Form(""),
+    regime: str = Form("regie"),
+    hours: str = Form(""),
+    hourly_rate: str = Form(""),
+    agreed_amount: str = Form(""),
+    parking_costs: str = Form(""),
+    material_costs: str = Form(""),
+    other_sales_costs: str = Form(""),
+    olympus_costs: str = Form(""),
+    olympus_cost_description: str = Form(""),
+    sales_vat_rate: str = Form("0"),
+    fee_percent: str = Form(""),
+    services: str = Form("a,b,c,d"),
+    sepa_active: str = Form(""),
+    factoring: str = Form(""),
+    factoring_company: str = Form("Pronkert Factoring B.V."),
+    factoring_iban: str = Form(""),
+    factoring_address: str = Form(""),
+    factoring_city: str = Form(""),
+    factoring_email: str = Form(""),
+    factoring_phone: str = Form(""),
+    factoring_kvk: str = Form(""),
+    supplier_invoice_number: str = Form(""),
+    supplier_invoice_suffix: str = Form(""),
+    payment_term_days: int = Form(30),
+    notes: str = Form(""),
+):
+    payload = locals()
+    try:
+        saved_run_id, input_id = create_invoice_input(payload)
+        _audit("Factuurinvoer opgeslagen", "invoice_input", input_id, f"Factuurregel {input_id}", "Nieuwe invoerregel opgeslagen in een concept-factuurrun.", "Facturatie", metadata={"invoice_run_id": saved_run_id})
+        return RedirectResponse(f"/dashboard/invoicing?run={saved_run_id}&saved={input_id}#invoer", status_code=303)
+    except Exception as exc:
+        print(f"INVOICE_INPUT_ERROR {type(exc).__name__}: {_db_error_detail(exc)}")
+        return RedirectResponse("/dashboard/invoicing?error=input#invoer", status_code=303)
+
+
+@router.post("/api/invoicing/runs/{run_id}/import-hours")
+def import_invoice_hours(run_id: int):
+    try:
+        imported = import_project_bookings_into_run(run_id)
+        _audit("Gevalideerde projecturen ingeladen", "invoice_run", run_id, f"Factuurrun {run_id}", f"{imported} invoerregels vanuit projecturen toegevoegd.", "Facturatie")
+        return RedirectResponse(f"/dashboard/invoicing?run={run_id}&imported={imported}#invoer", status_code=303)
+    except Exception as exc:
+        print(f"INVOICE_IMPORT_ERROR {type(exc).__name__}: {_db_error_detail(exc)}")
+        return RedirectResponse(f"/dashboard/invoicing?run={run_id}&error=import#invoer", status_code=303)
+
+
+@router.post("/api/invoicing/input/{input_id}")
+async def edit_invoice_input(input_id: int, request: Request):
+    data = dict(await request.form())
+    try:
+        run_id = update_invoice_input(input_id, data)
+        return RedirectResponse(f"/dashboard/invoicing?run={run_id}&saved={input_id}#invoer", status_code=303)
+    except Exception as exc:
+        print(f"INVOICE_UPDATE_ERROR {type(exc).__name__}: {_db_error_detail(exc)}")
+        return RedirectResponse("/dashboard/invoicing?error=input#invoer", status_code=303)
+
+
+@router.post("/api/invoicing/runs/{run_id}/generate")
+def generate_invoice_run_route(run_id: int):
+    try:
+        result = generate_invoice_run(run_id)
+        _audit("Facturen als PDF gegenereerd", "invoice_run", run_id, f"Factuurrun {run_id}", f"{result['count']} factuurregels verwerkt naar verkoop- en Olympus-facturen.", "Facturatie")
+        return RedirectResponse(f"/dashboard/invoicing?run={run_id}&generated={result['count']}#output", status_code=303)
+    except Exception as exc:
+        print(f"INVOICE_GENERATE_ERROR {type(exc).__name__}: {_db_error_detail(exc)}")
+        return RedirectResponse(f"/dashboard/invoicing?run={run_id}&error=generate#output", status_code=303)
+
+
+@router.get("/api/invoicing/output/{output_id}")
+def download_invoice_output(output_id: int):
+    path = get_invoice_output_path(output_id)
+    if not path:
+        return RedirectResponse("/dashboard/invoicing?error=output", status_code=303)
+    return FileResponse(path, filename=path.name, media_type="application/pdf")
 
 
 @router.get("/dashboard/tickets", response_class=HTMLResponse)
