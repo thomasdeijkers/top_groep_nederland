@@ -960,6 +960,9 @@ async def save_invoice_agreement(
     end_date: str = Form(""),
     status: str = Form("concept"),
     notes: str = Form(""),
+    assignment_scope: str = Form(""),
+    result_obligation: str = Form(""),
+    delivery_term: str = Form(""),
     file: UploadFile | None = File(None),
 ):
     try:
@@ -988,6 +991,9 @@ def preview_invoice_agreement(
     end_date: str = "",
     status: str = "concept",
     notes: str = "",
+    assignment_scope: str = "",
+    result_obligation: str = "",
+    delivery_term: str = "",
 ):
     try:
         content = _agreement_pdf_bytes(locals())

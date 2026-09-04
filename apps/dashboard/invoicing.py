@@ -6,6 +6,7 @@ from io import BytesIO
 from mimetypes import guess_type
 from pathlib import Path
 import re
+from xml.sax.saxutils import escape
 from uuid import uuid4
 
 from apps.dashboard.data_store import ensure_dashboard_tables
@@ -137,12 +138,15 @@ def create_invoice_agreement(data: dict) -> int:
             cursor.execute(
                 """
                 INSERT INTO invoice_agreements
-                    (relation_id, principal_id, project_id, regime, hourly_rate, start_date, end_date, status, notes)
-                VALUES (%s, %s, %s, %s, %s, %s, NULLIF(%s, '')::date, %s, %s)
+                    (relation_id, principal_id, project_id, regime, hourly_rate, start_date, end_date, status, notes,
+                     assignment_scope, result_obligation, delivery_term)
+                VALUES (%s, %s, %s, %s, %s, %s, NULLIF(%s, '')::date, %s, %s, %s, %s, %s)
                 RETURNING id;
                 """,
                 (relation_id, principal_id, project_id, regime, hourly_rate, _parse_date(data.get("start_date")),
-                 str(data.get("end_date") or "").strip(), status, str(data.get("notes") or "").strip()),
+                 str(data.get("end_date") or "").strip(), status, str(data.get("notes") or "").strip(),
+                 str(data.get("assignment_scope") or "").strip(), str(data.get("result_obligation") or "").strip(),
+                 str(data.get("delivery_term") or "").strip()),
             )
             agreement_id = cursor.fetchone()[0]
         conn.commit()
@@ -154,7 +158,8 @@ def _agreement_row(cursor, agreement_id: int | str | None) -> dict | None:
         return None
     cursor.execute(
         """
-        SELECT id, relation_id, principal_id, project_id, regime, hourly_rate, start_date, end_date, status, notes
+        SELECT id, relation_id, principal_id, project_id, regime, hourly_rate, start_date, end_date, status, notes,
+               assignment_scope, result_obligation, delivery_term
         FROM invoice_agreements
         WHERE id = %s;
         """,
@@ -163,7 +168,10 @@ def _agreement_row(cursor, agreement_id: int | str | None) -> dict | None:
     row = cursor.fetchone()
     if not row:
         return None
-    keys = ("id", "relation_id", "principal_id", "project_id", "regime", "hourly_rate", "start_date", "end_date", "status", "notes")
+    keys = (
+        "id", "relation_id", "principal_id", "project_id", "regime", "hourly_rate", "start_date", "end_date", "status", "notes",
+        "assignment_scope", "result_obligation", "delivery_term",
+    )
     return dict(zip(keys, row))
 
 
@@ -174,7 +182,7 @@ def list_invoice_agreements() -> list[dict]:
             cursor.execute(
                 """
                 SELECT a.id, a.relation_id, a.principal_id, a.project_id, a.regime, a.hourly_rate,
-                       a.start_date, a.end_date, a.status, a.notes,
+                       a.start_date, a.end_date, a.status, a.notes, a.assignment_scope, a.result_obligation, a.delivery_term,
                        COALESCE(z.name, ''), COALESCE(k.name, ''), COALESCE(v.title, ''),
                        COALESCE(v.reference_number, ''), COUNT(d.id)
                 FROM invoice_agreements a
@@ -192,6 +200,7 @@ def list_invoice_agreements() -> list[dict]:
     for row in rows:
         agreement = dict(zip((
             "id", "relation_id", "principal_id", "project_id", "regime", "hourly_rate", "start_date", "end_date", "status", "notes",
+            "assignment_scope", "result_obligation", "delivery_term",
             "employee_name", "principal_name", "project_name", "project_reference", "document_count",
         ), row))
         agreement["hourly_rate_text"] = _money_text(agreement["hourly_rate"])
@@ -910,7 +919,7 @@ def _input_attachment_paths(cursor, input_id: int) -> list[Path]:
     return [Path(row[0]) for row in cursor.fetchall() if _safe_document_path(row[0])]
 
 
-def _factuur_kader(c, x: float, y: float, width: float, height: float, rows: list[tuple[str, str, str, str]], accent="#111111") -> None:
+def _factuur_kader(c, x: float, y: float, width: float, height: float, rows: list[tuple[str, str, str, str]], accent="#111111", bold_values: bool = False) -> None:
     colors, _, _ = _reportlab_dependencies()
     c.setStrokeColor(colors.HexColor(accent))
     c.setLineWidth(0.65)
@@ -924,11 +933,11 @@ def _factuur_kader(c, x: float, y: float, width: float, height: float, rows: lis
         c.setFillColor(colors.HexColor("#111111"))
         c.setFont("Helvetica-Bold", 7.5)
         c.drawString(x + 8, baseline, left_label)
-        c.setFont("Helvetica", 8)
+        c.setFont("Helvetica-Bold" if bold_values else "Helvetica", 8)
         c.drawString(x + 62, baseline, str(left_value or "-"))
         c.setFont("Helvetica-Bold", 7.5)
         c.drawString(x + width * 0.52 + 8, baseline, right_label)
-        c.setFont("Helvetica", 8)
+        c.setFont("Helvetica-Bold" if bold_values else "Helvetica", 8)
         c.drawString(x + width * 0.52 + 62, baseline, str(right_value or "-"))
 
 
@@ -987,7 +996,30 @@ def _agreement_pdf_context(data: dict) -> dict:
         "end_date": str(data.get("end_date") or "").strip(),
         "status": str(data.get("status") or "concept").strip(),
         "notes": str(data.get("notes") or "").strip(),
+        "assignment_scope": str(data.get("assignment_scope") or "").strip(),
+        "result_obligation": str(data.get("result_obligation") or "").strip(),
+        "delivery_term": str(data.get("delivery_term") or "").strip(),
     }
+
+
+def _draw_agreement_paragraph(c, markup: str, x: float, top: float, width: float, *, font_size: float = 8.5, leading: float = 11) -> float:
+    from reportlab.lib.enums import TA_JUSTIFY
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.platypus import Paragraph
+
+    style = ParagraphStyle(
+        "agreement",
+        fontName="Helvetica",
+        fontSize=font_size,
+        leading=leading,
+        textColor="#111111",
+        alignment=TA_JUSTIFY,
+        spaceAfter=0,
+    )
+    paragraph = Paragraph(markup, style)
+    _, paragraph_height = paragraph.wrap(width, 700)
+    paragraph.drawOn(c, x, top - paragraph_height)
+    return top - paragraph_height
 
 
 def _agreement_pdf_bytes(data: dict) -> bytes:
@@ -1007,6 +1039,15 @@ def _agreement_pdf_bytes(data: dict) -> bytes:
         with conn.cursor() as cursor:
             brand_logo = _brand_logo_path(cursor)
 
+    safe_employee = escape(employee_name)
+    safe_principal = escape(principal_name)
+    safe_project = escape(context["project_name"])
+    safe_reference = escape(context["project_reference"] or "werknummer volgt")
+    safe_location = escape(context["project_location"] or "nader te bepalen plaats")
+    safe_scope = escape(context["assignment_scope"] or "Uitvoering van werkzaamheden conform de gekozen opdracht.")
+    safe_result = escape(context["result_obligation"] or "Oplevering conform de overeengekomen kwaliteitseisen.")
+    safe_delivery = escape(context["delivery_term"] or "Volgens de planning van opdrachtgever.")
+
     _draw_logo(c, brand_logo, 410, height - 36, 120, 58)
     c.setFillColor(colors.HexColor("#24559c"))
     c.setFont("Helvetica-Bold", 21)
@@ -1014,32 +1055,39 @@ def _agreement_pdf_bytes(data: dict) -> bytes:
     c.setFillColor(colors.HexColor("#27333a"))
     c.setFont("Helvetica", 9)
     c.drawString(42, height - 84, "Uitvoeringsovereenkomst voor zzp-opdracht in de bouw")
-    _draw_lines(c, 42, height - 124, ["Opdrachtgever", principal_name, f"T.a.v. {principal.get('contact_name') or 'Financiele administratie'}"] + _relation_address_lines(principal), size=9, leading=12)
-    _draw_lines(c, 302, height - 124, ["Opdrachtnemer", employee_name, employee.get("name") or employee_name] + _relation_address_lines(employee), size=9, leading=12)
+    principal_address = "<br/>".join(escape(str(line)) for line in _relation_address_lines(principal))
+    employee_address = "<br/>".join(escape(str(line)) for line in _relation_address_lines(employee))
+    _draw_agreement_paragraph(c, f"Opdrachtgever<br/><b>{safe_principal}</b><br/>T.a.v. {escape(principal.get('contact_name') or 'Financiele administratie')}<br/>{principal_address}", 42, height - 124, 220, font_size=8.7, leading=11)
+    _draw_agreement_paragraph(c, f"Opdrachtnemer<br/><b>{safe_employee}</b><br/><b>{escape(employee.get('name') or employee_name)}</b><br/>{employee_address}", 302, height - 124, 220, font_size=8.7, leading=11)
     _factuur_kader(c, 42, height - 300, width - 84, 84, [
         ("OBS-code", obs_code, "Project", context["project_name"]),
         ("Ingangsdatum", _date_text(context["start_date"]), "Werknummer", context["project_reference"] or "-"),
         ("Regime", "Regie" if context["regime"] == "regie" else "Aangenomen werk", "Plaats", context["project_location"] or "-"),
         ("Tarief", _money_text(context["hourly_rate"]) + " per uur" if context["regime"] == "regie" else "Volgens aanneemsom per week", "Status", context["status"].capitalize()),
-    ], accent="#24559c")
-    y = height - 340
+    ], accent="#24559c", bold_values=True)
+    y = height - 335
     c.setFillColor(colors.HexColor("#111111"))
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(42, y, "Afspraken over de opdracht")
-    c.setFont("Helvetica", 9)
-    lines = [
-        f"{employee_name} voert werkzaamheden uit voor {principal_name} op bovengenoemd project.",
-        "De werkzaamheden worden zelfstandig uitgevoerd; Olympus Bouw B.V. bemiddelt en verzorgt de facturatie.",
-        f"Facturatie vindt plaats op basis van de geaccordeerde weekstaat onder referentie {obs_code}.",
-        "Doorbelaste parkeer- en materiaalkosten worden uitsluitend met bijbehorende bewijsstukken verwerkt.",
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(42, y, "Gegevens project en opdracht")
+    y -= 16
+    first_page_items = [
+        ("Werknaam", safe_project),
+        ("Opgegeven afgebakende opdracht", safe_scope),
+        ("Opgegeven resultaatverplichting", safe_result),
+        ("Aanvang en planning", f"<b>{escape(_date_text(context['start_date']))}</b>, {safe_delivery}"),
+        ("Oplevertermijn", safe_delivery),
+        ("Adres werk", safe_location),
     ]
-    for line in lines:
-        c.drawString(48, y - 18, line)
-        y -= 18
+    for label, value in first_page_items:
+        c.setFillColor(colors.HexColor("#24559c"))
+        c.setFont("Helvetica-Bold", 8.5)
+        c.drawString(48, y, label)
+        y = _draw_agreement_paragraph(c, f"<b>{value}</b>", 176, y + 2, 360, font_size=8.5, leading=11) - 8
     if context["notes"]:
-        c.setFont("Helvetica-Oblique", 8.5)
-        c.drawString(48, y - 10, f"Bijzonderheden: {context['notes']}")
-        y -= 24
+        c.setFillColor(colors.HexColor("#24559c"))
+        c.setFont("Helvetica-Bold", 8.5)
+        c.drawString(48, y, "Bijzonderheden")
+        y = _draw_agreement_paragraph(c, f"<b>{escape(context['notes'])}</b>", 176, y + 2, 360, font_size=8.5, leading=11) - 8
     c.setStrokeColor(colors.HexColor("#24559c"))
     c.line(42, 150, 250, 150)
     c.line(330, 150, 538, 150)
@@ -1051,38 +1099,60 @@ def _agreement_pdf_bytes(data: dict) -> bytes:
     c.drawString(42, 36, "Olympus Bouw B.V. | Bemiddeling en facturatie namens de zelfstandige")
     c.showPage()
 
-    _draw_logo(c, brand_logo, 410, height - 36, 120, 58)
-    c.setFillColor(colors.HexColor("#24559c"))
-    c.setFont("Helvetica-Bold", 20)
-    c.drawString(42, height - 65, "MODELOVEREENKOMST")
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(42, height - 88, "Aanneming van werk")
-    c.setFillColor(colors.HexColor("#27333a"))
-    c.setFont("Helvetica", 9)
-    article_lines = [
-        ("1. Partijen", f"Opdrachtgever {principal_name} en opdrachtnemer {employee_name} sluiten deze uitvoeringsovereenkomst."),
-        ("2. Opdracht", f"De opdracht betreft {context['project_name']} ({context['project_reference'] or 'werknummer volgt'}) te {context['project_location'] or 'nader te bepalen plaats'}."),
-        ("3. Uitvoering", "De opdrachtnemer bepaalt zelfstandig de wijze van uitvoering, planning en inzet binnen de overeengekomen opdracht."),
-        ("4. Vergoeding", _money_text(context["hourly_rate"]) + " per uur exclusief btw en exclusief doorbelastbare kosten." if context["regime"] == "regie" else "De vergoeding wordt per geaccordeerde aanneemsom en weekstaat vastgesteld."),
-        ("5. Facturatie", f"Olympus Bouw B.V. verzorgt de facturatie namens de opdrachtnemer met OBS-code {obs_code}."),
-        ("6. Geldigheid", f"Deze overeenkomst gaat in op {_date_text(context['start_date'])}" + (f" en eindigt op {context['end_date']}." if context["end_date"] else ".")),
-    ]
-    y = height - 130
-    for title, text in article_lines:
+    def model_page_header(page_number: int) -> float:
         c.setFillColor(colors.HexColor("#24559c"))
-        c.setFont("Helvetica-Bold", 10)
-        c.drawString(42, y, title)
-        c.setFillColor(colors.HexColor("#111111"))
-        c.setFont("Helvetica", 9)
-        y = _draw_lines(c, 48, y - 14, [text], size=9, leading=13) - 10
+        c.setFont("Helvetica-Bold", 15)
+        c.drawString(42, height - 55, "OVEREENKOMST AANNEMING VAN WERK")
+        c.setFont("Helvetica", 8.5)
+        c.setFillColor(colors.HexColor("#27333a"))
+        c.drawString(42, height - 72, obs_code)
+        c.drawRightString(538, height - 72, f"Pagina {page_number}")
+        c.setStrokeColor(colors.HexColor("#24559c"))
+        c.line(42, height - 82, 538, height - 82)
+        return height - 105
+
+    y = model_page_header(2)
+    intro = (
+        f"<b>{safe_employee}</b>, handelend onder de naam <b>{escape(employee.get('name') or employee_name)}</b> "
+        f"(opdrachtnemer), zal voor <b>{safe_principal}</b> (opdrachtgever) als zelfstandig ondernemer werk realiseren "
+        f"zoals vermeld op dit opdrachtformulier. Het opdrachtformulier is de werkopdracht voor <b>{safe_project}</b> "
+        f"met werknummer <b>{safe_reference}</b> te <b>{safe_location}</b>. Deze overeenkomst geldt als raamovereenkomst."
+    )
+    model_paragraphs = [
+        intro,
+        "<b>1. Opdracht en zelfstandige uitvoering</b><br/>Opdrachtgever verstrekt voor aanvang van het werk de planning, bouwtekeningen, uitvoeringsdetails en het V&amp;G-plan. Opdrachtnemer voert de opdracht volledig zelfstandig uit en bepaalt zelf onder welke omstandigheden en op welke wijze de opdracht wordt uitgevoerd. Richtlijnen van opdrachtgever mogen uitsluitend zien op de afstemming met andere bouwtechnische werkzaamheden en grijpen niet in op de inrichting van het werk, de tijden of wijze van uitvoering.",
+        "Opdrachtnemer is vrij opdrachten van derden aan te nemen, vertegenwoordigt zijn eigen bedrijf, gebruikt eigen vervoersmiddelen, gereedschap en materieel en is aansprakelijk voor het overeengekomen resultaat. Opdrachtnemer kan zich vrijelijk laten vervangen of bijstaan, mits de vervanger op overeenkomstige wijze met opdrachtgever is gecontracteerd.",
+        "<b>2. Opdrachtgegevens</b><br/>De afgebakende opdracht is: <b>" + safe_scope + "</b><br/>De resultaatverplichting is: <b>" + safe_result + "</b><br/>De planning en oplevertermijn zijn: <b>" + safe_delivery + "</b>.",
+        "<b>3. Vergoeding en kosten</b><br/>" + (f"De overeengekomen vergoeding bedraagt <b>{escape(_money_text(context['hourly_rate']))} per regie-uur</b>, exclusief btw, materialen, parkeerkosten, extra ritten en andere kostenverhogende omstandigheden." if context["regime"] == "regie" else "De overeengekomen vergoeding wordt vastgesteld als <b>aanneemsom</b> op basis van de geaccordeerde werkopdracht en weekstaat.") + " Doorbelaste kosten worden alleen in rekening gebracht met de bijbehorende bewijsstukken.",
+        "<b>4. Weekstaat, inspectie en facturatie</b><br/>Opdrachtgever inspecteert het geleverde werk voordat prestaties worden afgetekend. Onvakkundig werk wordt direct, uiterlijk binnen 48 uur, gemeld. Opdrachtgever en opdrachtnemer vullen per opdracht aan het einde van iedere week een weekstaat in en ondertekenen deze. Met ondertekening gaat opdrachtgever de betalingsverplichting aan voor de gewerkte uren en gemaakte kosten.",
+        f"Olympus Bouw B.V. faciliteert namens opdrachtnemer de schriftelijke vastlegging en facturatie onder referentie <b>{escape(obs_code)}</b>. De btw-verleggingsregeling is van toepassing, tenzij per factuur anders is overeengekomen. Facturen worden betaald binnen de op het opdrachtformulier vermelde betalingstermijn.",
+        "<b>5. Toepasselijk recht</b><br/>Op deze opdracht is Nederlands recht van toepassing. Geschillen worden voorgelegd aan de bevoegde rechter te Rotterdam. Algemene voorwaarden zijn uitsluitend van toepassing voor zover zij geen afbreuk doen aan deze overeenkomst.",
+    ]
+    page_number = 2
+    for paragraph in model_paragraphs:
+        from reportlab.platypus import Paragraph
+        from reportlab.lib.styles import ParagraphStyle
+
+        probe = Paragraph(paragraph, ParagraphStyle("agreement-probe", fontName="Helvetica", fontSize=8.5, leading=11))
+        _, paragraph_height = probe.wrap(width - 84, 700)
+        if y - paragraph_height < 145:
+            c.showPage()
+            page_number += 1
+            y = model_page_header(page_number)
+        y = _draw_agreement_paragraph(c, paragraph, 42, y, width - 84) - 12
+
+    if y < 175:
+        c.showPage()
+        page_number += 1
+        y = model_page_header(page_number)
     c.setStrokeColor(colors.HexColor("#24559c"))
-    c.line(42, 150, 250, 150)
-    c.line(330, 150, 538, 150)
+    c.line(42, y - 15, 250, y - 15)
+    c.line(330, y - 15, 538, y - 15)
     c.setFillColor(colors.HexColor("#27333a"))
     c.setFont("Helvetica", 8)
-    c.drawString(42, 137, "Namens opdrachtgever")
-    c.drawString(330, 137, "Namens opdrachtnemer")
-    c.drawString(42, 36, f"Referentie: {obs_code} | Gegenereerd als conceptdocument")
+    c.drawString(42, y - 28, "Voor akkoord: opdrachtgever")
+    c.drawString(330, y - 28, "Voor akkoord: opdrachtnemer")
+    c.drawString(42, 36, f"Referentie: {obs_code} | Gegenereerd vanuit het dossier")
     c.save()
     return buffer.getvalue()
 
