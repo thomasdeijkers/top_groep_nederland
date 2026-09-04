@@ -17,6 +17,8 @@ from apps.dashboard.placeholders import (
 from apps.dashboard.organizations import create_organization, list_organizations
 from apps.dashboard.openai_usage import get_openai_usage_summary, list_openai_api_audit_events
 from apps.dashboard.invoicing import (
+    archive_invoice_run,
+    create_invoice_agreement,
     create_invoice_input,
     delete_invoice_document,
     delete_invoice_output,
@@ -28,6 +30,7 @@ from apps.dashboard.invoicing import (
     import_project_bookings_into_run,
     list_invoice_documents,
     list_relation_invoice_documents,
+    restore_invoice_run,
     save_invoice_document,
     update_invoice_input,
 )
@@ -895,6 +898,7 @@ def invoicing_page(request: Request, run: int | None = None, q: str = ""):
 @router.post("/api/invoicing/input")
 def save_invoice_input(
     run_id: int | None = Form(None),
+    agreement_id: int | None = Form(None),
     year: int = Form(...),
     week_number: int = Form(...),
     invoice_date: str = Form(...),
@@ -942,6 +946,33 @@ def save_invoice_input(
         return RedirectResponse("/dashboard/invoicing?error=input#invoer", status_code=303)
 
 
+@router.post("/api/invoicing/agreements")
+async def save_invoice_agreement(
+    relation_id: int = Form(...),
+    principal_id: int = Form(...),
+    project_id: int = Form(...),
+    regime: str = Form("regie"),
+    hourly_rate: str = Form(""),
+    start_date: str = Form(""),
+    end_date: str = Form(""),
+    status: str = Form("concept"),
+    notes: str = Form(""),
+    file: UploadFile | None = File(None),
+):
+    try:
+        agreement_id = create_invoice_agreement(locals())
+        if file and file.filename:
+            save_invoice_document(
+                await file.read(), file.filename, "overeenkomst", relation_id, principal_id, project_id,
+                agreement_id=agreement_id,
+            )
+        _audit("Overeenkomst vastgelegd", "invoice_agreement", agreement_id, f"Overeenkomst {agreement_id}", "Overeenkomst en opdrachtgegevens vastgelegd voor de facturatieflow.", "Facturatie")
+        return RedirectResponse("/dashboard/invoicing?agreement=saved#overeenkomsten", status_code=303)
+    except Exception as exc:
+        print(f"INVOICE_AGREEMENT_ERROR {type(exc).__name__}: {_db_error_detail(exc)}")
+        return RedirectResponse("/dashboard/invoicing?error=agreement#overeenkomsten", status_code=303)
+
+
 @router.post("/api/invoicing/runs/{run_id}/import-hours")
 def import_invoice_hours(run_id: int):
     try:
@@ -984,6 +1015,28 @@ def remove_invoice_run(run_id: int):
     except Exception as exc:
         print(f"INVOICE_RUN_DELETE_ERROR {type(exc).__name__}: {_db_error_detail(exc)}")
         return RedirectResponse(f"/dashboard/invoicing?run={run_id}&error=delete#output", status_code=303)
+
+
+@router.post("/api/invoicing/runs/{run_id}/archive")
+def archive_invoice_run_route(run_id: int):
+    try:
+        archive_invoice_run(run_id)
+        _audit("Factuurrun gearchiveerd", "invoice_run", run_id, f"Factuurrun {run_id}", "Facturen en dossierdocumenten zijn bewaard in het archief.", "Facturatie")
+        return RedirectResponse("/dashboard/invoicing?archived=run#archief", status_code=303)
+    except Exception as exc:
+        print(f"INVOICE_RUN_ARCHIVE_ERROR {type(exc).__name__}: {_db_error_detail(exc)}")
+        return RedirectResponse(f"/dashboard/invoicing?run={run_id}&error=archive#output", status_code=303)
+
+
+@router.post("/api/invoicing/runs/{run_id}/restore")
+def restore_invoice_run_route(run_id: int):
+    try:
+        restore_invoice_run(run_id)
+        _audit("Factuurrun hersteld", "invoice_run", run_id, f"Factuurrun {run_id}", "Factuurrun teruggezet naar de actieve werkvoorraad.", "Facturatie")
+        return RedirectResponse(f"/dashboard/invoicing?run={run_id}&restored=run#invoer", status_code=303)
+    except Exception as exc:
+        print(f"INVOICE_RUN_RESTORE_ERROR {type(exc).__name__}: {_db_error_detail(exc)}")
+        return RedirectResponse("/dashboard/invoicing?error=restore#archief", status_code=303)
 
 
 @router.get("/api/invoicing/output/{output_id}")

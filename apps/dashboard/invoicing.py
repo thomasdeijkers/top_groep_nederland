@@ -117,6 +117,110 @@ def create_invoice_run(year: int, week_number: int, invoice_date: str | date) ->
     return run_id
 
 
+def create_invoice_agreement(data: dict) -> int:
+    relation_id = int(data.get("relation_id") or 0)
+    principal_id = int(data.get("principal_id") or 0)
+    project_id = int(data.get("project_id") or 0)
+    if not all((relation_id, principal_id, project_id)):
+        raise ValueError("Kies een zzp'er, opdrachtgever en project voor de overeenkomst.")
+    regime = "aangenomen werk" if str(data.get("regime") or "").strip().lower() in {"aangenomen", "aangenomen werk"} else "regie"
+    hourly_rate = _money(data.get("hourly_rate")) if regime == "regie" else Decimal("0")
+    if regime == "regie" and hourly_rate <= 0:
+        raise ValueError("Vul het overeengekomen uurtarief in.")
+    status = str(data.get("status") or "concept").strip().lower()
+    if status not in {"concept", "verzonden", "getekend", "beeindigd"}:
+        status = "concept"
+    _ensure()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO invoice_agreements
+                    (relation_id, principal_id, project_id, regime, hourly_rate, start_date, end_date, status, notes)
+                VALUES (%s, %s, %s, %s, %s, %s, NULLIF(%s, '')::date, %s, %s)
+                RETURNING id;
+                """,
+                (relation_id, principal_id, project_id, regime, hourly_rate, _parse_date(data.get("start_date")),
+                 str(data.get("end_date") or "").strip(), status, str(data.get("notes") or "").strip()),
+            )
+            agreement_id = cursor.fetchone()[0]
+        conn.commit()
+    return agreement_id
+
+
+def _agreement_row(cursor, agreement_id: int | str | None) -> dict | None:
+    if not agreement_id:
+        return None
+    cursor.execute(
+        """
+        SELECT id, relation_id, principal_id, project_id, regime, hourly_rate, start_date, end_date, status, notes
+        FROM invoice_agreements
+        WHERE id = %s;
+        """,
+        (int(agreement_id),),
+    )
+    row = cursor.fetchone()
+    if not row:
+        return None
+    keys = ("id", "relation_id", "principal_id", "project_id", "regime", "hourly_rate", "start_date", "end_date", "status", "notes")
+    return dict(zip(keys, row))
+
+
+def list_invoice_agreements() -> list[dict]:
+    _ensure()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT a.id, a.relation_id, a.principal_id, a.project_id, a.regime, a.hourly_rate,
+                       a.start_date, a.end_date, a.status, a.notes,
+                       COALESCE(z.name, ''), COALESCE(k.name, ''), COALESCE(v.title, ''),
+                       COALESCE(v.reference_number, ''), COUNT(d.id)
+                FROM invoice_agreements a
+                LEFT JOIN relations z ON z.id = a.relation_id
+                LEFT JOIN relations k ON k.id = a.principal_id
+                LEFT JOIN vacancies v ON v.id = a.project_id
+                LEFT JOIN invoice_documents d ON d.agreement_id = a.id
+                GROUP BY a.id, z.name, k.name, v.title, v.reference_number
+                ORDER BY CASE a.status WHEN 'getekend' THEN 0 WHEN 'verzonden' THEN 1 WHEN 'concept' THEN 2 ELSE 3 END,
+                         a.start_date DESC, a.id DESC;
+                """
+            )
+            rows = cursor.fetchall()
+    agreements = []
+    for row in rows:
+        agreement = dict(zip((
+            "id", "relation_id", "principal_id", "project_id", "regime", "hourly_rate", "start_date", "end_date", "status", "notes",
+            "employee_name", "principal_name", "project_name", "project_reference", "document_count",
+        ), row))
+        agreement["hourly_rate_text"] = _money_text(agreement["hourly_rate"])
+        agreement["start_date_text"] = _date_text(agreement["start_date"])
+        agreement["status_label"] = {"concept": "Concept", "verzonden": "Verzonden", "getekend": "Getekend", "beeindigd": "Beeindigd"}.get(agreement["status"], agreement["status"])
+        agreement["is_invoice_ready"] = agreement["status"] == "getekend"
+        agreements.append(agreement)
+    return agreements
+
+
+def archive_invoice_run(run_id: int) -> None:
+    _ensure()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("UPDATE invoice_runs SET status = 'archief', updated_at = NOW() WHERE id = %s RETURNING id;", (run_id,))
+            if not cursor.fetchone():
+                raise ValueError("Factuurrun niet gevonden.")
+        conn.commit()
+
+
+def restore_invoice_run(run_id: int) -> None:
+    _ensure()
+    with get_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("UPDATE invoice_runs SET status = 'concept', updated_at = NOW() WHERE id = %s AND status = 'archief' RETURNING id;", (run_id,))
+            if not cursor.fetchone():
+                raise ValueError("Gearchiveerde factuurrun niet gevonden.")
+        conn.commit()
+
+
 def _lookup_names(cursor, relation_id, principal_id, project_id) -> dict:
     names = {
         "employee_name": "", "principal_name": "", "project_name": "", "project_reference": "",
@@ -169,8 +273,19 @@ def create_invoice_input(data: dict) -> tuple[int, int]:
     _ensure()
     with get_connection() as conn:
         with conn.cursor() as cursor:
-            names = _lookup_names(cursor, data.get("relation_id"), data.get("principal_id"), data.get("project_id"))
-            hourly_rate = _money(data.get("hourly_rate") or names.get("employee_hourly_rate"))
+            agreement = _agreement_row(cursor, data.get("agreement_id"))
+            relation_id = data.get("relation_id")
+            principal_id = data.get("principal_id")
+            project_id = data.get("project_id")
+            if agreement:
+                if agreement["status"] != "getekend":
+                    raise ValueError("Alleen een getekende overeenkomst kan worden gebruikt voor een weekkoppeling.")
+                relation_id = agreement["relation_id"]
+                principal_id = agreement["principal_id"]
+                project_id = agreement["project_id"]
+                regime = agreement["regime"]
+            names = _lookup_names(cursor, relation_id, principal_id, project_id)
+            hourly_rate = _money(agreement["hourly_rate"] if agreement and regime == "regie" else data.get("hourly_rate") or names.get("employee_hourly_rate"))
             labor_amount = _effective_amount(regime, hours, hourly_rate, agreed_amount)
             factoring = bool(data.get("factoring")) or names.get("employee_payment_method") == "factoring"
             sepa_active = bool(data.get("sepa_active")) or names.get("employee_payment_method") != "geen_incasso"
@@ -181,7 +296,7 @@ def create_invoice_input(data: dict) -> tuple[int, int]:
             cursor.execute(
                 """
                 INSERT INTO invoice_inputs (
-                    run_id, relation_id, principal_id, project_id,
+                    run_id, relation_id, principal_id, project_id, agreement_id,
                     employee_name, principal_name, project_name, project_reference, project_location,
                     regime, hours, hourly_rate, agreed_amount, labor_amount,
                     parking_costs, material_costs, other_sales_costs,
@@ -193,7 +308,7 @@ def create_invoice_input(data: dict) -> tuple[int, int]:
                     source_type, status, notes
                 )
                 VALUES (
-                    %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s,
                     %s, %s, %s, %s, %s,
                     %s, %s, %s, %s, %s,
                     %s, %s, %s,
@@ -207,7 +322,7 @@ def create_invoice_input(data: dict) -> tuple[int, int]:
                 RETURNING id;
                 """,
                 (
-                    run_id, data.get("relation_id") or None, data.get("principal_id") or None, data.get("project_id") or None,
+                    run_id, relation_id or None, principal_id or None, project_id or None, agreement["id"] if agreement else None,
                     names["employee_name"] or str(data.get("employee_name") or "").strip(),
                     names["principal_name"] or str(data.get("principal_name") or "").strip(),
                     names["project_name"] or str(data.get("project_name") or "").strip(),
@@ -383,7 +498,7 @@ def import_project_bookings_into_run(run_id: int) -> int:
 def _input_row(cursor, input_id: int):
     cursor.execute(
         """
-        SELECT i.id, i.run_id, i.relation_id, i.principal_id, i.project_id,
+        SELECT i.id, i.run_id, i.relation_id, i.principal_id, i.project_id, i.agreement_id,
                i.employee_name, i.principal_name, i.project_name, i.project_reference, i.project_location,
                i.regime, i.hours, i.hourly_rate, i.agreed_amount, i.labor_amount,
                i.parking_costs, i.material_costs, i.other_sales_costs,
@@ -402,7 +517,7 @@ def _input_row(cursor, input_id: int):
     if not row:
         return None
     keys = (
-        "id", "run_id", "relation_id", "principal_id", "project_id", "employee_name", "principal_name", "project_name",
+        "id", "run_id", "relation_id", "principal_id", "project_id", "agreement_id", "employee_name", "principal_name", "project_name",
         "project_reference", "project_location", "regime", "hours", "hourly_rate", "agreed_amount", "labor_amount",
         "parking_costs", "material_costs", "other_sales_costs", "olympus_costs", "olympus_cost_description",
         "sales_vat_rate", "fee_percent", "services", "sepa_active", "factoring", "factoring_company", "factoring_iban",
@@ -561,7 +676,7 @@ def delete_invoice_run(run_id: int) -> dict:
 
 
 def save_invoice_document(content: bytes, filename: str, document_type: str, relation_id=None, principal_id=None,
-                          project_id=None, run_id=None, input_id=None, output_id=None) -> int:
+                          project_id=None, run_id=None, input_id=None, output_id=None, agreement_id=None) -> int:
     if not content or not filename:
         raise ValueError("Kies een document om te uploaden.")
     suffix = Path(filename).suffix.lower()
@@ -583,13 +698,13 @@ def save_invoice_document(content: bytes, filename: str, document_type: str, rel
             cursor.execute(
                 """
                 INSERT INTO invoice_documents
-                    (relation_id, principal_id, project_id, run_id, input_id, output_id,
+                    (relation_id, principal_id, project_id, run_id, input_id, output_id, agreement_id,
                      document_type, filename, file_path, content_type)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id;
                 """,
                 (relation_id or None, principal_id or None, project_id or None, run_id or None, input_id or None,
-                 output_id or None, str(document_type or "overig"), Path(filename).name, str(path),
+                 output_id or None, agreement_id or None, str(document_type or "overig"), Path(filename).name, str(path),
                  guess_type(filename)[0] or "application/octet-stream"),
             )
             document_id = cursor.fetchone()[0]
@@ -1020,13 +1135,13 @@ def generate_invoice_run(run_id: int) -> dict:
                     cursor.execute(
                         """
                         INSERT INTO invoice_documents
-                            (relation_id, principal_id, project_id, run_id, input_id, output_id,
+                            (relation_id, principal_id, project_id, run_id, input_id, output_id, agreement_id,
                              document_type, filename, file_path, content_type)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'application/pdf')
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'application/pdf')
                         ON CONFLICT DO NOTHING;
                         """,
                         (item.get("relation_id"), item.get("principal_id"), item.get("project_id"), run_id,
-                         item["id"], output_id, "verkoopfactuur" if stream == "verkoop" else "olympusfactuur",
+                         item["id"], output_id, item.get("agreement_id"), "verkoopfactuur" if stream == "verkoop" else "olympusfactuur",
                          path.name, str(path)),
                     )
             cursor.execute("UPDATE invoice_runs SET status = 'concept', updated_at = NOW() WHERE id = %s;", (run_id,))
@@ -1047,6 +1162,7 @@ def get_invoicing_workspace(run_id: int | None = None) -> dict:
                     FROM invoice_runs r
                     LEFT JOIN invoice_inputs i ON i.run_id = r.id
                     LEFT JOIN invoice_outputs o ON o.run_id = r.id
+                    WHERE r.status <> 'archief'
                     GROUP BY r.id
                     ORDER BY r.year DESC, r.week_number DESC, r.id DESC
                     LIMIT 30;
@@ -1055,6 +1171,24 @@ def get_invoicing_workspace(run_id: int | None = None) -> dict:
                 runs = []
                 for row in cursor.fetchall():
                     runs.append({"id": row[0], "year": row[1], "week_number": row[2], "invoice_date": row[3], "invoice_date_text": _date_text(row[3]), "status": row[4], "input_count": row[5], "output_count": row[6], "created_at": row[7]})
+                cursor.execute(
+                    """
+                    SELECT r.id, r.year, r.week_number, r.invoice_date, COUNT(DISTINCT i.id), COUNT(DISTINCT o.id)
+                    FROM invoice_runs r
+                    LEFT JOIN invoice_inputs i ON i.run_id = r.id
+                    LEFT JOIN invoice_outputs o ON o.run_id = r.id
+                    WHERE r.status = 'archief'
+                    GROUP BY r.id
+                    ORDER BY r.year DESC, r.week_number DESC, r.id DESC
+                    LIMIT 100;
+                    """
+                )
+                archive_runs = [
+                    {"id": row[0], "year": row[1], "week_number": row[2], "invoice_date": row[3],
+                     "invoice_date_text": _date_text(row[3]), "input_count": row[4], "output_count": row[5]}
+                    for row in cursor.fetchall()
+                ]
+                agreements = list_invoice_agreements()
                 selected_id = run_id or (runs[0]["id"] if runs else None)
                 selected_run = next((item for item in runs if item["id"] == selected_id), None)
                 inputs = []
@@ -1081,7 +1215,8 @@ def get_invoicing_workspace(run_id: int | None = None) -> dict:
                 total_sales = sum((_money(item["sales_total_including_vat"]) for item in inputs), Decimal("0"))
                 total_olympus = sum((_money(item["olympus_total"]) for item in inputs), Decimal("0"))
                 total_hours = sum((_decimal(item["hours"]) for item in inputs), Decimal("0"))
-                return {"runs": runs, "selected_run": selected_run, "inputs": inputs, "outputs": outputs, "totals": {"sales": _money_text(total_sales), "olympus": _money_text(total_olympus), "hours": _number_text(total_hours), "blockers": sum(len(item["blockers"]) for item in inputs)}, "default_year": today.year, "default_week": today.isocalendar().week, "default_invoice_date": today.isoformat()}
+                return {"runs": runs, "archive_runs": archive_runs, "agreements": agreements, "selected_run": selected_run, "inputs": inputs, "outputs": outputs, "totals": {"sales": _money_text(total_sales), "olympus": _money_text(total_olympus), "hours": _number_text(total_hours), "blockers": sum(len(item["blockers"]) for item in inputs)}, "default_year": today.year, "default_week": today.isocalendar().week, "default_invoice_date": today.isoformat()}
     except Exception as exc:
         print(f"INVOICING_CONTEXT_ERROR {type(exc).__name__}: {exc}")
+        fallback.update({"archive_runs": [], "agreements": []})
         return fallback

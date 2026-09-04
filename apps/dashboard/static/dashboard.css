@@ -7856,7 +7856,9 @@ body[data-theme="light"] .invoicing-totals-bar div {
 .invoice-input-panel,
 .invoice-runs-panel,
 .invoice-run-detail,
-.invoice-output-panel {
+.invoice-output-panel,
+.invoice-agreement-panel,
+.invoice-archive-panel {
     padding: 18px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
@@ -7869,7 +7871,8 @@ body[data-theme="light"] .invoicing-totals-bar div {
 }
 
 .invoice-input-form,
-.invoice-edit-form {
+.invoice-edit-form,
+.invoice-agreement-form {
     display: grid;
     gap: 16px;
 }
@@ -8036,13 +8039,15 @@ body[data-theme="light"] .invoicing-totals-bar div {
 
 .invoice-run-list,
 .invoice-input-list,
-.invoice-output-list {
+.invoice-output-list,
+.invoice-agreement-list {
     display: grid;
     gap: 8px;
 }
 
 .invoice-run-card,
-.invoice-output-card {
+.invoice-output-card,
+.invoice-agreement-card {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -8061,26 +8066,64 @@ body[data-theme="light"] .invoicing-totals-bar div {
 }
 
 .invoice-run-card span:first-child,
-.invoice-output-card span:nth-child(2) {
+.invoice-output-card span:nth-child(2),
+.invoice-agreement-card > span {
     display: grid;
     gap: 3px;
 }
 
 .invoice-run-card strong,
-.invoice-output-card strong {
+.invoice-output-card strong,
+.invoice-agreement-card strong {
     color: #f5f7fa;
     font-size: 0.83rem;
 }
 
 .invoice-run-card small,
 .invoice-output-card small,
-.invoice-run-card__meta {
+.invoice-run-card__meta,
+.invoice-agreement-card small {
     color: #93a6ad;
     font-size: 0.71rem;
 }
 
 .invoice-run-card__meta {
     text-align: right;
+}
+
+.invoice-agreement-panel,
+.invoice-archive-panel {
+    display: grid;
+    gap: 16px;
+}
+
+.invoice-agreement-card {
+    justify-content: space-between;
+}
+
+.invoice-agreement-card > span:last-child {
+    align-items: flex-end;
+}
+
+.invoice-agreement-card em {
+    color: #ffc078;
+    font-size: 0.7rem;
+    font-style: normal;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.invoice-agreement-card--ready em {
+    color: #99f0bf;
+}
+
+.invoice-run-card--archived {
+    cursor: default;
+    border-color: rgba(147, 166, 173, 0.24);
+}
+
+.invoice-run-card--archived form {
+    margin: 0;
 }
 
 .invoice-summary-strip {
@@ -8240,7 +8283,9 @@ body[data-theme="light"] .invoicing-totals-bar div {
 body[data-theme="light"] .invoice-input-panel,
 body[data-theme="light"] .invoice-runs-panel,
 body[data-theme="light"] .invoice-run-detail,
-body[data-theme="light"] .invoice-output-panel {
+body[data-theme="light"] .invoice-output-panel,
+body[data-theme="light"] .invoice-agreement-panel,
+body[data-theme="light"] .invoice-archive-panel {
     border-color: rgba(28, 42, 50, 0.12);
     background: rgba(255, 255, 255, 0.82);
 }
@@ -8276,6 +8321,7 @@ body[data-theme="light"] .invoice-notes-field textarea {
 
 body[data-theme="light"] .invoice-run-card strong,
 body[data-theme="light"] .invoice-output-card strong,
+body[data-theme="light"] .invoice-agreement-card strong,
 body[data-theme="light"] .invoice-input-card summary b,
 body[data-theme="light"] .invoice-summary-strip strong {
     color: #172027;

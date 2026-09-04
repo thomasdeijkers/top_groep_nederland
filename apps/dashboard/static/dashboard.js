@@ -1889,10 +1889,29 @@
         });
     };
 
-    document.querySelectorAll(".invoice-input-form, .invoice-edit-form").forEach((form) => {
+    document.querySelectorAll(".invoice-input-form, .invoice-edit-form, .invoice-agreement-form").forEach((form) => {
         const regime = form.querySelector("[data-invoice-regime]");
         regime?.addEventListener("change", () => syncInvoiceRegime(form));
         syncInvoiceRegime(form);
+    });
+
+    document.querySelectorAll("[data-invoice-agreement-select]").forEach((select) => {
+        const form = select.closest("form");
+        const preview = form?.querySelector("[data-invoice-logo-preview]");
+        const image = preview?.querySelector("[data-invoice-logo-image]");
+        const label = preview?.querySelector("[data-invoice-logo-label]");
+        const refreshAgreement = () => {
+            const option = select.options[select.selectedIndex];
+            const regime = form?.querySelector("[data-invoice-regime]");
+            const rate = form?.querySelector('[name="hourly_rate"]');
+            if (image) image.src = option?.dataset.logoUrl || "/dashboard/static/olympusbouw.png";
+            if (label) label.textContent = option?.value ? option.textContent.trim() : "Nog geen overeenkomst gekozen";
+            if (regime && option?.dataset.regime) regime.value = option.dataset.regime;
+            if (rate && option?.dataset.hourlyRate) rate.value = option.dataset.hourlyRate;
+            if (form) syncInvoiceRegime(form);
+        };
+        select.addEventListener("change", refreshAgreement);
+        refreshAgreement();
     });
 
     document.querySelectorAll("[data-zzp-invoice]").forEach((calculator) => {
